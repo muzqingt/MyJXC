@@ -53,12 +53,7 @@
                 <div class="col-md-6">
                     <div class="mb-3">
                         <label class="form-label">客户 <span class="text-danger">*</span></label>
-                        <select name="customer_id" class="form-select" required>
-                            <option value="">请选择客户</option>
-                            {% for customer in customers %}
-                            <option value="{{ customer.id }}" {% if order and order.customer_id == customer.id %}selected{% endif %}>{{ customer.code }} - {{ customer.name }}</option>
-                            {% endfor %}
-                        </select>
+                        <div id="customer-search-container"></div>
                     </div>
                 </div>
                 <div class="col-md-6">
@@ -67,7 +62,7 @@
                         <select name="warehouse_id" class="form-select" required>
                             <option value="">请选择仓库</option>
                             {% for warehouse in warehouses %}
-                            <option value="{{ warehouse.id }}" {% if order and order.warehouse_id == warehouse.id %}selected{% endif %}>{{ warehouse.code }} - {{ warehouse.name }}</option>
+                            <option value="{{ warehouse.id }}" {% if order and order.warehouse_id == warehouse.id %}selected{% elif not order and loop.first %}selected{% endif %}>{{ warehouse.code }} - {{ warehouse.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -151,6 +146,9 @@
 <div id="products-data" style="display: none;">
     {{ products|tojson|safe if products else '[]' }}
 </div>
+<div id="customers-data" style="display: none;">
+    {{ customers|tojson|safe if customers else '[]' }}
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -166,8 +164,8 @@ $(document).ready(function() {
     // 表单提交前，删除空白行
     $('#items-form').on('submit', function(e) {
         $('#items-body tr').each(function() {
-            var productSelect = $(this).find('.product-select');
-            if (!productSelect.val()) {
+            var productIdInput = $(this).find('.product-id-input');
+            if (!productIdInput.val()) {
                 // 空白行：删除整行
                 $(this).remove();
             }
@@ -187,26 +185,52 @@ $(document).ready(function() {
         };
     });
 
+    // 客户数据
+    const customers = JSON.parse('{{ customers|tojson|safe }}').map(function(customer) {
+        return {
+            id: customer.id,
+            code: customer.code,
+            name: customer.name
+        };
+    });
+
+    // 初始化客户搜索
+    let customerSearcher = null;
+    const selectedCustomerId = '{{ order.customer_id if order else "" }}';
+    if (selectedCustomerId) {
+        const customer = customers.find(c => String(c.id) === String(selectedCustomerId));
+        if (customer) {
+            customerSearcher = initEntitySearch('#customer-search-container', customers, function(customer) {}, {
+                containerClass: 'customer-search',
+                fieldCode: 'code',
+                fieldName: 'name',
+                placeholder: '输入客户名称或编码搜索...',
+                selectedId: customer.id,
+                hiddenName: 'customer_id'
+            });
+        }
+    } else {
+        customerSearcher = initEntitySearch('#customer-search-container', customers, function(customer) {}, {
+            containerClass: 'customer-search',
+            fieldCode: 'code',
+            fieldName: 'name',
+            placeholder: '输入客户名称或编码搜索...',
+            selectedId: null,
+            hiddenName: 'customer_id'
+        });
+    }
+
     // 存储每个商品的原始价格
     let originalPrices = {};
 
     // 添加商品行
     function addItemRow(productId = '', quantity = '', unitPrice = '') {
         const rowId = itemCount++;
-        const productOptions = products.map(p => 
-            `<option value="${p.id}" ${productId == p.id ? 'selected' : ''}>
-                ${p.code} - ${p.name} (${p.specification || '无规格'}) - 库存: ${p.stock_quantity}${p.unit}
-            </option>`
-        ).join('');
-
         const row = `
-            <tr id="row-${rowId}">
+            <tr id="row-${rowId}" data-row-id="${rowId}">
                 <td>${rowId + 1}</td>
                 <td>
-                    <select name="product_id[]" class="form-select product-select" data-row="${rowId}">
-                        <option value="">请选择商品</option>
-                        ${productOptions}
-                    </select>
+                    <div class="product-search-wrapper" id="product-wrapper-${rowId}"></div>
                 </td>
                 <td>
                     <div class="input-group">
@@ -231,46 +255,91 @@ $(document).ready(function() {
         `;
         
         $('#items-body').append(row);
+        
+        // 初始化商品搜索组件
+        const searcher = new ProductSearcher({
+            products: products,
+            onSelect: function(product) {
+                handleProductSelect(rowId, product);
+            },
+            containerClass: `product-search-${rowId}`,
+            rowId: rowId,
+            selectedProductId: productId || null
+        });
+        
+        $('#product-wrapper-' + rowId).append(searcher.getContainer());
+        
+        // 存储searcher实例
+        window[`searcher_${rowId}`] = searcher;
+        
+        // 如果有初始值，设置搜索框显示
+        if (productId) {
+            const product = products.find(p => String(p.id) === String(productId));
+            if (product) {
+                searcher.input.val(`${product.code} - ${product.name}`);
+            }
+        }
+        
         updateRow(rowId);
         updateTotal();
     }
 
+    // 处理商品选择
+    function handleProductSelect(rowId, product) {
+        const unitPriceInput = $(`#row-${rowId} .unit-price`);
+        
+        // 如果用户修改了价格，同步到数据库
+        const newUnitPrice = parseFloat(unitPriceInput.val()) || 0;
+        if (newUnitPrice > 0 && newUnitPrice !== product.sale_price) {
+            $.ajax({
+                url: '/product/api/product/price',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    product_id: product.id,
+                    price_type: 'sale_price',
+                    price: newUnitPrice
+                }),
+                success: function(response) {
+                    if (response.success) {
+                        const p = products.find(prod => prod.id == product.id);
+                        if (p) p.sale_price = newUnitPrice;
+                    }
+                }
+            });
+        }
+        
+        updateRow(rowId, product);
+        updateTotal();
+        
+        // 自动添加新行
+        var hasEmptyRow = false;
+        $('#items-body tr').each(function() {
+            var productIdInput = $(this).find('.product-id-input');
+            if (!productIdInput.val() && $(this).data('row-id') != rowId) {
+                hasEmptyRow = true;
+            }
+        });
+        if (!hasEmptyRow && rowId === itemCount - 1) {
+            addItemRow();
+        }
+    }
+
     // 更新单行计算
-    function updateRow(rowId, oldUnitPrice) {
-        const productSelect = $(`#row-${rowId} .product-select`);
+    function updateRow(rowId, selectedProduct) {
+        const productSelect = $(`#row-${rowId} .product-id-input`);
         const quantityInput = $(`#row-${rowId} .quantity`);
         const unitPriceInput = $(`#row-${rowId} .unit-price`);
         const unitDisplay = $(`#unit-${rowId}`);
         const amountDisplay = $(`#amount-${rowId}`);
 
         const productId = productSelect.val();
-        const product = products.find(p => p.id == productId);
+        const product = selectedProduct || products.find(p => String(p.id) === String(productId));
         
         if (product) {
             unitDisplay.text(product.unit);
             if (!unitPriceInput.val() && product.sale_price > 0) {
                 unitPriceInput.val(product.sale_price);
-            }
-            // 如果用户修改了价格，同步到数据库
-            const newUnitPrice = parseFloat(unitPriceInput.val()) || 0;
-            if (oldUnitPrice !== undefined && newUnitPrice !== oldUnitPrice && newUnitPrice > 0) {
-                $.ajax({
-                    url: '/product/api/product/price',
-                    type: 'POST',
-                    contentType: 'application/json',
-                    data: JSON.stringify({
-                        product_id: productId,
-                        price_type: 'sale_price',
-                        price: newUnitPrice
-                    }),
-                    success: function(response) {
-                        if (response.success) {
-                            // 更新本地products数据
-                            const p = products.find(prod => prod.id == productId);
-                            if (p) p.sale_price = newUnitPrice;
-                        }
-                    }
-                });
             }
         }
 
@@ -295,25 +364,16 @@ $(document).ready(function() {
         addItemRow();
     });
 
-    $(document).on('change', '.product-select, .quantity, .unit-price', function() {
+    $(document).on('change', '.quantity, .unit-price', function() {
         const rowId = $(this).data('row');
-        const productSelect = $(`#row-${rowId} .product-select`);
-        const productId = productSelect.val();
+        const productId = $(`#row-${rowId} .product-id-input`).val();
         const unitPriceInput = $(`#row-${rowId} .unit-price`);
-        
-        // 如果是选择商品，保存原始价格到 data 属性
-        if ($(this).hasClass('product-select') && productId) {
-            const product = products.find(p => String(p.id) === String(productId));
-            if (product) {
-                // 将原价存储在 input 的 data 属性中
-                unitPriceInput.data('original-price', product.sale_price);
-            }
-        }
         
         // 如果是修改价格，与原始价格比较
         if ($(this).hasClass('unit-price') && productId) {
             const currentPrice = parseFloat(unitPriceInput.val()) || 0;
-            const originalPrice = unitPriceInput.data('original-price') || 0;
+            const product = products.find(p => String(p.id) === String(productId));
+            const originalPrice = product ? product.sale_price : 0;
             
             // 只有当价格确实改变时才同步
             if (currentPrice > 0 && currentPrice !== originalPrice) {
@@ -328,8 +388,6 @@ $(document).ready(function() {
                     }),
                     success: function(response) {
                         if (response.success) {
-                            // 更新本地数据和 data 属性
-                            unitPriceInput.data('original-price', currentPrice);
                             const p = products.find(prod => String(prod.id) === String(productId));
                             if (p) p.sale_price = currentPrice;
                             console.log('价格已同步到数据库');
@@ -344,20 +402,6 @@ $(document).ready(function() {
         
         updateRow(rowId);
         updateTotal();
-        
-        // 如果是选择商品且选择了有效商品，自动添加新行
-        if ($(this).hasClass('product-select') && $(this).val()) {
-            var hasEmptyRow = false;
-            $('#items-body tr').each(function() {
-                var productSelect = $(this).find('.product-select');
-                if (!productSelect.val() && productSelect.attr('data-row') != rowId) {
-                    hasEmptyRow = true;
-                }
-            });
-            if (!hasEmptyRow && rowId === itemCount - 1) {
-                addItemRow();
-            }
-        }
     });
 
     $(document).on('click', '.remove-item', function() {

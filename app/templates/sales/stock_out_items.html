@@ -123,20 +123,11 @@ $(document).ready(function() {
     // 添加商品行
     function addItemRow(productId = '', quantity = '', unitPrice = '') {
         const rowId = itemCount++;
-        const productOptions = products.map(p => 
-            `<option value="${p.id}" ${productId == p.id ? 'selected' : ''}>
-                ${p.code} - ${p.name} (${p.specification || '无规格'}) - 库存: ${p.stock_quantity}${p.unit}
-            </option>`
-        ).join('');
-
         const row = `
-            <tr id="row-${rowId}">
+            <tr id="row-${rowId}" data-row-id="${rowId}">
                 <td>${rowId + 1}</td>
                 <td>
-                    <select name="product_id[]" class="form-select product-select" data-row="${rowId}" required>
-                        <option value="">请选择商品</option>
-                        ${productOptions}
-                    </select>
+                    <div class="product-search-wrapper" id="product-wrapper-${rowId}"></div>
                 </td>
                 <td class="text-end">
                     <span class="before-stock" id="before-${rowId}">0</span>
@@ -167,13 +158,44 @@ $(document).ready(function() {
         `;
         
         $('#items-body').append(row);
+        
+        // 初始化商品搜索组件
+        const searcher = new ProductSearcher({
+            products: products,
+            onSelect: function(product) {
+                handleProductSelect(rowId, product);
+            },
+            containerClass: `product-search-${rowId}`,
+            rowId: rowId,
+            selectedProductId: productId || null
+        });
+        
+        $('#product-wrapper-' + rowId).append(searcher.getContainer());
+        
+        // 存储searcher实例
+        window[`searcher_${rowId}`] = searcher;
+        
+        // 如果有初始值，设置搜索框显示
+        if (productId) {
+            const product = products.find(p => String(p.id) === String(productId));
+            if (product) {
+                searcher.input.val(`${product.code} - ${product.name}`);
+            }
+        }
+        
         updateRow(rowId);
         updateTotal();
     }
 
+    // 处理商品选择
+    function handleProductSelect(rowId, product) {
+        updateRow(rowId, product);
+        updateTotal();
+    }
+
     // 更新单行计算
-    function updateRow(rowId) {
-        const productSelect = $(`#row-${rowId} .product-select`);
+    function updateRow(rowId, selectedProduct) {
+        const productSelect = $(`#row-${rowId} .product-id-input`);
         const quantityInput = $(`#row-${rowId} .quantity`);
         const unitPriceInput = $(`#row-${rowId} .unit-price`);
         const unitDisplay = $(`#unit-${rowId}`);
@@ -182,7 +204,7 @@ $(document).ready(function() {
         const amountDisplay = $(`#amount-${rowId}`);
 
         const productId = productSelect.val();
-        const product = products.find(p => p.id == productId);
+        const product = selectedProduct || products.find(p => String(p.id) === String(productId));
         
         if (product) {
             unitDisplay.text(product.unit);
@@ -218,7 +240,7 @@ $(document).ready(function() {
         addItemRow();
     });
 
-    $(document).on('change', '.product-select, .quantity, .unit-price', function() {
+    $(document).on('change', '.quantity, .unit-price', function() {
         const rowId = $(this).data('row');
         updateRow(rowId);
         updateTotal();

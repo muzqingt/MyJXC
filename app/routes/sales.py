@@ -85,6 +85,11 @@ def index():
 @login_required
 def new_order():
     customers = Customer.query.all()
+    customers_data = [{
+        'id': c.id,
+        'code': c.code,
+        'name': c.name
+    } for c in customers]
     warehouses = Warehouse.query.all()
     products = Product.query.all()
     products_data = [{
@@ -96,10 +101,10 @@ def new_order():
         'sale_price': float(p.sale_price) if p.sale_price else 0,
         'stock_quantity': float(p.stock_quantity) if p.stock_quantity else 0
     } for p in products]
-
+    
     if request.method == 'POST':
         order_status = request.form.get('order_status', 'saved')
-
+        
         # 获取表单数据
         customer_id = request.form.get('customer_id', type=int)
         warehouse_id = request.form.get('warehouse_id', type=int)
@@ -109,12 +114,12 @@ def new_order():
         product_ids = request.form.getlist('product_id[]')
         quantities = request.form.getlist('quantity[]')
         unit_prices = request.form.getlist('unit_price[]')
-
+        
         if not customer_id or not warehouse_id or not order_date:
             flash('请填写必填字段！', 'danger')
             return render_template('sales/order_items.html',
                                  title='新建销售订单',
-                                 customers=customers,
+                                 customers=customers_data,
                                  warehouses=warehouses,
                                  products=products_data,
                                  action='new')
@@ -183,7 +188,7 @@ def new_order():
                 flash(f'库存不足: {", ".join(insufficient_stock)}', 'danger')
                 return render_template('sales/order_items.html',
                                      title='新建销售订单',
-                                     customers=customers,
+                                     customers=customers_data,
                                      warehouses=warehouses,
                                      products=products_data,
                                      action='new')
@@ -268,7 +273,7 @@ def new_order():
 
     return render_template('sales/order_items.html',
                          title='新建销售订单',
-                         customers=customers,
+                         customers=customers_data,
                          warehouses=warehouses,
                          products=products_data,
                          action='new')
@@ -284,6 +289,11 @@ def edit_order(id):
         return redirect(url_for('sales.index', tab=get_redirect_tab()))
     
     customers = Customer.query.all()
+    customers_data = [{
+        'id': c.id,
+        'code': c.code,
+        'name': c.name
+    } for c in customers]
     warehouses = Warehouse.query.all()
     products = Product.query.all()
     products_data = [{
@@ -323,7 +333,7 @@ def edit_order(id):
             return render_template('sales/order_items.html',
                                  title='编辑销售订单',
                                  order=order,
-                                 customers=customers,
+                                 customers=customers_data,
                                  warehouses=warehouses,
                                  products=products_data,
                                  order_items=order_items_data,
@@ -366,7 +376,7 @@ def edit_order(id):
     return render_template('sales/order_items.html',
                          title='编辑销售订单',
                          order=order,
-                         customers=customers,
+                         customers=customers_data,
                          warehouses=warehouses,
                          products=products_data,
                          order_items=order_items_data,

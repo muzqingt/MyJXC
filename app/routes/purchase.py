@@ -84,6 +84,11 @@ def index():
 @login_required
 def new_order():
     suppliers = Supplier.query.all()
+    suppliers_data = [{
+        'id': s.id,
+        'code': s.code,
+        'name': s.name
+    } for s in suppliers]
     warehouses = Warehouse.query.all()
     products = Product.query.all()
     products_data = [{
@@ -114,7 +119,7 @@ def new_order():
             flash('请填写必填字段！', 'danger')
             return render_template('purchase/order_items.html',
                                  title='新建采购订单',
-                                 suppliers=suppliers,
+                                 suppliers=suppliers_data,
                                  warehouses=warehouses,
                                  products=products_data,
                                  action='new')
@@ -251,7 +256,7 @@ def new_order():
     
     return render_template('purchase/order_items.html', 
                          title='新建采购订单',
-                         suppliers=suppliers,
+                         suppliers=suppliers_data,
                          warehouses=warehouses,
                          products=products_data,
                          action='new')
@@ -266,6 +271,11 @@ def edit_order(id):
         return redirect(url_for('purchase.index', tab=get_redirect_tab()))
     
     suppliers = Supplier.query.all()
+    suppliers_data = [{
+        'id': s.id,
+        'code': s.code,
+        'name': s.name
+    } for s in suppliers]
     warehouses = Warehouse.query.all()
     products = Product.query.all()
     products_data = [{
@@ -305,7 +315,7 @@ def edit_order(id):
             return render_template('purchase/order_items.html',
                                  title='编辑采购订单',
                                  order=order,
-                                 suppliers=suppliers,
+                                 suppliers=suppliers_data,
                                  warehouses=warehouses,
                                  products=products_data,
                                  order_items=order_items_data,
@@ -348,7 +358,7 @@ def edit_order(id):
                 return render_template('purchase/order_items.html',
                                      title='编辑采购订单',
                                      order=order,
-                                     suppliers=suppliers,
+                                     suppliers=suppliers_data,
                                      warehouses=warehouses,
                                      products=products_data,
                                      order_items=order_items_data,
@@ -366,7 +376,7 @@ def edit_order(id):
     return render_template('purchase/order_items.html', 
                          title='编辑采购订单',
                          order=order,
-                         suppliers=suppliers,
+                         suppliers=suppliers_data,
                          warehouses=warehouses,
                          products=products_data,
                          order_items=order_items_data,
