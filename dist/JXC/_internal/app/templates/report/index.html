@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-4 text-gray-800">{{ title }}</h1>
+    
+    <!-- 功能导航 -->
+    <div class="row">
+        <div class="col-lg-3 col-md-6 mb-4">
+            <a href="{{ url_for('report.inventory_report') }}" class="card text-decoration-none">
+                <div class="card-body text-center">
+                    <i class="fas fa-chart-bar fa-3x text-primary mb-3"></i>
+                    <h5 class="card-title">进销存报表</h5>
+                    <p class="card-text text-muted">商品进销存统计分析</p>
+                </div>
+            </a>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-4">
+            <a href="{{ url_for('report.sales_ranking') }}" class="card text-decoration-none">
+                <div class="card-body text-center">
+                    <i class="fas fa-trophy fa-3x text-warning mb-3"></i>
+                    <h5 class="card-title">销售排行榜</h5>
+                    <p class="card-text text-muted">商品销售排名统计</p>
+                </div>
+            </a>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-4">
+            <a href="{{ url_for('report.customer_statistics') }}" class="card text-decoration-none">
+                <div class="card-body text-center">
+                    <i class="fas fa-users fa-3x text-success mb-3"></i>
+                    <h5 class="card-title">客户统计</h5>
+                    <p class="card-text text-muted">客户消费行为分析</p>
+                </div>
+            </a>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-4">
+            <a href="{{ url_for('report.supplier_statistics') }}" class="card text-decoration-none">
+                <div class="card-body text-center">
+                    <i class="fas fa-truck fa-3x text-info mb-3"></i>
+                    <h5 class="card-title">供应商统计</h5>
+                    <p class="card-text text-muted">供应商采购情况分析</p>
+                </div>
+            </a>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-4">
+            <a href="{{ url_for('report.daily_report') }}" class="card text-decoration-none">
+                <div class="card-body text-center">
+                    <i class="fas fa-calendar-day fa-3x text-danger mb-3"></i>
+                    <h5 class="card-title">经营日报</h5>
+                    <p class="card-text text-muted">每日经营情况汇总</p>
+                </div>
+            </a>
+        </div>
+    </div>
+    
+    <!-- 销售趋势图表 -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">销售趋势分析</h6>
+        </div>
+        <div class="card-body">
+            <div style="height: 300px; position: relative;">
+                <canvas id="salesTrendChart"></canvas>
+            </div>
+            <div id="chartLoading" class="text-center text-muted py-3">
+                <i class="fas fa-spinner fa-spin"></i> 加载中...
+            </div>
+        </div>
+    </div>
+    
+    <!-- 报表使用说明 -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-info">报表使用说明</h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="font-weight-bold text-primary">进销存报表</h6>
+                    <p class="text-muted">提供商品在指定时间段内的采购、销售和库存情况统计，帮助您了解商品的流转情况。</p>
+                    <ul class="text-muted">
+                        <li>支持按时间段筛选</li>
+                        <li>显示期初库存、采购量、销售量、期末库存</li>
+                        <li>可导出为Excel格式</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="font-weight-bold text-warning">销售排行榜</h6>
+                    <p class="text-muted">按销售额或销售数量对商品进行排名，帮助您识别畅销商品和滞销商品。</p>
+                    <ul class="text-muted">
+                        <li>支持按时间段筛选</li>
+                        <li>可按销售额或销售数量排序</li>
+                        <li>显示前20名商品</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <h6 class="font-weight-bold text-success">客户统计</h6>
+                    <p class="text-muted">分析客户的购买行为和消费能力，帮助您识别重要客户和潜在客户。</p>
+                    <ul class="text-muted">
+                        <li>显示客户购买次数和总金额</li>
+                        <li>计算客户平均消费金额</li>
+                        <li>按消费金额排序</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="font-weight-bold text-info">供应商统计</h6>
+                    <p class="text-muted">分析供应商的供货情况和采购金额，帮助您管理供应商关系。</p>
+                    <ul class="text-muted">
+                        <li>显示供应商供货次数和总金额</li>
+                        <li>计算平均采购金额</li>
+                        <li>按采购金额排序</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+$(document).ready(function() {
+    // 加载销售趋势数据
+    function loadSalesTrend() {
+        $('#chartLoading').show();
+        $.ajax({
+            url: "{{ url_for('report.sales_trend_api') }}",
+            type: 'GET',
+            success: function(data) {
+                drawSalesTrendChart(data);
+                $('#chartLoading').hide();
+            },
+            error: function(xhr, status, error) {
+                console.log('获取销售趋势数据失败: ' + error);
+                $('#chartLoading').html('<span class="text-danger">加载失败，请刷新页面重试</span>');
+            }
+        });
+    }
+    
+    // 绘制销售趋势图表
+    function drawSalesTrendChart(data) {
+        var ctx = document.getElementById('salesTrendChart').getContext('2d');
+        
+        var months = data.map(function(item) { return item.month; });
+        var amounts = data.map(function(item) { return item.amount; });
+        
+        if (amounts.length === 0 || amounts.every(function(a) { return a === 0; })) {
+            $('#chartLoading').html('<span class="text-muted">暂无销售数据</span>');
+            return;
+        }
+        
+        var chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: months,
+                datasets: [{
+                    label: '销售额',
+                    data: amounts,
+                    backgroundColor: 'rgba(78, 115, 223, 0.1)',
+                    borderColor: 'rgba(78, 115, 223, 1)',
+                    pointRadius: 4,
+                    pointBackgroundColor: 'rgba(78, 115, 223, 1)',
+                    pointBorderColor: '#fff',
+                    pointHoverRadius: 6,
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: "rgba(255,255,255,0.95)",
+                        titleColor: '#333',
+                        bodyColor: '#666',
+                        borderColor: '#ddd',
+                        borderWidth: 1,
+                        padding: 12,
+                        callbacks: {
+                            label: function(context) {
+                                return '销售额: ¥' + context.parsed.y.toLocaleString();
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '¥' + value.toLocaleString();
+                            }
+                        },
+                        grid: {
+                            color: "rgba(0,0,0,0.05)"
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // 初始加载
+    loadSalesTrend();
+});
+</script>
+{% endblock %}

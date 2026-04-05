@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}销售订单 - {{ super() }}{% endblock %}
+
+{% block header %}销售订单管理{% endblock %}
+
+{% block actions %}
+<div class="btn-group">
+    <a href="{{ url_for('sales.new_order') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> 新建销售订单
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        <!-- 搜索表单 -->
+        <form method="get" class="row g-3 mb-4">
+            <div class="col-md-3">
+                <label for="status" class="form-label">订单状态</label>
+                <select name="status" id="status" class="form-select">
+                    <option value="">全部状态</option>
+                    <option value="draft" {% if status == 'draft' %}selected{% endif %}>草稿</option>
+                    <option value="confirmed" {% if status == 'confirmed' %}selected{% endif %}>已确认</option>
+                    <option value="partial" {% if status == 'partial' %}selected{% endif %}>部分出库</option>
+                    <option value="completed" {% if status == 'completed' %}selected{% endif %}>已完成</option>
+                    <option value="cancelled" {% if status == 'cancelled' %}selected{% endif %}>已取消</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="customer_id" class="form-label">客户</label>
+                <select name="customer_id" id="customer_id" class="form-select">
+                    <option value="">全部客户</option>
+                    {% for customer in customers %}
+                    <option value="{{ customer.id }}" {% if customer_id == customer.id %}selected{% endif %}>
+                        {{ customer.code }} - {{ customer.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="start_date" class="form-label">开始日期</label>
+                <input type="date" name="start_date" id="start_date" class="form-control" value="{{ start_date or '' }}">
+            </div>
+            <div class="col-md-2">
+                <label for="end_date" class="form-label">结束日期</label>
+                <input type="date" name="end_date" id="end_date" class="form-control" value="{{ end_date or '' }}">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search"></i> 搜索
+                </button>
+            </div>
+        </form>
+
+        <!-- 订单列表 -->
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>订单号</th>
+                        <th>客户</th>
+                        <th>仓库</th>
+                        <th>订单日期</th>
+                        <th>预计发货</th>
+                        <th>总金额</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders.items %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('sales.view_order', id=order.id) }}" class="text-decoration-none">
+                                {{ order.order_number }}
+                            </a>
+                        </td>
+                        <td>{{ order.customer.code }} - {{ order.customer.name }}</td>
+                        <td>{{ order.warehouse.code }} - {{ order.warehouse.name }}</td>
+                        <td>{{ order.order_date.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ order.delivery_date.strftime('%Y-%m-%d') if order.delivery_date else '-' }}</td>
+                        <td class="text-end">¥{{ "%.2f"|format(order.total_amount) }}</td>
+                        <td>
+                            {% if order.status == 'draft' %}
+                            <span class="badge bg-secondary">草稿</span>
+                            {% elif order.status == 'confirmed' %}
+                            <span class="badge bg-primary">已确认</span>
+                            {% elif order.status == 'partial' %}
+                            <span class="badge bg-warning">部分出库</span>
+                            {% elif order.status == 'completed' %}
+                            <span class="badge bg-success">已完成</span>
+                            {% elif order.status == 'cancelled' %}
+                            <span class="badge bg-danger">已取消</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('sales.view_order', id=order.id) }}" class="btn btn-outline-info" title="查看">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% if order.status == 'draft' %}
+                                <a href="{{ url_for('sales.edit_order', id=order.id) }}" class="btn btn-outline-primary" title="编辑">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{{ url_for('sales.edit_order_items', id=order.id) }}" class="btn btn-outline-success" title="编辑明细">
+                                    <i class="bi bi-list-check"></i>
+                                </a>
+                                <form method="post" action="{{ url_for('sales.confirm_order', id=order.id) }}" class="d-inline">
+                                    <button type="submit" class="btn btn-outline-warning" title="确认订单" onclick="return confirm('确认此销售订单？')">
+                                        <i class="bi bi-check-circle"></i>
+                                    </button>
+                                </form>
+                                <form method="post" action="{{ url_for('sales.delete_order', id=order.id) }}" class="d-inline">
+                                    <button type="submit" class="btn btn-outline-danger" title="删除" onclick="return confirm('确定删除此销售订单？')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                                {% elif order.status == 'confirmed' %}
+                                <form method="post" action="{{ url_for('sales.cancel_order', id=order.id) }}" class="d-inline">
+                                    <button type="submit" class="btn btn-outline-danger" title="取消订单" onclick="return confirm('确定取消此销售订单？')">
+                                        <i class="bi bi-x-circle"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">
+                            <i class="bi bi-inbox display-6"></i>
+                            <p class="mt-2">暂无销售订单</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 分页 -->
+        {% if orders.pages > 1 %}
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center">
+                {% if orders.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('sales.orders', page=orders.prev_num, status=status, customer_id=customer_id, start_date=start_date, end_date=end_date) }}">
+                        上一页
+                    </a>
+                </li>
+                {% endif %}
+                
+                {% for page_num in orders.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2) %}
+                    {% if page_num %}
+                        {% if page_num == orders.page %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ page_num }}</span>
+                        </li>
+                        {% else %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('sales.orders', page=page_num, status=status, customer_id=customer_id, start_date=start_date, end_date=end_date) }}">
+                                {{ page_num }}
+                            </a>
+                        </li>
+                        {% endif %}
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if orders.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('sales.orders', page=orders.next_num, status=status, customer_id=customer_id, start_date=start_date, end_date=end_date) }}">
+                        下一页
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

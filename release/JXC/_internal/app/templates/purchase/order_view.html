@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}采购订单详情 - {{ super() }}{% endblock %}
+
+{% block extra_js %}
+<script>
+function confirmQuickStockIn(btn) {
+    const msg = btn.getAttribute('data-items');
+    if (!msg) {
+        alert("此订单所有商品都已入库！");
+        return false;
+    }
+    return confirm("确认快捷入库？将入库以下商品：\n\n" + msg);
+}
+</script>
+{% endblock %}
+
+{% block header %}采购订单详情{% endblock %}
+
+{% block actions %}
+<div class="btn-group">
+    <a href="{{ url_for('purchase.index') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> 返回列表
+    </a>
+    {% if order.status == 'draft' %}
+    <a href="{{ url_for('purchase.edit_order', id=order.id) }}" class="btn btn-primary">
+        <i class="bi bi-pencil"></i> 编辑订单
+    </a>
+    <a href="{{ url_for('purchase.edit_order_items', id=order.id) }}" class="btn btn-success">
+        <i class="bi bi-list-check"></i> 编辑明细
+    </a>
+    <form method="post" action="{{ url_for('purchase.confirm_order', id=order.id) }}" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-warning" onclick="return confirm('确认此采购订单？')">
+            <i class="bi bi-check-circle"></i> 确认订单
+        </button>
+    </form>
+    <form method="post" action="{{ url_for('purchase.delete_order', id=order.id) }}" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-danger" onclick="return confirm('确定删除此采购订单？')">
+            <i class="bi bi-trash"></i> 删除订单
+        </button>
+    </form>
+    {% elif order.status in ['confirmed', 'partial'] %}
+    <form method="post" action="{{ url_for('purchase.quick_stock_in', id=order.id) }}" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-success" data-items="{% for item in order_items_data %}{{ item.name }} x {{ item.remaining }} {{ item.unit }}{% if not loop.last %}\n{% endif %}{% endfor %}" onclick="return confirmQuickStockIn(this);">
+            <i class="bi bi-box-arrow-in-down"></i> 快速入库
+        </button>
+    </form>
+    <form method="post" action="{{ url_for('purchase.cancel_order', id=order.id) }}" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-danger" onclick="return confirm('确定取消此采购订单？')">
+            <i class="bi bi-x-circle"></i> 取消订单
+        </button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">订单信息</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-sm">
+                            <tr>
+                                <th width="120">订单号：</th>
+                                <td>{{ order.order_number }}</td>
+                            </tr>
+                            <tr>
+                                <th>供应商：</th>
+                                <td>{{ order.supplier.code }} - {{ order.supplier.name }}</td>
+                            </tr>
+                            <tr>
+                                <th>联系人：</th>
+                                <td>{{ order.supplier.contact_person or '-' }}</td>
+                            </tr>
+                            <tr>
+                                <th>电话：</th>
+                                <td>{{ order.supplier.phone or '-' }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-sm">
+                            <tr>
+                                <th width="120">仓库：</th>
+                                <td>{{ order.warehouse.code }} - {{ order.warehouse.name }}</td>
+                            </tr>
+                            <tr>
+                                <th>订单日期：</th>
+                                <td>{{ order.order_date.strftime('%Y-%m-%d') }}</td>
+                            </tr>
+                            <tr>
+                                <th>预计到货：</th>
+                                <td>{{ order.expected_date.strftime('%Y-%m-%d') if order.expected_date else '-' }}</td>
+                            </tr>
+                            <tr>
+                                <th>订单状态：</th>
+                                <td>
+                                    {% if order.status == 'draft' %}
+                                    <span class="badge bg-secondary">草稿</span>
+                                    {% elif order.status == 'confirmed' %}
+                                    <span class="badge bg-primary">已确认</span>
+                                    {% elif order.status == 'partial' %}
+                                    <span class="badge bg-warning">部分入库</span>
+                                    {% elif order.status == 'completed' %}
+                                    <span class="badge bg-success">已完成</span>
+                                    {% elif order.status == 'cancelled' %}
+                                    <span class="badge bg-danger">已取消</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                
+                {% if order.notes %}
+                <div class="mt-3">
+                    <h6>备注：</h6>
+                    <p class="text-muted">{{ order.notes }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">商品明细</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>商品编码</th>
+                                <th>商品名称</th>
+                                <th>规格</th>
+                                <th>单位</th>
+                                <th class="text-end">数量</th>
+                                <th class="text-end">单价</th>
+                                <th class="text-end">金额</th>
+                                <th class="text-end">已入库</th>
+                                <th>库存状态</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in order.items %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td>{{ item.product.code }}</td>
+                                <td>{{ item.product.name }}</td>
+                                <td>{{ item.product.specification or '-' }}</td>
+                                <td>{{ item.product.unit }}</td>
+                                <td class="text-end">{{ "%.2f"|format(item.quantity) }}</td>
+                                <td class="text-end">¥{{ "%.2f"|format(item.unit_price) }}</td>
+                                <td class="text-end">¥{{ "%.2f"|format(item.amount) }}</td>
+                                <td class="text-end">{{ "%.2f"|format(item.received_quantity) }}</td>
+                                <td>
+                                    {% if item.product.stock_quantity >= item.quantity %}
+                                    <span class="badge bg-success">库存充足</span>
+                                    {% elif item.product.stock_quantity > 0 %}
+                                    <span class="badge bg-warning">库存不足</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">无库存</span>
+                                    {% endif %}
+                                    ({{ item.product.stock_quantity }})
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="10" class="text-center text-muted py-4">
+                                    暂无商品明细
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="7" class="text-end fw-bold">总计：</td>
+                                <td class="text-end fw-bold">¥{{ "%.2f"|format(order.total_amount) }}</td>
+                                <td colspan="2"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">操作记录</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>创建时间</span>
+                        <span class="text-muted">{{ order.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>创建人</span>
+                        <span class="text-muted">{{ order.creator.username if order.creator else '系统' }}</span>
+                    </li>
+                    {% if order.status != 'draft' %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>确认时间</span>
+                        <span class="text-muted">{{ order.updated_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">入库记录</h5>
+            </div>
+            <div class="card-body">
+                {% if order.stock_ins %}
+                <div class="list-group">
+                    {% for stock_in in order.stock_ins %}
+                    <a href="{{ url_for('purchase.view_stock_in', id=stock_in.id) }}" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ stock_in.receipt_number }}</h6>
+                            <small>{{ stock_in.receipt_date.strftime('%Y-%m-%d') }}</small>
+                        </div>
+                        <p class="mb-1">金额: ¥{{ "%.2f"|format(stock_in.total_amount) }}</p>
+                        <small>经办人: {{ stock_in.handler or '-' }}</small>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center mb-0">暂无入库记录</p>
+                {% endif %}
+                
+                {% if order.status in ['confirmed', 'partial'] %}
+                <div class="mt-3">
+                    <a href="{{ url_for('purchase.new_stock_in_from_order', id=order.id) }}" class="btn btn-primary w-100">
+                        <i class="bi bi-box-arrow-down"></i> 创建入库单
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

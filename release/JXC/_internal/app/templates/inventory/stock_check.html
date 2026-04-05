@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-0 text-gray-800">{{ title }}</h1>
+        </div>
+        <div class="col-auto">
+            <button class="btn btn-primary" onclick="startStockCheck()">
+                <i class="fas fa-clipboard-check"></i> 开始盘点
+            </button>
+            <button class="btn btn-success" onclick="saveStockCheck()" style="display: none;" id="saveBtn">
+                <i class="fas fa-save"></i> 保存盘点结果
+            </button>
+        </div>
+    </div>
+
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">商品库存列表</h6>
+            <div class="form-inline">
+                <input type="text" class="form-control form-control-sm mr-2" id="searchProduct" placeholder="搜索商品..." onkeyup="searchProducts()">
+                <select class="form-control form-control-sm" id="filterWarehouse" onchange="filterByWarehouse()">
+                    <option value="">所有仓库</option>
+                    <!-- 仓库选项将通过JavaScript动态加载 -->
+                </select>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="stockCheckTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>商品编码</th>
+                            <th>商品名称</th>
+                            <th>规格</th>
+                            <th>单位</th>
+                            <th>仓库</th>
+                            <th>系统库存</th>
+                            <th>实际库存</th>
+                            <th>差异数量</th>
+                            <th>差异金额</th>
+                            <th>备注</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stockCheckBody">
+                        {% for product in products %}
+                        <tr data-product-id="{{ product.id }}" data-warehouse-id="{{ product.warehouse_id or '' }}">
+                            <td>{{ product.code }}</td>
+                            <td>{{ product.name }}</td>
+                            <td>{{ product.specification or '' }}</td>
+                            <td>{{ product.unit }}</td>
+                            <td>
+                                {% if product.warehouse %}
+                                {{ product.warehouse.name }}
+                                {% else %}
+                                未指定
+                                {% endif %}
+                            </td>
+                            <td class="system-stock">{{ product.stock_quantity|float }}</td>
+                            <td>
+                                <input type="number" class="form-control form-control-sm actual-stock" 
+                                       value="{{ product.stock_quantity|float }}" 
+                                       step="0.01" min="0" 
+                                       onchange="calculateDifference(this)">
+                            </td>
+                            <td class="difference-qty">0.00</td>
+                            <td class="difference-amount">0.00</td>
+                            <td>
+                                <input type="text" class="form-control form-control-sm remark" placeholder="备注">
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="table-info">
+                            <td colspan="5" class="text-right"><strong>总计：</strong></td>
+                            <td id="totalSystemStock">0.00</td>
+                            <td id="totalActualStock">0.00</td>
+                            <td id="totalDifferenceQty">0.00</td>
+                            <td id="totalDifferenceAmount">0.00</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 盘点统计卡片 -->
+    <div class="row">
+        <div class="col-lg-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                盘点商品总数
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalProducts">0</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-boxes fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                无差异商品
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="noDifferenceProducts">0</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                有差异商品
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="differenceProducts">0</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // 初始化统计
+    updateStatistics();
+    calculateTotals();
+    
+    // 加载仓库选项
+    loadWarehouses();
+});
+
+function loadWarehouses() {
+    $.ajax({
+        url: '/api/warehouses',
+        method: 'GET',
+        success: function(warehouses) {
+            var select = $('#filterWarehouse');
+            warehouses.forEach(function(warehouse) {
+                select.append('<option value="' + warehouse.id + '">' + warehouse.name + '</option>');
+            });
+        }
+    });
+}
+
+function startStockCheck() {
+    if (!confirm('确定要开始盘点吗？盘点期间建议暂停出入库操作。')) return;
+    
+    // 启用所有输入框
+    $('.actual-stock').prop('disabled', false);
+    $('.remark').prop('disabled', false);
+    
+    // 显示保存按钮
+    $('#saveBtn').show();
+    
+    alert('盘点已开始，请填写实际库存数量。');
+}
+
+function searchProducts() {
+    var searchText = $('#searchProduct').val().toLowerCase();
+    $('#stockCheckBody tr').each(function() {
+        var productCode = $(this).find('td:eq(0)').text().toLowerCase();
+        var productName = $(this).find('td:eq(1)').text().toLowerCase();
+        if (productCode.indexOf(searchText) > -1 || productName.indexOf(searchText) > -1) {
+            $(this).show();
+        } else {
+            $(this).hide();
+        }
+    });
+}
+
+function filterByWarehouse() {
+    var warehouseId = $('#filterWarehouse').val();
+    $('#stockCheckBody tr').each(function() {
+        var rowWarehouseId = $(this).data('warehouse-id');
+        if (!warehouseId || rowWarehouseId == warehouseId) {
+            $(this).show();
+        } else {
+            $(this).hide();
+        }
+    });
+}
+
+function calculateDifference(input) {
+    var row = $(input).closest('tr');
+    var systemStock = parseFloat(row.find('.system-stock').text()) || 0;
+    var actualStock = parseFloat($(input).val()) || 0;
+    var price = parseFloat(row.find('td:eq(5)').text()) || 0; // 假设价格在第6列
+    
+    var differenceQty = actualStock - systemStock;
+    var differenceAmount = differenceQty * price;
+    
+    row.find('.difference-qty').text(differenceQty.toFixed(2));
+    row.find('.difference-amount').text(differenceAmount.toFixed(2));
+    
+    // 根据差异设置行样式
+    if (Math.abs(differenceQty) > 0) {
+        row.addClass('table-warning');
+    } else {
+        row.removeClass('table-warning');
+    }
+    
+    updateStatistics();
+    calculateTotals();
+}
+
+function calculateTotals() {
+    var totalSystemStock = 0;
+    var totalActualStock = 0;
+    var totalDifferenceQty = 0;
+    var totalDifferenceAmount = 0;
+    
+    $('#stockCheckBody tr:visible').each(function() {
+        totalSystemStock += parseFloat($(this).find('.system-stock').text()) || 0;
+        totalActualStock += parseFloat($(this).find('.actual-stock').val()) || 0;
+        totalDifferenceQty += parseFloat($(this).find('.difference-qty').text()) || 0;
+        totalDifferenceAmount += parseFloat($(this).find('.difference-amount').text()) || 0;
+    });
+    
+    $('#totalSystemStock').text(totalSystemStock.toFixed(2));
+    $('#totalActualStock').text(totalActualStock.toFixed(2));
+    $('#totalDifferenceQty').text(totalDifferenceQty.toFixed(2));
+    $('#totalDifferenceAmount').text(totalDifferenceAmount.toFixed(2));
+}
+
+function updateStatistics() {
+    var totalProducts = 0;
+    var noDifferenceProducts = 0;
+    var differenceProducts = 0;
+    
+    $('#stockCheckBody tr:visible').each(function() {
+        totalProducts++;
+        var differenceQty = parseFloat($(this).find('.difference-qty').text()) || 0;
+        if (Math.abs(differenceQty) === 0) {
+            noDifferenceProducts++;
+        } else {
+            differenceProducts++;
+        }
+    });
+    
+    $('#totalProducts').text(totalProducts);
+    $('#noDifferenceProducts').text(noDifferenceProducts);
+    $('#differenceProducts').text(differenceProducts);
+}
+
+function saveStockCheck() {
+    if (!confirm('确定要保存盘点结果吗？保存后系统库存将被更新。')) return;
+    
+    var stockCheckData = [];
+    $('#stockCheckBody tr:visible').each(function() {
+        var productId = $(this).data('product-id');
+        var systemStock = parseFloat($(this).find('.system-stock').text()) || 0;
+        var actualStock = parseFloat($(this).find('.actual-stock').val()) || 0;
+        var remark = $(this).find('.remark').val();
+        
+        // 只保存有差异的数据
+        if (actualStock !== systemStock) {
+            stockCheckData.push({
+                product_id: productId,
+                system_stock: systemStock,
+                actual_stock: actualStock,
+                difference: actualStock - systemStock,
+                remark: remark || ''
+            });
+        }
+    });
+    
+    if (stockCheckData.length === 0) {
+        alert('没有需要保存的盘点数据（没有发现库存差异）。');
+        return;
+    }
+    
+    var postData = {
+        check_data: stockCheckData,
+        check_date: new Date().toISOString().split('T')[0]
+    };
+    
+    console.log('发送数据:', postData);
+    
+    $.ajax({
+        url: '/inventory/api/stock-check',
+        method: 'POST',
+        contentType: 'application/json',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        data: JSON.stringify(postData),
+        success: function(response) {
+            console.log('响应:', response);
+            if (response.success) {
+                alert('盘点结果保存成功！系统库存已更新。');
+                location.reload();
+            } else {
+                alert(response.message || '保存失败');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.log('错误:', xhr.responseText);
+            alert('请求失败: ' + (xhr.responseJSON?.message || error));
+        }
+    });
+}
+</script>
+{% endblock %}

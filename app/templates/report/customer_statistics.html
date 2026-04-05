@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block header %}{{ title }}{% endblock %}
+
+{% block actions %}
+<div class="btn-group">
+    <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
+        <i class="bi bi-download"></i> 导出
+    </button>
+    <ul class="dropdown-menu">
+        <li><a class="dropdown-item" href="{{ url_for('report.export_customer') }}">Excel</a></li>
+        <li><a class="dropdown-item" href="#" onclick="alert('PDF导出功能开发中')">PDF</a></li>
+    </ul>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped">
+                <thead class="table-primary">
+                    <tr>
+                        <th>序号</th>
+                        <th>客户编码</th>
+                        <th>客户名称</th>
+                        <th>订单数量</th>
+                        <th class="text-end">消费总额</th>
+                        <th class="text-end">平均订单金额</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for customer in customer_stats %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ customer.code }}</td>
+                        <td>{{ customer.name }}</td>
+                        <td>{{ customer.order_count or 0 }}</td>
+                        <td class="text-end">¥{{ "%.2f"|format(customer.total_amount or 0) }}</td>
+                        <td class="text-end">¥{{ "%.2f"|format(customer.avg_amount or 0) }}</td>
+                        <td>
+                            <a href="{{ url_for('product.edit_customer', id=customer.id) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i> 查看
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted">暂无客户统计数据</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="table-secondary">
+                        <td colspan="3" class="text-end"><strong>总计：</strong></td>
+                        <td><strong>{{ customer_stats|sum(attribute='order_count') or 0 }}</strong></td>
+                        <td class="text-end"><strong>¥{{ "%.2f"|format(customer_stats|sum(attribute='total_amount') or 0) }}</strong></td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">客户消费TOP5</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    {% for customer in customer_stats %}
+                    {% if loop.index <= 5 %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="badge bg-primary me-2">{{ loop.index }}</span>
+                            {{ customer.name }}
+                        </div>
+                        <span class="badge bg-success rounded-pill">¥{{ "%.2f"|format(customer.total_amount or 0) }}</span>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">客户订单数TOP5</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    {% set sorted_customers = customer_stats|sort(attribute='order_count', reverse=true) %}
+                    {% for customer in sorted_customers %}
+                    {% if loop.index <= 5 %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="badge bg-primary me-2">{{ loop.index }}</span>
+                            {{ customer.name }}
+                        </div>
+                        <span class="badge bg-info rounded-pill">{{ customer.order_count or 0 }} 单</span>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 客户分析 -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">客户分析</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 text-center">
+                        <div class="p-3 border rounded">
+                            <h3 class="text-primary mb-1">{{ customer_stats|length }}</h3>
+                            <p class="text-muted mb-0">客户总数</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <div class="p-3 border rounded">
+                            <h3 class="text-success mb-1">¥{{ "%.2f"|format(customer_stats|sum(attribute='total_amount') or 0) }}</h3>
+                            <p class="text-muted mb-0">总消费额</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <div class="p-3 border rounded">
+                            <h3 class="text-info mb-1">{{ customer_stats|sum(attribute='order_count') or 0 }}</h3>
+                            <p class="text-muted mb-0">总订单数</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <div class="p-3 border rounded">
+                            <h3 class="text-warning mb-1">
+                                {% if customer_stats|sum(attribute='order_count') > 0 %}
+                                    ¥{{ "%.2f"|format((customer_stats|sum(attribute='total_amount') or 0) / (customer_stats|sum(attribute='order_count') or 1)) }}
+                                {% else %}
+                                    ¥0.00
+                                {% endif %}
+                            </h3>
+                            <p class="text-muted mb-0">平均订单额</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 客户消费分布 -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">客户消费分布</h5>
+            </div>
+            <div class="card-body">
+                <div style="height: 300px; position: relative;">
+                    <canvas id="customerChart"></canvas>
+                </div>
+                <div id="customerChartLoading" class="text-center text-muted py-3">
+                    <i class="fas fa-spinner fa-spin"></i> 加载中...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 客户等级分析 -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">客户等级分析</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% set vip_customers = customer_stats|selectattr('total_amount', 'ge', 10000)|list %}
+                    {% set gold_customers = customer_stats|selectattr('total_amount', 'ge', 5000)|selectattr('total_amount', 'lt', 10000)|list %}
+                    {% set silver_customers = customer_stats|selectattr('total_amount', 'ge', 1000)|selectattr('total_amount', 'lt', 5000)|list %}
+                    {% set normal_customers = customer_stats|selectattr('total_amount', 'lt', 1000)|list %}
+                    
+                    <div class="col-md-3">
+                        <div class="card border-danger">
+                            <div class="card-body text-center">
+                                <h3 class="text-danger mb-1">{{ vip_customers|length }}</h3>
+                                <p class="text-muted mb-0">VIP客户</p>
+                                <small class="text-muted">(消费≥1万元)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-warning">
+                            <div class="card-body text-center">
+                                <h3 class="text-warning mb-1">{{ gold_customers|length }}</h3>
+                                <p class="text-muted mb-0">金牌客户</p>
+                                <small class="text-muted">(5千~1万元)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-info">
+                            <div class="card-body text-center">
+                                <h3 class="text-info mb-1">{{ silver_customers|length }}</h3>
+                                <p class="text-muted mb-0">银牌客户</p>
+                                <small class="text-muted">(1千~5千元)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-secondary">
+                            <div class="card-body text-center">
+                                <h3 class="text-secondary mb-1">{{ normal_customers|length }}</h3>
+                                <p class="text-muted mb-0">普通客户</p>
+                                <small class="text-muted">(消费<1千元)</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+$(document).ready(function() {
+    renderCustomerChart();
+});
+
+function renderCustomerChart() {
+    var ctx = document.getElementById('customerChart').getContext('2d');
+    
+    var labels = [
+        {% for customer in customer_stats[:10] %}
+        "{{ customer.name }}",
+        {% endfor %}
+    ];
+    
+    var amounts = [
+        {% for customer in customer_stats[:10] %}
+        {{ customer.total_amount or 0 }},
+        {% endfor %}
+    ];
+    
+    if (amounts.length === 0 || amounts.every(function(a) { return a === 0; })) {
+        $('#customerChartLoading').html('<span class="text-muted">暂无消费数据</span>');
+        return;
+    }
+    
+    new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: amounts,
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.8)',
+                    'rgba(54, 162, 235, 0.8)',
+                    'rgba(255, 206, 86, 0.8)',
+                    'rgba(75, 192, 192, 0.8)',
+                    'rgba(153, 102, 255, 0.8)',
+                    'rgba(255, 159, 64, 0.8)',
+                    'rgba(199, 199, 199, 0.8)',
+                    'rgba(83, 102, 255, 0.8)',
+                    'rgba(255, 99, 132, 0.8)',
+                    'rgba(54, 162, 235, 0.8)'
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.label + ': ¥' + context.parsed.toLocaleString();
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    $('#customerChartLoading').hide();
+}
+</script>
+{% endblock %}

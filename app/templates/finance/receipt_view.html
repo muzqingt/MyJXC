@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block header %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                <h6 class="m-0 font-weight-bold text-primary">{{ title }}</h6>
+                <div>
+                    <a href="{{ url_for('finance.edit_receipt', receipt_id=receipt.id) }}" class="btn btn-sm btn-warning mr-2">
+                        <i class="fas fa-edit"></i> 编辑
+                    </a>
+                    <a href="{{ url_for('finance.receipts') }}" class="btn btn-sm btn-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回列表
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>收款单号：</strong>
+                        <p>{{ receipt.receipt_number or 'N/A' }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>收款日期：</strong>
+                        <p>{{ receipt.receipt_date.strftime('%Y-%m-%d') if receipt.receipt_date else 'N/A' }}</p>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>客户：</strong>
+                        <p>{{ receipt.customer.name if receipt.customer else '未知客户' }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>收款金额：</strong>
+                        <p class="text-success font-weight-bold">¥{{ "%.2f"|format(receipt.amount) if receipt.amount else '0.00' }}</p>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>收款方式：</strong>
+                        <p>
+                            {% if receipt.payment_method == 'cash' %}
+                            <span class="badge badge-primary">现金</span>
+                            {% elif receipt.payment_method == 'bank_transfer' %}
+                            <span class="badge badge-info">银行转账</span>
+                            {% elif receipt.payment_method == 'wechat' %}
+                            <span class="badge badge-success">微信支付</span>
+                            {% elif receipt.payment_method == 'alipay' %}
+                            <span class="badge badge-warning">支付宝</span>
+                            {% else %}
+                            <span class="badge badge-secondary">{{ receipt.payment_method or '现金' }}</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>关联类型：</strong>
+                        <p>
+                            {% if receipt.reference_type == 'sales_order' %}
+                            <span class="badge badge-info">销售订单</span>
+                            {% else %}
+                            <span class="badge badge-secondary">{{ receipt.reference_type or '无' }}</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>关联ID：</strong>
+                        <p>{{ receipt.reference_id or 'N/A' }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>创建人：</strong>
+                        <p>{{ receipt.creator.username if receipt.creator else '系统' }}</p>
+                    </div>
+                </div>
+                
+                {% if receipt.notes %}
+                <div class="mb-3">
+                    <strong>备注：</strong>
+                    <p class="text-muted">{{ receipt.notes }}</p>
+                </div>
+                {% endif %}
+                
+                <div class="mb-3">
+                    <strong>创建时间：</strong>
+                    <p class="text-muted">{{ receipt.created_at.strftime('%Y-%m-%d %H:%M:%S') if receipt.created_at else 'N/A' }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block header %}{{ title }}{% endblock %}
+
+{% block actions %}
+<div class="btn-group">
+    <a href="{{ url_for('product.new_product') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> 添加商品
+    </a>
+    <a href="{{ url_for('product.categories') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-tags"></i> 分类管理
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="get" action="{{ url_for('product.index') }}" class="row g-3">
+                    <div class="col-md-4">
+                        <input type="text" name="keyword" class="form-control" placeholder="搜索商品编码、名称、规格..." 
+                               value="{{ keyword }}">
+                    </div>
+                    <div class="col-md-3">
+                        <select name="category_id" class="form-select">
+                            <option value="">所有分类</option>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}" {% if category_id == category.id %}selected{% endif %}>
+                                {{ category.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-search"></i> 搜索
+                        </button>
+                    </div>
+                    <div class="col-md-2">
+                        <a href="{{ url_for('product.index') }}" class="btn btn-outline-secondary w-100">
+                            <i class="bi bi-arrow-clockwise"></i> 重置
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>商品编码</th>
+                                <th>商品名称</th>
+                                <th>规格</th>
+                                <th>分类</th>
+                                <th>单位</th>
+                                <th>采购价</th>
+                                <th>销售价</th>
+                                <th>安全库存</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for product in products.items %}
+                            <tr>
+                                <td>{{ product.code }}</td>
+                                <td>
+                                    {% if product.image_path %}
+                                    <img src="{{ url_for('static', filename='uploads/' + product.image_path) }}" 
+                                         alt="{{ product.name }}" class="img-thumbnail" style="width: 40px; height: 40px; object-fit: cover;">
+                                    {% endif %}
+                                    {{ product.name }}
+                                </td>
+                                <td>{{ product.specification }}</td>
+                                <td>
+                                    {% if product.category %}
+                                    <span class="badge bg-info">{{ product.category.name }}</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">无分类</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ product.unit }}</td>
+                                <td>¥{{ "%.2f"|format(product.purchase_price) }}</td>
+                                <td>¥{{ "%.2f"|format(product.sale_price) }}</td>
+                                <td>{{ product.safety_stock }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('product.view_product', id=product.id) }}" 
+                                           class="btn btn-outline-info" title="查看">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        <a href="{{ url_for('product.edit_product', id=product.id) }}" 
+                                           class="btn btn-outline-primary" title="编辑">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-outline-danger" 
+                                                data-bs-toggle="modal" data-bs-target="#deleteModal{{ product.id }}" title="删除">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- 删除确认模态框 -->
+                                    <div class="modal fade" id="deleteModal{{ product.id }}" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">确认删除</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    确定要删除商品 "{{ product.name }}" 吗？此操作不可恢复。
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                                                    <form method="post" action="{{ url_for('product.delete_product', id=product.id) }}">
+                                                        <button type="submit" class="btn btn-danger">确认删除</button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="9" class="text-center text-muted py-4">
+                                    <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                                    <p class="mt-2">暂无商品数据</p>
+                                    <a href="{{ url_for('product.new_product') }}" class="btn btn-primary mt-2">
+                                        <i class="bi bi-plus-circle"></i> 添加第一个商品
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- 分页 -->
+                {% if products.pages > 1 %}
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center">
+                        {% if products.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('product.index', page=products.prev_num, keyword=keyword, category_id=category_id) }}">
+                                上一页
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for page_num in products.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2) %}
+                            {% if page_num %}
+                                {% if page_num == products.page %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page_num }}</span>
+                                </li>
+                                {% else %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('product.index', page=page_num, keyword=keyword, category_id=category_id) }}">
+                                        {{ page_num }}
+                                    </a>
+                                </li>
+                                {% endif %}
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if products.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('product.index', page=products.next_num, keyword=keyword, category_id=category_id) }}">
+                                下一页
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">商品总数</h5>
+                <h2 class="text-primary">{{ products.total }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">分类数量</h5>
+                <h2 class="text-success">{{ categories|length }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">操作提示</h5>
+                <p class="text-muted">点击商品名称可以查看详情，点击编辑按钮可以修改商品信息。</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 自动聚焦搜索框
+    $('input[name="keyword"]').focus();
+    
+    // 确认删除
+    $('.delete-btn').click(function() {
+        return confirm('确定要删除这个商品吗？此操作不可恢复。');
+    });
+});
+</script>
+{% endblock %}

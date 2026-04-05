@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - {{ super() }}{% endblock %}
+
+{% block header %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        <!-- 出库单基本信息 -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <h5>出库单信息</h5>
+                <table class="table table-sm">
+                    <tr>
+                        <th width="120">出库单号：</th>
+                        <td>{{ stock_out.delivery_number }}</td>
+                    </tr>
+                    <tr>
+                        <th>仓库：</th>
+                        <td>{{ stock_out.warehouse.code }} - {{ stock_out.warehouse.name }}</td>
+                    </tr>
+                    <tr>
+                        <th>出库日期：</th>
+                        <td>{{ stock_out.delivery_date.strftime('%Y-%m-%d') }}</td>
+                    </tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h5>关联信息</h5>
+                <table class="table table-sm">
+                    <tr>
+                        <th width="120">销售订单：</th>
+                        <td>
+                            {% if stock_out.sales_order %}
+                            <a href="{{ url_for('sales.view_order', id=stock_out.sales_order.id) }}" class="text-decoration-none">
+                                {{ stock_out.sales_order.order_number }}
+                            </a>
+                            {% else %}
+                            <span class="text-muted">直接出库</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>经办人：</th>
+                        <td>{{ stock_out.handler or '-' }}</td>
+                    </tr>
+                    <tr>
+                        <th>总金额：</th>
+                        <td class="fw-bold">¥{{ "%.2f"|format(stock_out.total_amount) }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- 商品明细表单 -->
+        <form method="post" id="items-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="table-responsive mb-3">
+                <table class="table table-bordered" id="items-table">
+                    <thead class="table-light">
+                        <tr>
+                            <th width="40">#</th>
+                            <th>商品</th>
+                            <th width="100">出库前库存</th>
+                            <th width="100">出库数量</th>
+                            <th width="100">出库后库存</th>
+                            <th width="100">单价</th>
+                            <th width="120">金额</th>
+                            <th width="60">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="items-body">
+                        <!-- 动态添加的行会在这里 -->
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="6" class="text-end fw-bold">总计：</td>
+                            <td class="text-end fw-bold" id="total-amount">¥0.00</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <div class="mb-3">
+                <button type="button" class="btn btn-success" id="add-item">
+                    <i class="bi bi-plus-circle"></i> 添加商品
+                </button>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <a href="{{ url_for('sales.index', tab='stockouts') }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> 返回列表
+                </a>
+                <div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> 保存明细
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    let itemCount = 0;
+    const products = JSON.parse('{{ products|tojson|safe }}').map(function(product) {
+        return {
+            id: product.id,
+            code: product.code,
+            name: product.name,
+            specification: product.specification || '',
+            unit: product.unit,
+            sale_price: product.sale_price || 0,
+            stock_quantity: product.stock_quantity || 0
+        };
+    });
+
+    // 添加商品行
+    function addItemRow(productId = '', quantity = '', unitPrice = '') {
+        const rowId = itemCount++;
+        const productOptions = products.map(p => 
+            `<option value="${p.id}" ${productId == p.id ? 'selected' : ''}>
+                ${p.code} - ${p.name} (${p.specification || '无规格'}) - 库存: ${p.stock_quantity}${p.unit}
+            </option>`
+        ).join('');
+
+        const row = `
+            <tr id="row-${rowId}">
+                <td>${rowId + 1}</td>
+                <td>
+                    <select name="product_id[]" class="form-select product-select" data-row="${rowId}" required>
+                        <option value="">请选择商品</option>
+                        ${productOptions}
+                    </select>
+                </td>
+                <td class="text-end">
+                    <span class="before-stock" id="before-${rowId}">0</span>
+                </td>
+                <td>
+                    <div class="input-group">
+                        <input type="number" name="quantity[]" class="form-control quantity" 
+                               data-row="${rowId}" step="0.01" min="0.01" value="${quantity}" required>
+                        <span class="input-group-text unit-display" id="unit-${rowId}">个</span>
+                    </div>
+                </td>
+                <td class="text-end">
+                    <span class="after-stock text-danger" id="after-${rowId}">0</span>
+                </td>
+                <td>
+                    <input type="number" name="unit_price[]" class="form-control unit-price" 
+                           data-row="${rowId}" step="0.01" min="0" value="${unitPrice}" required>
+                </td>
+                <td class="text-end">
+                    <span class="amount-display" id="amount-${rowId}">0.00</span>
+                </td>
+                <td>
+                    <button type="button" class="btn btn-danger btn-sm remove-item" data-row="${rowId}">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+        
+        $('#items-body').append(row);
+        updateRow(rowId);
+        updateTotal();
+    }
+
+    // 更新单行计算
+    function updateRow(rowId) {
+        const productSelect = $(`#row-${rowId} .product-select`);
+        const quantityInput = $(`#row-${rowId} .quantity`);
+        const unitPriceInput = $(`#row-${rowId} .unit-price`);
+        const unitDisplay = $(`#unit-${rowId}`);
+        const beforeDisplay = $(`#before-${rowId}`);
+        const afterDisplay = $(`#after-${rowId}`);
+        const amountDisplay = $(`#amount-${rowId}`);
+
+        const productId = productSelect.val();
+        const product = products.find(p => p.id == productId);
+        
+        if (product) {
+            unitDisplay.text(product.unit);
+            beforeDisplay.text(product.stock_quantity);
+            if (!unitPriceInput.val() && product.sale_price > 0) {
+                unitPriceInput.val(product.sale_price);
+            }
+        } else {
+            beforeDisplay.text('0');
+        }
+
+        const quantity = parseFloat(quantityInput.val()) || 0;
+        const beforeStock = parseFloat(beforeDisplay.text()) || 0;
+        const afterStock = beforeStock - quantity;
+        const unitPrice = parseFloat(unitPriceInput.val()) || 0;
+        const amount = quantity * unitPrice;
+        
+        afterDisplay.text(afterStock);
+        amountDisplay.text(amount.toFixed(2));
+    }
+
+    // 更新总计
+    function updateTotal() {
+        let total = 0;
+        $('.amount-display').each(function() {
+            total += parseFloat($(this).text()) || 0;
+        });
+        $('#total-amount').text('¥' + total.toFixed(2));
+    }
+
+    // 事件监听
+    $('#add-item').click(function() {
+        addItemRow();
+    });
+
+    $(document).on('change', '.product-select, .quantity, .unit-price', function() {
+        const rowId = $(this).data('row');
+        updateRow(rowId);
+        updateTotal();
+    });
+
+    $(document).on('click', '.remove-item', function() {
+        const rowId = $(this).data('row');
+        $(`#row-${rowId}`).remove();
+        // 重新编号
+        $('#items-body tr').each(function(index) {
+            $(this).find('td:first').text(index + 1);
+        });
+        updateTotal();
+    });
+
+    // 初始化时添加一行
+    addItemRow();
+});
+</script>
+{% endblock %}

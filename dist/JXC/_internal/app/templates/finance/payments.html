@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block header %}{{ title }}{% endblock %}
+
+{% block actions %}
+<div class="btn-group">
+    <a href="{{ url_for('finance.add_payment') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> 添加付款
+    </a>
+    <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
+        <i class="bi bi-download"></i> 导出
+    </button>
+    <ul class="dropdown-menu">
+        <li><a class="dropdown-item" href="#">Excel</a></li>
+        <li><a class="dropdown-item" href="#">PDF</a></li>
+    </ul>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped">
+                <thead class="table-primary">
+                    <tr>
+                        <th>付款单号</th>
+                        <th>供应商</th>
+                        <th class="text-end">付款金额</th>
+                        <th>付款日期</th>
+                        <th>付款方式</th>
+                        <th>关联单据</th>
+                        <th>备注</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for payment in payments %}
+                    <tr>
+                        <td>{{ payment.payment_number }}</td>
+                        <td>
+                            {% if payment.supplier %}
+                            {{ payment.supplier.name }}
+                            {% else %}
+                            <span class="text-muted">未知供应商</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">¥{{ "%.2f"|format(payment.amount) }}</td>
+                        <td>{{ payment.payment_date }}</td>
+                        <td>
+                            <span class="badge bg-info">
+                                {% if payment.payment_method == 'cash' %}现金
+                                {% elif payment.payment_method == 'bank_transfer' %}银行转账
+                                {% elif payment.payment_method == 'wechat' %}微信支付
+                                {% elif payment.payment_method == 'alipay' %}支付宝
+                                {% else %}{{ payment.payment_method }}
+                                {% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            {% if payment.reference_type == 'purchase_order' %}
+                            <span class="badge bg-warning">采购订单</span>
+                            {% elif payment.reference_type %}
+                            <span class="badge bg-secondary">{{ payment.reference_type }}</span>
+                            {% else %}
+                            <span class="text-muted">无</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if payment.notes %}
+                            <span class="text-truncate" style="max-width: 150px;" title="{{ payment.notes }}">
+                                {{ payment.notes }}
+                            </span>
+                            {% else %}
+                            <span class="text-muted">无</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('finance.view_payment', payment_id=payment.id) }}" 
+                               class="btn btn-sm btn-outline-primary" title="查看详情">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            <a href="{{ url_for('finance.edit_payment', payment_id=payment.id) }}" 
+                               class="btn btn-sm btn-outline-warning" title="编辑">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center text-muted">暂无付款记录</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="table-secondary">
+                        <td colspan="2" class="text-end"><strong>总计：</strong></td>
+                        <td class="text-end"><strong>¥{{ "%.2f"|format(payments|sum(attribute='amount')) }}</strong></td>
+                        <td colspan="5"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 统计卡片 -->
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card border-primary">
+            <div class="card-body text-center">
+                <h3 class="text-primary mb-1">¥{{ "%.2f"|format(payments|sum(attribute='amount')) }}</h3>
+                <p class="text-muted mb-0">付款总额</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-success">
+            <div class="card-body text-center">
+                <h3 class="text-success mb-1">{{ payments|length }}</h3>
+                <p class="text-muted mb-0">付款单数</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-info">
+            <div class="card-body text-center">
+                <h3 class="text-info mb-1">
+                    {% set cash_payments = payments|selectattr('payment_method', 'equalto', 'cash')|list %}
+                    ¥{{ "%.2f"|format(cash_payments|sum(attribute='amount')) }}
+                </h3>
+                <p class="text-muted mb-0">现金付款</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-warning">
+            <div class="card-body text-center">
+                <h3 class="text-warning mb-1">
+                    {% set bank_payments = payments|selectattr('payment_method', 'equalto', 'bank_transfer')|list %}
+                    ¥{{ "%.2f"|format(bank_payments|sum(attribute='amount')) }}
+                </h3>
+                <p class="text-muted mb-0">银行转账</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    console.log('付款管理页面加载完成');
+});
+</script>
+{% endblock %}

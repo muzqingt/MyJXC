@@ -1,0 +1,377 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - {{ super() }}{% endblock %}
+
+{% block header %}{{ title }}{% endblock %}
+
+{% block actions %}
+<div class="btn-group">
+    <a href="{{ url_for('sales.index') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> 返回列表
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        <form method="post" id="items-form" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            
+            <!-- 订单基本信息编辑 -->
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <h5 class="border-bottom pb-2 mb-3">订单基本信息</h5>
+                </div>
+            </div>
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">订单号</label>
+                        {% if order %}
+                        <input type="text" class="form-control" value="{{ order.order_number }}" readonly>
+                        {% else %}
+                        <input type="text" class="form-control" value="系统自动生成" readonly>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">订单状态</label>
+                        {% if order %}
+                        <input type="text" class="form-control" value="{% if order.status == 'draft' %}草稿{% elif order.status == 'confirmed' %}已确认{% elif order.status == 'partial' %}部分出库{% elif order.status == 'completed' %}已完成{% elif order.status == 'cancelled' %}已取消{% endif %}" readonly>
+                        {% else %}
+                        <select name="order_status" class="form-select" id="orderStatus">
+                            <option value="saved">未出库</option>
+                            <option value="completed">直接出库</option>
+                        </select>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">客户 <span class="text-danger">*</span></label>
+                        <select name="customer_id" class="form-select" required>
+                            <option value="">请选择客户</option>
+                            {% for customer in customers %}
+                            <option value="{{ customer.id }}" {% if order and order.customer_id == customer.id %}selected{% endif %}>{{ customer.code }} - {{ customer.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">仓库 <span class="text-danger">*</span></label>
+                        <select name="warehouse_id" class="form-select" required>
+                            <option value="">请选择仓库</option>
+                            {% for warehouse in warehouses %}
+                            <option value="{{ warehouse.id }}" {% if order and order.warehouse_id == warehouse.id %}selected{% endif %}>{{ warehouse.code }} - {{ warehouse.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">订单日期 <span class="text-danger">*</span></label>
+                        <input type="date" name="order_date" class="form-control" required value="{{ order.order_date.strftime('%Y-%m-%d') if order else '' }}">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">预计发货日期</label>
+                        <input type="date" name="delivery_date" class="form-control" value="{{ order.delivery_date.strftime('%Y-%m-%d') if order and order.delivery_date else '' }}">
+                    </div>
+                </div>
+            </div>
+            <div class="mb-4">
+                <label class="form-label">备注</label>
+                <textarea name="notes" class="form-control" rows="2">{{ order.notes if order else '' }}</textarea>
+            </div>
+
+            <!-- 商品明细 -->
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <h5 class="border-bottom pb-2 mb-3">商品明细</h5>
+                </div>
+            </div>
+            <div class="table-responsive mb-3">
+                <table class="table table-bordered" id="items-table">
+                    <thead class="table-light">
+                        <tr>
+                            <th width="40">#</th>
+                            <th>商品</th>
+                            <th width="120">数量</th>
+                            <th width="120">单价</th>
+                            <th width="120">金额</th>
+                            <th width="80">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="items-body">
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="4" class="text-end fw-bold">总计：</td>
+                            <td class="text-end fw-bold" id="total-amount">¥0.00</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <button type="button" class="btn btn-success" id="add-item">
+                        <i class="bi bi-plus-circle"></i> 添加商品
+                    </button>
+                </div>
+                <div>
+                    {% if not order %}
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> 创建订单
+                    </button>
+                    {% elif order and order.status in ['draft', 'confirmed'] %}
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> 保存明细
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 存储订单明细数据 -->
+<div id="order-items-data" style="display: none;">
+    {{ order_items|tojson|safe if order_items else '[]' }}
+</div>
+<div id="products-data" style="display: none;">
+    {{ products|tojson|safe if products else '[]' }}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 如果订单日期为空，设置默认值为今天
+    var orderDateInput = $('input[name="order_date"]');
+    if (!orderDateInput.val()) {
+        var today = new Date().toISOString().split('T')[0];
+        orderDateInput.val(today);
+    }
+    
+    // 表单提交前，删除空白行
+    $('#items-form').on('submit', function(e) {
+        $('#items-body tr').each(function() {
+            var productSelect = $(this).find('.product-select');
+            if (!productSelect.val()) {
+                // 空白行：删除整行
+                $(this).remove();
+            }
+        });
+    });
+    
+    let itemCount = 0;
+    const products = JSON.parse('{{ products|tojson|safe }}').map(function(product) {
+        return {
+            id: product.id,
+            code: product.code,
+            name: product.name,
+            specification: product.specification || '',
+            unit: product.unit,
+            sale_price: product.sale_price || 0,
+            stock_quantity: product.stock_quantity || 0
+        };
+    });
+
+    // 存储每个商品的原始价格
+    let originalPrices = {};
+
+    // 添加商品行
+    function addItemRow(productId = '', quantity = '', unitPrice = '') {
+        const rowId = itemCount++;
+        const productOptions = products.map(p => 
+            `<option value="${p.id}" ${productId == p.id ? 'selected' : ''}>
+                ${p.code} - ${p.name} (${p.specification || '无规格'}) - 库存: ${p.stock_quantity}${p.unit}
+            </option>`
+        ).join('');
+
+        const row = `
+            <tr id="row-${rowId}">
+                <td>${rowId + 1}</td>
+                <td>
+                    <select name="product_id[]" class="form-select product-select" data-row="${rowId}">
+                        <option value="">请选择商品</option>
+                        ${productOptions}
+                    </select>
+                </td>
+                <td>
+                    <div class="input-group">
+                        <input type="number" name="quantity[]" class="form-control quantity" 
+                               data-row="${rowId}" step="0.01" min="0.01" value="${quantity}">
+                        <span class="input-group-text unit-display" id="unit-${rowId}">个</span>
+                    </div>
+                </td>
+                <td>
+                    <input type="number" name="unit_price[]" class="form-control unit-price" 
+                           data-row="${rowId}" step="0.01" min="0" value="${unitPrice}">
+                </td>
+                <td class="text-end">
+                    <span class="amount-display" id="amount-${rowId}">0.00</span>
+                </td>
+                <td>
+                    <button type="button" class="btn btn-danger btn-sm remove-item" data-row="${rowId}">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+        
+        $('#items-body').append(row);
+        updateRow(rowId);
+        updateTotal();
+    }
+
+    // 更新单行计算
+    function updateRow(rowId, oldUnitPrice) {
+        const productSelect = $(`#row-${rowId} .product-select`);
+        const quantityInput = $(`#row-${rowId} .quantity`);
+        const unitPriceInput = $(`#row-${rowId} .unit-price`);
+        const unitDisplay = $(`#unit-${rowId}`);
+        const amountDisplay = $(`#amount-${rowId}`);
+
+        const productId = productSelect.val();
+        const product = products.find(p => p.id == productId);
+        
+        if (product) {
+            unitDisplay.text(product.unit);
+            if (!unitPriceInput.val() && product.sale_price > 0) {
+                unitPriceInput.val(product.sale_price);
+            }
+            // 如果用户修改了价格，同步到数据库
+            const newUnitPrice = parseFloat(unitPriceInput.val()) || 0;
+            if (oldUnitPrice !== undefined && newUnitPrice !== oldUnitPrice && newUnitPrice > 0) {
+                $.ajax({
+                    url: '/product/api/product/price',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        product_id: productId,
+                        price_type: 'sale_price',
+                        price: newUnitPrice
+                    }),
+                    success: function(response) {
+                        if (response.success) {
+                            // 更新本地products数据
+                            const p = products.find(prod => prod.id == productId);
+                            if (p) p.sale_price = newUnitPrice;
+                        }
+                    }
+                });
+            }
+        }
+
+        const quantity = parseFloat(quantityInput.val()) || 0;
+        const unitPrice = parseFloat(unitPriceInput.val()) || 0;
+        const amount = quantity * unitPrice;
+        
+        amountDisplay.text(amount.toFixed(2));
+    }
+
+    // 更新总计
+    function updateTotal() {
+        let total = 0;
+        $('.amount-display').each(function() {
+            total += parseFloat($(this).text()) || 0;
+        });
+        $('#total-amount').text('¥' + total.toFixed(2));
+    }
+
+    // 事件监听
+    $('#add-item').click(function() {
+        addItemRow();
+    });
+
+    $(document).on('change', '.product-select, .quantity, .unit-price', function() {
+        const rowId = $(this).data('row');
+        const productSelect = $(`#row-${rowId} .product-select`);
+        const productId = productSelect.val();
+        const unitPriceInput = $(`#row-${rowId} .unit-price`);
+        
+        // 如果是选择商品，保存原始价格到 data 属性
+        if ($(this).hasClass('product-select') && productId) {
+            const product = products.find(p => String(p.id) === String(productId));
+            if (product) {
+                // 将原价存储在 input 的 data 属性中
+                unitPriceInput.data('original-price', product.sale_price);
+            }
+        }
+        
+        // 如果是修改价格，与原始价格比较
+        if ($(this).hasClass('unit-price') && productId) {
+            const currentPrice = parseFloat(unitPriceInput.val()) || 0;
+            const originalPrice = unitPriceInput.data('original-price') || 0;
+            
+            // 只有当价格确实改变时才同步
+            if (currentPrice > 0 && currentPrice !== originalPrice) {
+                $.ajax({
+                    url: '/product/api/product/price',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        product_id: parseInt(productId),
+                        price_type: 'sale_price',
+                        price: currentPrice
+                    }),
+                    success: function(response) {
+                        if (response.success) {
+                            // 更新本地数据和 data 属性
+                            unitPriceInput.data('original-price', currentPrice);
+                            const p = products.find(prod => String(prod.id) === String(productId));
+                            if (p) p.sale_price = currentPrice;
+                            console.log('价格已同步到数据库');
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.log('价格同步失败:', error);
+                    }
+                });
+            }
+        }
+        
+        updateRow(rowId);
+        updateTotal();
+        
+        // 如果是选择商品且选择了有效商品，自动添加新行
+        if ($(this).hasClass('product-select') && $(this).val()) {
+            var hasEmptyRow = false;
+            $('#items-body tr').each(function() {
+                var productSelect = $(this).find('.product-select');
+                if (!productSelect.val() && productSelect.attr('data-row') != rowId) {
+                    hasEmptyRow = true;
+                }
+            });
+            if (!hasEmptyRow && rowId === itemCount - 1) {
+                addItemRow();
+            }
+        }
+    });
+
+    $(document).on('click', '.remove-item', function() {
+        const rowId = $(this).data('row');
+        $(`#row-${rowId}`).remove();
+        // 重新编号
+        $('#items-body tr').each(function(index) {
+            $(this).find('td:first').text(index + 1);
+        });
+        updateTotal();
+    });
+
+    // 初始化时添加一行
+    addItemRow();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block header %}{{ title }}{% endblock %}
+
+{% block actions %}
+<div class="btn-group">
+    <a href="{{ url_for('purchase.view_order', id=order.id) }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> 返回订单
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">订单信息</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <strong>订单号：</strong>{{ order.order_number }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>供应商：</strong>{{ order.supplier.name }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>仓库：</strong>{{ order.warehouse.name }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>订单日期：</strong>{{ order.order_date.strftime('%Y-%m-%d') }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <form method="post" action="{{ url_for('purchase.new_stock_in_from_order', id=order.id) }}" id="stockInForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">入库明细</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered" id="itemsTable">
+                            <thead>
+                                <tr>
+                                    <th width="5%">#</th>
+                                    <th width="15%">商品编码</th>
+                                    <th width="20%">商品名称</th>
+                                    <th width="10%">规格</th>
+                                    <th width="8%">单位</th>
+                                    <th width="10%">订单数量</th>
+                                    <th width="10%">已入库</th>
+                                    <th width="10%">待入库</th>
+                                    <th width="12%">本次入库</th>
+                                    <th width="10%">单价</th>
+                                    <th width="5%">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in order_items %}
+                                <tr data-product-id="{{ item.product_id }}">
+                                    <td>{{ loop.index }}</td>
+                                    <td>
+                                        <input type="hidden" name="product_id[]" value="{{ item.product_id }}">
+                                        <span class="product-code">{{ item.product_code }}</span>
+                                    </td>
+                                    <td>{{ item.product_name }}</td>
+                                    <td>{{ item.specification }}</td>
+                                    <td>{{ item.unit }}</td>
+                                    <td class="order-qty">{{ "%.2f"|format(item.quantity) }}</td>
+                                    <td class="received-qty">{{ "%.2f"|format(item.received_quantity) }}</td>
+                                    <td class="remaining-qty">{{ "%.2f"|format(item.remaining_quantity) }}</td>
+                                    <td>
+                                        <input type="number" name="quantity[]" class="form-control form-control-sm stock-qty" 
+                                               value="{{ item.remaining_quantity }}" min="0" step="0.01" max="{{ item.remaining_quantity }}">
+                                    </td>
+                                    <td>
+                                        <input type="number" name="unit_price[]" class="form-control form-control-sm unit-price" 
+                                               value="{{ item.unit_price }}" min="0" step="0.01">
+                                    </td>
+                                    <td>
+                                        {% if item.remaining_quantity <= 0 %}
+                                        <span class="badge bg-success">已完成</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                <label class="form-label">入库日期</label>
+                <input type="date" class="form-control" name="receipt_date" value="{{ now().strftime('%Y-%m-%d') }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">经手人</label>
+                                <input type="text" class="form-control" name="handler">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">入库金额</label>
+                                <div class="form-control-plaintext fw-bold text-primary" id="totalAmount">¥0.00</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">备注</label>
+                        <textarea class="form-control" name="notes" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> 保存入库单
+                    </button>
+                    <a href="{{ url_for('purchase.view_order', id=order.id) }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-circle"></i> 取消
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 计算入库金额
+    function calculateTotal() {
+        let total = 0;
+        $('#itemsTable tbody tr').each(function() {
+            const qty = parseFloat($(this).find('.stock-qty').val()) || 0;
+            const price = parseFloat($(this).find('.unit-price').val()) || 0;
+            total += qty * price;
+        });
+        $('#totalAmount').text('¥' + total.toFixed(2));
+    }
+    
+    // 监听数量和质量变化
+    $('#itemsTable').on('input', '.stock-qty, .unit-price', function() {
+        calculateTotal();
+    });
+    
+    // 初始化计算
+    calculateTotal();
+    
+    // 表单验证
+    $('#stockInForm').on('submit', function(e) {
+        let hasValidQty = false;
+        $('#itemsTable tbody tr').each(function() {
+            const qty = parseFloat($(this).find('.stock-qty').val()) || 0;
+            const remaining = parseFloat($(this).find('.remaining-qty').text()) || 0;
+            if (qty > 0) {
+                hasValidQty = true;
+            }
+            if (qty > remaining) {
+                alert('本次入库数量不能大于待入库数量！');
+                e.preventDefault();
+                return false;
+            }
+        });
+        
+        if (!hasValidQty) {
+            alert('请至少填写一行入库数量！');
+            e.preventDefault();
+        }
+    });
+});
+</script>
+{% endblock %}

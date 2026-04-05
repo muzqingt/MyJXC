@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block header %}{{ title }}{% endblock %}
+
+{% block actions %}
+<div class="btn-group">
+    <a href="{{ url_for('product.new_category') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> 添加分类
+    </a>
+    <a href="{{ url_for('product.index') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> 返回商品
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                {% if categories %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>分类名称</th>
+                                <th>父级分类</th>
+                                <th>商品数量</th>
+                                <th>描述</th>
+                                <th>创建时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for category in categories %}
+                            <tr>
+                                <td>
+                                    <strong>{{ category.name }}</strong>
+                                    {% if category.children %}
+                                    <span class="badge bg-info ms-2">有{{ category.children|length }}个子分类</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if category.parent %}
+                                    <span class="badge bg-secondary">{{ category.parent.name }}</span>
+                                    {% else %}
+                                    <span class="text-muted">无</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary">{{ category.products|length }}</span>
+                                </td>
+                                <td>
+                                    {% if category.description %}
+                                    <small class="text-muted">{{ category.description|truncate(50) }}</small>
+                                    {% else %}
+                                    <span class="text-muted">无描述</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ category.created_at.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('product.edit_category', id=category.id) }}" 
+                                           class="btn btn-outline-primary" title="编辑">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-outline-danger" 
+                                                data-bs-toggle="modal" data-bs-target="#deleteModal{{ category.id }}" title="删除">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- 删除确认模态框 -->
+                                    <div class="modal fade" id="deleteModal{{ category.id }}" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">确认删除</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    确定要删除分类 "{{ category.name }}" 吗？
+                                                    {% if category.children|length > 0 %}
+                                                    <div class="alert alert-warning mt-2">
+                                                        <i class="bi bi-exclamation-triangle"></i>
+                                                        该分类下有 {{ category.children|length }} 个子分类，删除父级分类将同时删除所有子分类！
+                                                    </div>
+                                                    {% endif %}
+                                                    {% if category.products|length > 0 %}
+                                                    <div class="alert alert-danger mt-2">
+                                                        <i class="bi bi-exclamation-triangle"></i>
+                                                        该分类下有 {{ category.products|length }} 个商品，删除分类后这些商品将变为无分类状态！
+                                                    </div>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                                                    <form method="post" action="{{ url_for('product.delete_category', id=category.id) }}">
+                                                        <button type="submit" class="btn btn-danger">确认删除</button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-tags" style="font-size: 3rem;"></i>
+                    <p class="mt-2">暂无分类数据</p>
+                    <a href="{{ url_for('product.new_category') }}" class="btn btn-primary mt-2">
+                        <i class="bi bi-plus-circle"></i> 添加第一个分类
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">分类总数</h5>
+                <h2 class="text-primary">{{ categories|length }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">顶级分类</h5>
+                <h2 class="text-success">{{ categories|selectattr('parent_id', 'none')|list|length }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">操作提示</h5>
+                <p class="text-muted">分类可以嵌套，用于更好地组织商品。</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 确认删除
+    $('.delete-btn').click(function() {
+        return confirm('确定要删除这个分类吗？此操作不可恢复。');
+    });
+});
+</script>
+{% endblock %}

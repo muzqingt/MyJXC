@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block header %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <form method="post">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.category.label(class="form-label") }}
+                            {{ form.category(class="form-control" + (" is-invalid" if form.category.errors else "")) }}
+                            {% for error in form.category.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                            <small class="form-text text-muted">费用类别，如：办公用品、差旅费、水电费等</small>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            {{ form.amount.label(class="form-label") }}
+                            {{ form.amount(class="form-control" + (" is-invalid" if form.amount.errors else "")) }}
+                            {% for error in form.amount.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                            <small class="form-text text-muted">输入费用金额</small>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.expense_date.label(class="form-label") }}
+                            {{ form.expense_date(class="form-control" + (" is-invalid" if form.expense_date.errors else ""), type="date") }}
+                            {% for error in form.expense_date.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                            <small class="form-text text-muted">选择费用发生日期</small>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            {{ form.payment_method.label(class="form-label") }}
+                            {{ form.payment_method(class="form-select" + (" is-invalid" if form.payment_method.errors else "")) }}
+                            {% for error in form.payment_method.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                            <small class="form-text text-muted">选择支付方式</small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.payee.label(class="form-label") }}
+                        {{ form.payee(class="form-control" + (" is-invalid" if form.payee.errors else "")) }}
+                        {% for error in form.payee.errors %}
+                        <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                        <small class="form-text text-muted">收款方名称</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.notes.label(class="form-label") }}
+                        {{ form.notes(class="form-control" + (" is-invalid" if form.notes.errors else ""), rows=3) }}
+                        {% for error in form.notes.errors %}
+                        <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                        <small class="form-text text-muted">费用详细说明</small>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('finance.expenses') }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> 返回列表
+                        </a>
+                        {{ form.submit(class="btn btn-primary") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">常见费用类别</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="setCategory('办公用品')">办公用品</button>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="setCategory('差旅费')">差旅费</button>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="setCategory('水电费')">水电费</button>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="setCategory('通讯费')">通讯费</button>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="setCategory('房租')">房租</button>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="setCategory('员工福利')">员工福利</button>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="setCategory('业务招待')">业务招待</button>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="setCategory('其他')">其他</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 设置默认日期为今天
+    var today = new Date().toISOString().split('T')[0];
+    $('input[name="expense_date"]').val(today);
+    
+    // 自动聚焦类别输入框
+    $('input[name="category"]').focus();
+});
+
+function setCategory(category) {
+    $('input[name="category"]').val(category);
+}
+</script>
+{% endblock %}

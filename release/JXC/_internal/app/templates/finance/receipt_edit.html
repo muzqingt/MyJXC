@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block header %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <form method="post">
+                    {% if not form %}
+                    <!-- 编辑模式：不使用WTForms，直接使用HTML表单 -->
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">客户</label>
+                            <select name="customer_id" class="form-select">
+                                {% for customer in customers %}
+                                <option value="{{ customer.id }}" {% if receipt and receipt.customer_id == customer.id %}selected{% endif %}>{{ customer.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted">选择收款客户</small>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">金额</label>
+                            <input type="number" name="amount" class="form-control" step="0.01" value="{{ receipt.amount if receipt else '' }}">
+                            <small class="form-text text-muted">输入收款金额</small>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">收款日期</label>
+                            <input type="date" name="receipt_date" class="form-control" value="{{ receipt.receipt_date.strftime('%Y-%m-%d') if receipt and receipt.receipt_date else '' }}">
+                            <small class="form-text text-muted">选择收款日期</small>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">支付方式</label>
+                            <select name="payment_method" class="form-select">
+                                <option value="cash" {% if receipt and receipt.payment_method == 'cash' %}selected{% endif %}>现金</option>
+                                <option value="bank_transfer" {% if receipt and receipt.payment_method == 'bank_transfer' %}selected{% endif %}>银行转账</option>
+                                <option value="wechat" {% if receipt and receipt.payment_method == 'wechat' %}selected{% endif %}>微信支付</option>
+                                <option value="alipay" {% if receipt and receipt.payment_method == 'alipay' %}selected{% endif %}>支付宝</option>
+                            </select>
+                            <small class="form-text text-muted">选择支付方式</small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">备注</label>
+                        <textarea name="notes" class="form-control" rows="3">{{ receipt.notes if receipt else '' }}</textarea>
+                        <small class="form-text text-muted">收款备注信息</small>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        {% if receipt %}
+                        <a href="{{ url_for('finance.view_receipt', receipt_id=receipt.id) }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> 返回详情
+                        </a>
+                        {% else %}
+                        <a href="{{ url_for('finance.receipts') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> 返回列表
+                        </a>
+                        {% endif %}
+                        <button type="submit" class="btn btn-primary">
+                            {% if receipt %}更新{% else %}提交{% endif %}
+                        </button>
+                    </div>
+                    {% else %}
+                    <!-- 新增模式：使用WTForms -->
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.customer_id.label(class="form-label") }}
+                            {{ form.customer_id(class="form-select" + (" is-invalid" if form.customer_id.errors else "")) }}
+                            {% for error in form.customer_id.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                            <small class="form-text text-muted">选择收款客户</small>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            {{ form.amount.label(class="form-label") }}
+                            {{ form.amount(class="form-control" + (" is-invalid" if form.amount.errors else "")) }}
+                            {% for error in form.amount.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                            <small class="form-text text-muted">输入收款金额</small>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.receipt_date.label(class="form-label") }}
+                            {{ form.receipt_date(class="form-control" + (" is-invalid" if form.receipt_date.errors else ""), type="date") }}
+                            {% for error in form.receipt_date.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                            <small class="form-text text-muted">选择收款日期</small>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            {{ form.payment_method.label(class="form-label") }}
+                            {{ form.payment_method(class="form-select" + (" is-invalid" if form.payment_method.errors else "")) }}
+                            {% for error in form.payment_method.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                            <small class="form-text text-muted">选择支付方式</small>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.reference_type.label(class="form-label") }}
+                            {{ form.reference_type(class="form-select" + (" is-invalid" if form.reference_type.errors else "")) }}
+                            {% for error in form.reference_type.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                            <small class="form-text text-muted">选择关联类型</small>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            {{ form.reference_id.label(class="form-label") }}
+                            {{ form.reference_id(class="form-control" + (" is-invalid" if form.reference_id.errors else "")) }}
+                            {% for error in form.reference_id.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                            <small class="form-text text-muted">输入关联ID（如销售订单号）</small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.notes.label(class="form-label") }}
+                        {{ form.notes(class="form-control" + (" is-invalid" if form.notes.errors else ""), rows=3) }}
+                        {% for error in form.notes.errors %}
+                        <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                        <small class="form-text text-muted">收款备注信息</small>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('finance.receipts') }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> 返回列表
+                        </a>
+                        {{ form.submit(class="btn btn-primary") }}
+                    </div>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+        
+        {% if sales_orders %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">可关联的销售订单</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>订单号</th>
+                                <th>客户</th>
+                                <th>订单金额</th>
+                                <th>已收款</th>
+                                <th>待收款</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in sales_orders %}
+                            <tr>
+                                <td>{{ order.order_number }}</td>
+                                <td>{{ order.customer.name if order.customer else '未知客户' }}</td>
+                                <td>{{ order.total_amount|float }}</td>
+                                <td>{{ order.paid_amount|float }}</td>
+                                <td>{{ (order.total_amount - order.paid_amount)|float }}</td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectOrder({{ order.id }}, '{{ order.order_number }}')">
+                                        选择
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 设置默认日期为今天（仅在新增模式下）
+    var today = new Date().toISOString().split('T')[0];
+    var receiptDate = $('input[name="receipt_date"]');
+    if (!receiptDate.val()) {
+        receiptDate.val(today);
+    }
+    
+    // 自动聚焦金额输入框
+    $('input[name="amount"]').focus();
+});
+
+function selectOrder(orderId, orderNumber) {
+    // 设置关联类型为销售订单
+    $('select[name="reference_type"]').val('sales_order');
+    // 设置关联ID
+    $('input[name="reference_id"]').val(orderId);
+    // 显示提示信息
+    alert('已选择销售订单: ' + orderNumber);
+}
+</script>
+{% endblock %}

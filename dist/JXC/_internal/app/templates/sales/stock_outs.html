@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}销售出库 - {{ super() }}{% endblock %}
+
+{% block header %}销售出库管理{% endblock %}
+
+{% block actions %}
+<div class="btn-group">
+    <a href="{{ url_for('sales.new_stock_out') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> 新建出库单
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        <!-- 搜索表单 -->
+        <form method="get" class="row g-3 mb-4">
+            <div class="col-md-3">
+                <label for="warehouse_id" class="form-label">仓库</label>
+                <select name="warehouse_id" id="warehouse_id" class="form-select">
+                    <option value="">全部仓库</option>
+                    {% for warehouse in warehouses %}
+                    <option value="{{ warehouse.id }}" {% if warehouse_id == warehouse.id %}selected{% endif %}>
+                        {{ warehouse.code }} - {{ warehouse.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="start_date" class="form-label">开始日期</label>
+                <input type="date" name="start_date" id="start_date" class="form-control" value="{{ start_date or '' }}">
+            </div>
+            <div class="col-md-2">
+                <label for="end_date" class="form-label">结束日期</label>
+                <input type="date" name="end_date" id="end_date" class="form-control" value="{{ end_date or '' }}">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search"></i> 搜索
+                </button>
+            </div>
+        </form>
+
+        <!-- 出库单列表 -->
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>出库单号</th>
+                        <th>销售订单</th>
+                        <th>仓库</th>
+                        <th>出库日期</th>
+                        <th>总金额</th>
+                        <th>经办人</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for stock_out in stock_outs.items %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('sales.view_stock_out', id=stock_out.id) }}" class="text-decoration-none">
+                                {{ stock_out.delivery_number }}
+                            </a>
+                        </td>
+                        <td>
+                            {% if stock_out.sales_order %}
+                            <a href="{{ url_for('sales.view_order', id=stock_out.sales_order.id) }}" class="text-decoration-none">
+                                {{ stock_out.sales_order.order_number }}
+                            </a>
+                            {% else %}
+                            <span class="text-muted">直接出库</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ stock_out.warehouse.code }} - {{ stock_out.warehouse.name }}</td>
+                        <td>{{ stock_out.delivery_date.strftime('%Y-%m-%d') }}</td>
+                        <td class="text-end">¥{{ "%.2f"|format(stock_out.total_amount) }}</td>
+                        <td>{{ stock_out.handler or '-' }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('sales.view_stock_out', id=stock_out.id) }}" class="btn btn-outline-info" title="查看">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% if stock_out.items|length == 0 %}
+                                <a href="{{ url_for('sales.edit_stock_out_items', id=stock_out.id) }}" class="btn btn-outline-success" title="编辑明细">
+                                    <i class="bi bi-list-check"></i>
+                                </a>
+                                <form method="post" action="{{ url_for('sales.delete_stock_out', id=stock_out.id) }}" class="d-inline">
+                                    <button type="submit" class="btn btn-outline-danger" title="删除" onclick="return confirm('确定删除此出库单？')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                                {% else %}
+                                <form method="post" action="{{ url_for('sales.complete_stock_out', id=stock_out.id) }}" class="d-inline">
+                                    <button type="submit" class="btn btn-outline-warning" title="完成出库" onclick="return confirm('确认完成出库？库存将被扣减。')">
+                                        <i class="bi bi-check-circle"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            <i class="bi bi-inbox display-6"></i>
+                            <p class="mt-2">暂无出库单</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 分页 -->
+        {% if stock_outs.pages > 1 %}
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center">
+                {% if stock_outs.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('sales.stock_outs', page=stock_outs.prev_num, warehouse_id=warehouse_id, start_date=start_date, end_date=end_date) }}">
+                        上一页
+                    </a>
+                </li>
+                {% endif %}
+                
+                {% for page_num in stock_outs.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2) %}
+                    {% if page_num %}
+                        {% if page_num == stock_outs.page %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ page_num }}</span>
+                        </li>
+                        {% else %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('sales.stock_outs', page=page_num, warehouse_id=warehouse_id, start_date=start_date, end_date=end_date) }}">
+                                {{ page_num }}
+                            </a>
+                        </li>
+                        {% endif %}
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if stock_outs.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('sales.stock_outs', page=stock_outs.next_num, warehouse_id=warehouse_id, start_date=start_date, end_date=end_date) }}">
+                        下一页
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

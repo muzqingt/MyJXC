@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block header %}{{ title }}{% endblock %}
+
+{% block actions %}
+<div class="btn-group">
+    <a href="{{ url_for('product.new_supplier') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> 添加供应商
+    </a>
+    <a href="{{ url_for('product.index') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> 返回商品
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                {% if suppliers %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>供应商编码</th>
+                                <th>供应商名称</th>
+                                <th>联系人</th>
+                                <th>电话</th>
+                                <th>邮箱</th>
+                                <th>创建时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for supplier in suppliers %}
+                            <tr>
+                                <td><code>{{ supplier.code }}</code></td>
+                                <td><strong>{{ supplier.name }}</strong></td>
+                                <td>{{ supplier.contact_person or '未设置' }}</td>
+                                <td>{{ supplier.phone or '未设置' }}</td>
+                                <td>{{ supplier.email or '未设置' }}</td>
+                                <td>{{ supplier.created_at.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('product.edit_supplier', id=supplier.id) }}" 
+                                           class="btn btn-outline-primary" title="编辑">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-outline-danger" 
+                                                data-bs-toggle="modal" data-bs-target="#deleteModal{{ supplier.id }}" title="删除">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- 删除确认模态框 -->
+                                    <div class="modal fade" id="deleteModal{{ supplier.id }}" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">确认删除</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    确定要删除供应商 "{{ supplier.name }}" 吗？
+                                                    {% if supplier.purchase_orders|length > 0 %}
+                                                    <div class="alert alert-warning mt-2">
+                                                        <i class="bi bi-exclamation-triangle"></i>
+                                                        该供应商已有 {{ supplier.purchase_orders|length }} 条采购记录，删除后相关记录将无法查看供应商信息。
+                                                    </div>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                                                    <form method="post" action="{{ url_for('product.delete_supplier', id=supplier.id) }}">
+                                                        <button type="submit" class="btn btn-danger">确认删除</button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-truck" style="font-size: 3rem;"></i>
+                    <p class="mt-2">暂无供应商数据</p>
+                    <a href="{{ url_for('product.new_supplier') }}" class="btn btn-primary mt-2">
+                        <i class="bi bi-plus-circle"></i> 添加第一个供应商
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">供应商总数</h5>
+                <h2 class="text-primary">{{ suppliers|length }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">操作提示</h5>
+                <p class="text-muted">供应商信息用于采购管理，添加商品前建议先添加供应商。</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">快速导航</h5>
+                <a href="{{ url_for('purchase.new_order') }}" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-cart-plus"></i> 新建采购
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 确认删除
+    $('.delete-btn').click(function() {
+        return confirm('确定要删除这个供应商吗？此操作不可恢复。');
+    });
+});
+</script>
+{% endblock %}

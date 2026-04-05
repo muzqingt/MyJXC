@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-4 text-gray-800">{{ title }}</h1>
+    
+    <!-- 系统概览卡片 -->
+    <div class="row">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                用户数量</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="userCount">0</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-users fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                数据库大小</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="dbSize">0 MB</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-database fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                操作日志</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="logCount">0</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-history fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                服务器时间</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="serverTime">--:--:--</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clock fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 功能导航 -->
+    <div class="row">
+        {% if current_user.role == 'admin' %}
+        <div class="col-lg-3 col-md-6 mb-4">
+            <a href="{{ url_for('system.user_management') }}" class="card text-decoration-none">
+                <div class="card-body text-center">
+                    <i class="fas fa-user-cog fa-3x text-primary mb-3"></i>
+                    <h5 class="card-title">用户管理</h5>
+                    <p class="card-text text-muted">管理系统用户和权限</p>
+                </div>
+            </a>
+        </div>
+        {% endif %}
+        
+        <div class="col-lg-3 col-md-6 mb-4">
+            <a href="{{ url_for('system.logs') }}" class="card text-decoration-none">
+                <div class="card-body text-center">
+                    <i class="fas fa-clipboard-list fa-3x text-success mb-3"></i>
+                    <h5 class="card-title">操作日志</h5>
+                    <p class="card-text text-muted">查看系统操作记录</p>
+                </div>
+            </a>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-4">
+            <a href="{{ url_for('system.backup') }}" class="card text-decoration-none">
+                <div class="card-body text-center">
+                    <i class="fas fa-save fa-3x text-warning mb-3"></i>
+                    <h5 class="card-title">数据备份</h5>
+                    <p class="card-text text-muted">备份和恢复系统数据</p>
+                </div>
+            </a>
+        </div>
+        
+        {% if current_user.role == 'admin' %}
+        <div class="col-lg-3 col-md-6 mb-4">
+            <a href="{{ url_for('system.settings') }}" class="card text-decoration-none">
+                <div class="card-body text-center">
+                    <i class="fas fa-cogs fa-3x text-info mb-3"></i>
+                    <h5 class="card-title">系统设置</h5>
+                    <p class="card-text text-muted">配置系统参数</p>
+                </div>
+            </a>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- 系统信息 -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">系统信息</h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <table class="table table-bordered">
+                        <tbody>
+                            <tr>
+                                <th width="40%">系统名称</th>
+                                <td>进销存管理系统 (MyJXC)</td>
+                            </tr>
+                            <tr>
+                                <th>当前用户</th>
+                                <td>{{ current_user.username }} ({{ current_user.role }})</td>
+                            </tr>
+                            <tr>
+                                <th>用户邮箱</th>
+                                <td>{{ current_user.email or '未设置' }}</td>
+                            </tr>
+                            <tr>
+                                <th>最后登录</th>
+                                <td>{{ current_user.last_login.strftime('%Y-%m-%d %H:%M:%S') if current_user.last_login else '从未登录' }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <table class="table table-bordered">
+                        <tbody>
+                            <tr>
+                                <th width="40%">数据库类型</th>
+                                <td>SQLite</td>
+                            </tr>
+                            <tr>
+                                <th>数据库路径</th>
+                                <td>instance/store.db</td>
+                            </tr>
+                            <tr>
+                                <th>系统版本</th>
+                                <td>1.0.0</td>
+                            </tr>
+                            <tr>
+                                <th>技术支持</th>
+                                <td>admin@example.com</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 系统维护提示 -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-warning">
+            <h6 class="m-0 font-weight-bold text-white">系统维护提示</h6>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning" role="alert">
+                <h6 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> 重要提醒</h6>
+                <p>为确保系统数据安全，请定期进行以下操作：</p>
+                <ul>
+                    <li><strong>数据备份</strong>：建议每周至少备份一次数据库</li>
+                    <li><strong>日志清理</strong>：定期清理过期的操作日志</li>
+                    <li><strong>用户管理</strong>：及时禁用不再使用的账户</li>
+                    <li><strong>系统更新</strong>：关注系统更新，及时升级到最新版本</li>
+                </ul>
+                <hr>
+                <p class="mb-0">如有任何问题，请联系系统管理员。</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // 加载系统信息
+    function loadSystemInfo() {
+        $.ajax({
+            url: "{{ url_for('system.system_info_api') }}",
+            type: 'GET',
+            success: function(data) {
+                // 更新用户数量
+                $('#userCount').text(data.user_count);
+                
+                // 更新数据库大小
+                var dbSizeMB = (data.database_size / (1024 * 1024)).toFixed(2);
+                $('#dbSize').text(dbSizeMB + ' MB');
+                
+                // 更新日志数量
+                $('#logCount').text(data.log_count);
+                
+                // 更新服务器时间
+                $('#serverTime').text(data.server_time.split(' ')[1]);
+            },
+            error: function(xhr) {
+                if (xhr.status === 403) {
+                    // 非管理员用户，隐藏系统信息
+                    $('.card.border-left-success, .card.border-left-warning').hide();
+                }
+            }
+        });
+    }
+    
+    // 更新服务器时间
+    function updateServerTime() {
+        var now = new Date();
+        var timeStr = now.getHours().toString().padStart(2, '0') + ':' + 
+                      now.getMinutes().toString().padStart(2, '0') + ':' + 
+                      now.getSeconds().toString().padStart(2, '0');
+        $('#serverTime').text(timeStr);
+    }
+    
+    // 初始加载
+    loadSystemInfo();
+    updateServerTime();
+    
+    // 每秒更新一次时间
+    setInterval(updateServerTime, 1000);
+    
+    // 每5分钟刷新一次系统信息
+    setInterval(loadSystemInfo, 5 * 60 * 1000);
+});
+</script>
+{% endblock %}

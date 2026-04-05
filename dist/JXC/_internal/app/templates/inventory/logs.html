@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-0 text-gray-800">{{ title }}</h1>
+        </div>
+        <div class="col-auto">
+            <button class="btn btn-primary" onclick="exportLogs()">
+                <i class="fas fa-download"></i> 导出日志
+            </button>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-lg-3">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                入库记录
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="stockInCount">0</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-arrow-down fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                出库记录
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="stockOutCount">0</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-arrow-up fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                调拨记录
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="transferCount">0</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exchange-alt fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                盘点记录
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="checkCount">0</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clipboard-check fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex flex-wrap align-items-center gap-2">
+            <h6 class="m-0 font-weight-bold text-primary me-auto">库存流水记录</h6>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <label class="mb-0 text-nowrap">日期:</label>
+                <input type="date" class="form-control form-control-sm" style="width: 130px;" id="startDate" value="{{ start_date }}">
+                <span class="text-nowrap">至</span>
+                <input type="date" class="form-control form-control-sm" style="width: 130px;" id="endDate" value="{{ end_date }}">
+                <label class="mb-0 text-nowrap ml-2">类型:</label>
+                <select class="form-control form-control-sm" style="width: 100px;" id="logType">
+                    <option value="">所有</option>
+                    <option value="in" {% if log_type == 'in' %}selected{% endif %}>入库</option>
+                    <option value="out" {% if log_type == 'out' %}selected{% endif %}>出库</option>
+                    <option value="transfer" {% if log_type == 'transfer' %}selected{% endif %}>调拨</option>
+                    <option value="check" {% if log_type == 'check' %}selected{% endif %}>盘点</option>
+                    <option value="adjust" {% if log_type == 'adjust' %}selected{% endif %}>调整</option>
+                </select>
+                <button class="btn btn-sm btn-primary" onclick="filterLogs()">
+                    <i class="fas fa-filter"></i> 筛选
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="logsTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>单号</th>
+                            <th>关联信息</th>
+                            <th>类型</th>
+                            <th>商品</th>
+                            <th>仓库</th>
+                            <th>数量</th>
+                            <th>操作前库存</th>
+                            <th>操作后库存</th>
+                            <th>操作人</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logsBody">
+                        {% for log in logs %}
+                        <tr>
+                            <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                            <td>
+                                {% if log.reference_type == 'stock_in' %}
+                                    {% if log.stock_in %}
+                                        <a href="{{ url_for('purchase.view_stock_in', id=log.stock_in.id) }}">{{ log.stock_in.receipt_number }}</a>
+                                    {% else %}
+                                        {{ log.reference_number or 'N/A' }}
+                                    {% endif %}
+                                {% elif log.reference_type == 'stock_out' %}
+                                    {% if log.stock_out %}
+                                        <a href="{{ url_for('sales.view_stock_out', id=log.stock_out.id) }}">{{ log.stock_out.delivery_number }}</a>
+                                    {% else %}
+                                        {{ log.reference_number or 'N/A' }}
+                                    {% endif %}
+                                {% else %}
+                                    {{ log.reference_number or 'N/A' }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if log.reference_type == 'stock_in' and log.stock_in and log.stock_in.purchase_order %}
+                                    <a href="{{ url_for('purchase.view_order', id=log.stock_in.purchase_order.id) }}">{{ log.stock_in.purchase_order.supplier.name }}</a>
+                                {% elif log.reference_type == 'stock_out' and log.stock_out and log.stock_out.sales_order %}
+                                    <a href="{{ url_for('sales.view_order', id=log.stock_out.sales_order.id) }}">{{ log.stock_out.sales_order.customer.name }}</a>
+                                {% elif log.reference_type == 'stock_transfer' %}
+                                    调拨
+                                {% elif log.reference_type == 'stock_check' %}
+                                    盘点
+                                {% elif log.reference_type == 'stock_adjust' %}
+                                    调整
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if log.change_type == 'in' %}
+                                <span class="badge bg-primary">入库</span>
+                                {% elif log.change_type == 'out' %}
+                                <span class="badge bg-success">出库</span>
+                                {% elif log.change_type == 'transfer' %}
+                                <span class="badge bg-warning text-dark">调拨</span>
+                                {% elif log.change_type == 'check_in' or log.change_type == 'check_out' %}
+                                <span class="badge bg-info">盘点</span>
+                                {% elif log.change_type == 'adjust_in' or log.change_type == 'adjust_out' %}
+                                <span class="badge bg-secondary">调整</span>
+                                {% else %}
+                                <span class="badge bg-dark">{{ log.change_type }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if log.product %}
+                                {{ log.product.code }} - {{ log.product.name }}
+                                {% else %}
+                                未知商品
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if log.warehouse %}
+                                {{ log.warehouse.name }}
+                                {% else %}
+                                未知仓库
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                {% if log.quantity > 0 %}
+                                <span class="text-success">+{{ log.quantity|float }}</span>
+                                {% else %}
+                                <span class="text-danger">{{ log.quantity|float }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">{{ log.before_quantity|float }}</td>
+                            <td class="text-end">{{ log.after_quantity|float }}</td>
+                            <td>
+                                {% if log.creator %}
+                                {{ log.creator.username }}
+                                {% else %}
+                                系统
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // 加载统计信息
+    loadStatistics();
+});
+
+function loadStatistics() {
+    $.ajax({
+        url: '/inventory/api/logs-statistics',
+        method: 'GET',
+        success: function(data) {
+            $('#stockInCount').text(data.stock_in_count || 0);
+            $('#stockOutCount').text(data.stock_out_count || 0);
+            $('#transferCount').text(data.transfer_count || 0);
+            $('#checkCount').text(data.check_count || 0);
+        }
+    });
+}
+
+function filterLogs() {
+    var startDate = $('#startDate').val();
+    var endDate = $('#endDate').val();
+    var logType = $('#logType').val();
+    
+    // 构建URL参数
+    var params = [];
+    if (startDate) params.push('start_date=' + startDate);
+    if (endDate) params.push('end_date=' + endDate);
+    if (logType) params.push('log_type=' + logType);
+    
+    // 跳转到筛选页面
+    window.location.href = '{{ url_for("inventory.stock_logs") }}' + (params.length > 0 ? '?' + params.join('&') : '');
+}
+
+function exportLogs() {
+    var startDate = $('#startDate').val();
+    var endDate = $('#endDate').val();
+    var logType = $('#logType').val();
+    
+    var url = '/inventory/api/export-logs?';
+    var params = [];
+    
+    if (startDate) params.push('start_date=' + startDate);
+    if (endDate) params.push('end_date=' + endDate);
+    if (logType) params.push('log_type=' + logType);
+    
+    if (params.length > 0) {
+        url += params.join('&');
+    }
+    
+    window.location.href = url;
+}
+</script>
+{% endblock %}

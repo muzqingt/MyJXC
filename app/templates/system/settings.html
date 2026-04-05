@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-0 text-gray-800">{{ title }}</h1>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6">
+            <!-- 系统信息卡片 -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">系统信息</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered" width="100%" cellspacing="0">
+                            <tbody>
+                                <tr>
+                                    <th width="40%">数据库大小</th>
+                                    <td id="db-size">加载中...</td>
+                                </tr>
+                                <tr>
+                                    <th>用户数量</th>
+                                    <td id="user-count">加载中...</td>
+                                </tr>
+                                <tr>
+                                    <th>日志数量</th>
+                                    <td id="log-count">加载中...</td>
+                                </tr>
+                                <tr>
+                                    <th>服务器时间</th>
+                                    <td id="server-time">加载中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="refreshSystemInfo()">
+                        <i class="fas fa-sync-alt"></i> 刷新信息
+                    </button>
+                </div>
+            </div>
+
+            <!-- 系统设置卡片 -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">系统设置</h6>
+                </div>
+                <div class="card-body">
+                    <form id="systemSettingsForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="form-group">
+                            <label for="COMPANY_NAME">公司名称</label>
+                            <input type="text" class="form-control" id="COMPANY_NAME" name="COMPANY_NAME" value="{{ config.get('COMPANY_NAME', '') }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="COMPANY_ADDRESS">公司地址</label>
+                            <input type="text" class="form-control" id="COMPANY_ADDRESS" name="COMPANY_ADDRESS" value="{{ config.get('COMPANY_ADDRESS', '') }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="COMPANY_PHONE">联系电话</label>
+                            <input type="text" class="form-control" id="COMPANY_PHONE" name="COMPANY_PHONE" value="{{ config.get('COMPANY_PHONE', '') }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="DEFAULT_CURRENCY">默认货币</label>
+                            <select class="form-control" id="DEFAULT_CURRENCY" name="DEFAULT_CURRENCY">
+                                <option value="CNY" {% if config.get('DEFAULT_CURRENCY', 'CNY') == 'CNY' %}selected{% endif %}>人民币 (CNY)</option>
+                                <option value="USD" {% if config.get('DEFAULT_CURRENCY', 'CNY') == 'USD' %}selected{% endif %}>美元 (USD)</option>
+                                <option value="EUR" {% if config.get('DEFAULT_CURRENCY', 'CNY') == 'EUR' %}selected{% endif %}>欧元 (EUR)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ITEMS_PER_PAGE">每页显示数量</label>
+                            <input type="number" class="form-control" id="ITEMS_PER_PAGE" name="ITEMS_PER_PAGE" value="{{ config.get('ITEMS_PER_PAGE', 20) }}" min="10" max="100">
+                        </div>
+                        <div class="form-group">
+                            <div class="custom-control custom-switch">
+                                <input type="checkbox" class="custom-control-input" id="ENABLE_BACKUP" name="ENABLE_BACKUP" value="1" {% if config.get('ENABLE_BACKUP', True) %}checked{% endif %}>
+                                <label class="custom-control-label" for="ENABLE_BACKUP">启用自动备份</label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <div class="custom-control custom-switch">
+                                <input type="checkbox" class="custom-control-input" id="ENABLE_LOGGING" name="ENABLE_LOGGING" value="1" {% if config.get('ENABLE_LOGGING', True) %}checked{% endif %}>
+                                <label class="custom-control-label" for="ENABLE_LOGGING">启用操作日志</label>
+                            </div>
+                        </div>
+                        <button id="btn-save-settings" type="submit" class="btn btn-primary">保存设置</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <!-- 数据库维护卡片 -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">数据库维护</h6>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 定期维护数据库可以优化性能并清理无用数据。
+                    </div>
+                    
+                    <div class="mb-3">
+                        <button id="btn-optimize" class="btn btn-warning btn-block mb-2" onclick="optimizeDatabase()">
+                            <i class="fas fa-tools"></i> 优化数据库
+                        </button>
+                        <small class="text-muted">优化数据库表结构，提高查询性能</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <button id="btn-clean" class="btn btn-danger btn-block mb-2" onclick="cleanOldLogs()">
+                            <i class="fas fa-trash-alt"></i> 清理旧日志
+                        </button>
+                        <small class="text-muted">删除90天前的操作日志</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <button id="btn-export" class="btn btn-secondary btn-block mb-2" onclick="exportDatabase()">
+                            <i class="fas fa-download"></i> 导出数据库
+                        </button>
+                        <small class="text-muted">导出当前数据库为SQL文件</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 系统日志卡片 -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-primary">最近系统日志</h6>
+                    <a href="{{ url_for('system.logs') }}" class="btn btn-sm btn-primary">查看全部</a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th>时间</th>
+                                    <th>用户</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recent-logs">
+                                <tr>
+                                    <td colspan="3" class="text-center">加载中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // 加载系统信息
+    loadSystemInfo();
+    loadRecentLogs();
+
+    // 系统设置表单提交
+    $('#systemSettingsForm').submit(function(e) {
+        e.preventDefault();
+        var btn = $('#btn-save-settings');
+        var originalText = '保存设置';
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm mr-1"></span>处理中...');
+        
+        $.ajax({
+            url: '/system/api/system/settings',
+            method: 'POST',
+            data: $(this).serialize(),
+            headers: {
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            success: function(response) {
+                btn.prop('disabled', false).removeClass('btn-primary').addClass('btn-success').text('保存成功');
+                setTimeout(function() {
+                    btn.removeClass('btn-success').addClass('btn-primary').text(originalText);
+                }, 1000);
+            },
+            error: function(xhr) {
+                btn.prop('disabled', false).removeClass('btn-primary').addClass('btn-danger').text('请求失败' + xhr.status);
+                setTimeout(function() {
+                    btn.removeClass('btn-danger').addClass('btn-primary').text(originalText);
+                }, 1500);
+            }
+        });
+    });
+});
+
+function loadSystemInfo() {
+    $.ajax({
+        url: '/system/api/system-info',
+        method: 'GET',
+        success: function(data) {
+            $('#db-size').text(formatFileSize(data.database_size));
+            $('#user-count').text(data.user_count);
+            $('#log-count').text(data.log_count);
+            $('#server-time').text(data.server_time);
+        }
+    });
+}
+
+function loadRecentLogs() {
+    $.ajax({
+        url: '/system/api/system/recent-logs',
+        method: 'GET',
+        success: function(logs) {
+            var html = '';
+            if (logs.length === 0) {
+                html = '<tr><td colspan="3" class="text-center">暂无日志</td></tr>';
+            } else {
+                logs.forEach(function(log) {
+                    html += '<tr>' +
+                        '<td>' + log.created_at + '</td>' +
+                        '<td>' + (log.username || '系统') + '</td>' +
+                        '<td>' + log.action + '</td>' +
+                        '</tr>';
+                });
+            }
+            $('#recent-logs').html(html);
+        }
+    });
+}
+
+function refreshSystemInfo() {
+    loadSystemInfo();
+    loadRecentLogs();
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    var k = 1024;
+    var sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    var i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function optimizeDatabase() {
+    if (!confirm('确定要优化数据库吗？这可能需要一些时间。')) return;
+    
+    var btn = $('#btn-optimize');
+    var originalText = btn.text();
+    btn.prop('disabled', true).text('处理中...');
+    
+    $.ajax({
+        url: '/system/api/system/optimize-db',
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        success: function(response) {
+            if (response.success) {
+                btn.removeClass('btn-warning').addClass('btn-success').text('优化成功');
+                setTimeout(function() {
+                    btn.removeClass('btn-success').addClass('btn-warning').text(originalText).prop('disabled', false);
+                    refreshSystemInfo();
+                }, 1000);
+            } else {
+                btn.addClass('btn-danger').text('优化失败');
+                setTimeout(function() {
+                    btn.removeClass('btn-danger').text(originalText).prop('disabled', false);
+                }, 1500);
+            }
+        },
+        error: function() {
+            btn.addClass('btn-danger').text('请求失败');
+            setTimeout(function() {
+                btn.removeClass('btn-danger').text(originalText).prop('disabled', false);
+            }, 1500);
+        }
+    });
+}
+
+function cleanOldLogs() {
+    if (!confirm('确定要清理90天前的日志吗？此操作不可恢复。')) return;
+    
+    var btn = $('#btn-clean');
+    var originalText = btn.text();
+    btn.prop('disabled', true).text('处理中...');
+    
+    $.ajax({
+        url: '/system/api/system/clean-logs',
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        success: function(response) {
+            if (response.success) {
+                btn.removeClass('btn-danger').addClass('btn-success').text('清理成功');
+                setTimeout(function() {
+                    btn.removeClass('btn-success').addClass('btn-danger').text(originalText).prop('disabled', false);
+                    refreshSystemInfo();
+                }, 1000);
+            } else {
+                btn.addClass('btn-warning').text('清理失败');
+                setTimeout(function() {
+                    btn.removeClass('btn-warning').addClass('btn-danger').text(originalText).prop('disabled', false);
+                }, 1500);
+            }
+        },
+        error: function() {
+            btn.addClass('btn-warning').text('请求失败');
+            setTimeout(function() {
+                btn.removeClass('btn-warning').addClass('btn-danger').text(originalText).prop('disabled', false);
+            }, 1500);
+        }
+    });
+}
+
+function exportDatabase() {
+    if (!confirm('确定要导出数据库吗？')) return;
+    
+    var btn = $('#btn-export');
+    var originalText = btn.text();
+    btn.prop('disabled', true).text('导出中...');
+    
+    window.location.href = '/system/api/system/export-db';
+    setTimeout(function() {
+        btn.text('导出成功');
+        setTimeout(function() {
+            btn.text(originalText).prop('disabled', false);
+        }, 1000);
+    }, 500);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,524 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block header %}{{ title }}{% endblock %}
+
+{% block actions %}
+<div class="btn-group">
+    <a href="{{ url_for('purchase.new_order') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> 新建采购订单
+    </a>
+    <a href="{{ url_for('purchase.new_stock_in') }}" class="btn btn-success">
+        <i class="bi bi-box-arrow-in-down"></i> 新建入库单
+    </a>
+    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#filterModal">
+        <i class="bi bi-funnel"></i> 筛选
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- 筛选表单 -->
+<div class="modal fade" id="filterModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">筛选条件</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="get" action="{{ url_for('purchase.index') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">订单状态</label>
+                        <select class="form-select" name="status">
+                            <option value="">全部状态</option>
+                            <option value="confirmed" {% if status == 'confirmed' %}selected{% endif %}>已确认</option>
+                            <option value="partial" {% if status == 'partial' %}selected{% endif %}>部分入库</option>
+                            <option value="completed" {% if status == 'completed' %}selected{% endif %}>已完成</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">供应商</label>
+                        <select class="form-select" name="supplier_id">
+                            <option value="">全部供应商</option>
+                            {% for supplier in suppliers %}
+                            <option value="{{ supplier.id }}" {% if supplier_id == supplier.id %}selected{% endif %}>
+                                {{ supplier.code }} - {{ supplier.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">仓库</label>
+                        <select class="form-select" name="warehouse_id">
+                            <option value="">全部仓库</option>
+                            {% for warehouse in warehouses %}
+                            <option value="{{ warehouse.id }}" {% if warehouse_id == warehouse.id %}selected{% endif %}>
+                                {{ warehouse.code }} - {{ warehouse.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">开始日期</label>
+                                <input type="date" class="form-control" name="start_date" value="{{ start_date or '' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">结束日期</label>
+                                <input type="date" class="form-control" name="end_date" value="{{ end_date or '' }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <a href="{{ url_for('purchase.index') }}" class="btn btn-outline-secondary">重置</a>
+                    <button type="submit" class="btn btn-primary">应用筛选</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 标签页导航 -->
+<ul class="nav nav-tabs mb-3" id="purchaseTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders" type="button" role="tab">
+            <i class="bi bi-file-earmark-text"></i> 采购订单
+            {% if orders.total > 0 %}
+            <span class="badge bg-primary">{{ orders.total }}</span>
+            {% endif %}
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="stockins-tab" data-bs-toggle="tab" data-bs-target="#stockins" type="button" role="tab">
+            <i class="bi bi-box-arrow-in-down"></i> 采购入库
+            {% if stock_ins.total > 0 %}
+            <span class="badge bg-success">{{ stock_ins.total }}</span>
+            {% endif %}
+        </button>
+    </li>
+</ul>
+
+<!-- 标签页内容 -->
+<div class="tab-content" id="purchaseTabContent">
+    <!-- 采购订单标签页 -->
+    <div class="tab-pane fade show active" id="orders" role="tabpanel">
+        <div class="card">
+            <div class="card-body">
+                {% if orders.items %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>订单号</th>
+                                <th>供应商</th>
+                                <th>仓库</th>
+                                <th>订单日期</th>
+                                <th>预计到货</th>
+                                <th>总金额</th>
+                                <th>状态</th>
+                                <th>创建人</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in orders.items %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('purchase.view_order', id=order.id) }}" class="text-decoration-none">
+                                        <strong>{{ order.order_number }}</strong>
+                                    </a>
+                                    {% if order.notes %}
+                                    <br><small class="text-muted">{{ order.notes|truncate(30) }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if order.supplier %}
+                                    <span class="badge bg-info">{{ order.supplier.name }}</span>
+                                    {% else %}
+                                    <span class="text-muted">未知供应商</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if order.warehouse %}
+                                    <span class="badge bg-secondary">{{ order.warehouse.name }}</span>
+                                    {% else %}
+                                    <span class="text-muted">未知仓库</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ order.order_date.strftime('%Y-%m-%d') }}</td>
+                                <td>{{ order.expected_date.strftime('%Y-%m-%d') if order.expected_date else '-' }}</td>
+                                <td>
+                                    <strong class="text-primary">¥{{ "%.2f"|format(order.total_amount) }}</strong>
+                                </td>
+                                <td>
+                                    {% if order.status == 'completed' %}
+                                    <span class="badge bg-success">已入库</span>
+                                    {% elif order.status == 'partial' %}
+                                    <span class="badge bg-info">部分入库</span>
+                                    {% else %}
+                                    <span class="badge bg-warning">未入库</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if order.creator %}
+                                    <small>{{ order.creator.username }}</small>
+                                    {% else %}
+                                    <small class="text-muted">未知</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('purchase.view_order', id=order.id) }}" 
+                                           class="btn btn-outline-primary" title="查看详情">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        {% if order.status != 'completed' and order.status != 'cancelled' %}
+                                        <a href="{{ url_for('purchase.edit_order', id=order.id) }}" 
+                                           class="btn btn-outline-warning" title="编辑">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <form method="post" action="{{ url_for('purchase.quick_stock_in', id=order.id) }}" 
+                                              class="d-inline" onsubmit="return confirm('确认快捷入库？此操作将根据订单内容直接入库。');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-outline-success" title="快捷入库">
+                                                <i class="bi bi-box-arrow-in-down"></i> 入库
+                                            </button>
+                                        </form>
+                                        <form method="post" action="{{ url_for('purchase.delete_order', id=order.id) }}" 
+                                              class="d-inline" onsubmit="return confirm('删除此订单？');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-outline-danger" title="删除">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- 订单分页 -->
+                <nav aria-label="订单分页">
+                    <ul class="pagination justify-content-center">
+                        {% if orders.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('purchase.index', page=orders.prev_num, status=status, supplier_id=supplier_id, warehouse_id=warehouse_id, start_date=start_date, end_date=end_date, tab='orders') }}">上一页</a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">上一页</span>
+                        </li>
+                        {% endif %}
+                        
+                        {% for page_num in orders.iter_pages(left_edge=2, left_current=2, right_current=2, right_edge=2) %}
+                            {% if page_num %}
+                                {% if page_num == orders.page %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page_num }}</span>
+                                </li>
+                                {% else %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('purchase.index', page=page_num, status=status, supplier_id=supplier_id, warehouse_id=warehouse_id, start_date=start_date, end_date=end_date, tab='orders') }}">{{ page_num }}</a>
+                                </li>
+                                {% endif %}
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if orders.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('purchase.index', page=orders.next_num, status=status, supplier_id=supplier_id, warehouse_id=warehouse_id, start_date=start_date, end_date=end_date, tab='orders') }}">下一页</a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">下一页</span>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-cart" style="font-size: 3rem;"></i>
+                    <p class="mt-2">暂无采购订单</p>
+                    <a href="{{ url_for('purchase.new_order') }}" class="btn btn-primary mt-2">
+                        <i class="bi bi-plus-circle"></i> 创建第一个订单
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 采购入库标签页 -->
+    <div class="tab-pane fade" id="stockins" role="tabpanel">
+        <div class="card">
+            <div class="card-body">
+                {% if stock_ins.items %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>入库单号</th>
+                                <th>采购订单</th>
+                                <th>仓库</th>
+                                <th>入库日期</th>
+                                <th>经手人</th>
+                                <th>总金额</th>
+                                <th>状态</th>
+                                <th>创建人</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stock_in in stock_ins.items %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('purchase.view_stock_in', id=stock_in.id) }}" class="text-decoration-none">
+                                        <strong>{{ stock_in.receipt_number }}</strong>
+                                    </a>
+                                    {% if stock_in.notes %}
+                                    <br><small class="text-muted">{{ stock_in.notes|truncate(30) }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if stock_in.purchase_order %}
+                                    <a href="{{ url_for('purchase.view_order', id=stock_in.purchase_order.id) }}" class="badge bg-info text-decoration-none">
+                                        {{ stock_in.purchase_order.order_number }}
+                                    </a>
+                                    {% else %}
+                                    <span class="badge bg-secondary">直接入库</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if stock_in.warehouse %}
+                                    <span class="badge bg-primary">{{ stock_in.warehouse.name }}</span>
+                                    {% else %}
+                                    <span class="text-muted">未知仓库</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ stock_in.receipt_date.strftime('%Y-%m-%d') }}</td>
+                                <td>{{ stock_in.handler or '-' }}</td>
+                                <td>
+                                    <strong class="text-primary">¥{{ "%.2f"|format(stock_in.total_amount) }}</strong>
+                                </td>
+                                <td>
+                                    {% if stock_in.status == 'draft' %}
+                                    <span class="badge bg-secondary">草稿</span>
+                                    {% elif stock_in.status == 'completed' %}
+                                    <span class="badge bg-success">已完成</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if stock_in.creator %}
+                                    <small>{{ stock_in.creator.username }}</small>
+                                    {% else %}
+                                    <small class="text-muted">未知</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('purchase.view_stock_in', id=stock_in.id) }}" 
+                                           class="btn btn-outline-primary" title="查看">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        {% if stock_in.status == 'draft' %}
+                                        <a href="{{ url_for('purchase.edit_stock_in_items', id=stock_in.id) }}" 
+                                           class="btn btn-outline-info" title="编辑明细">
+                                            <i class="bi bi-list-check"></i>
+                                        </a>
+                                        {% if stock_in.items|length > 0 %}
+                                        <form method="post" action="{{ url_for('purchase.complete_stock_in', id=stock_in.id) }}" 
+                                              class="d-inline" onsubmit="return confirm('确认完成入库？库存将被更新。');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-outline-success" title="完成入库">
+                                                <i class="bi bi-check-circle"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                        <form method="post" action="{{ url_for('purchase.delete_stock_in', id=stock_in.id) }}" 
+                                              class="d-inline" onsubmit="return confirm('删除此入库单？');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-outline-danger" title="删除">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- 入库分页 -->
+                <nav aria-label="入库单分页">
+                    <ul class="pagination justify-content-center">
+                        {% if stock_ins.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('purchase.index', page=stock_ins.prev_num, status=status, supplier_id=supplier_id, warehouse_id=warehouse_id, start_date=start_date, end_date=end_date, tab='stockins') }}">上一页</a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">上一页</span>
+                        </li>
+                        {% endif %}
+                        
+                        {% for page_num in stock_ins.iter_pages(left_edge=2, left_current=2, right_current=2, right_edge=2) %}
+                            {% if page_num %}
+                                {% if page_num == stock_ins.page %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page_num }}</span>
+                                </li>
+                                {% else %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('purchase.index', page=page_num, status=status, supplier_id=supplier_id, warehouse_id=warehouse_id, start_date=start_date, end_date=end_date, tab='stockins') }}">{{ page_num }}</a>
+                                </li>
+                                {% endif %}
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if stock_ins.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('purchase.index', page=stock_ins.next_num, status=status, supplier_id=supplier_id, warehouse_id=warehouse_id, start_date=start_date, end_date=end_date, tab='stockins') }}">下一页</a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">下一页</span>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-box-arrow-in-down" style="font-size: 3rem;"></i>
+                    <p class="mt-2">暂无入库单</p>
+                    <a href="{{ url_for('purchase.new_stock_in') }}" class="btn btn-primary mt-2">
+                        <i class="bi bi-plus-circle"></i> 创建第一个入库单
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 统计卡片 -->
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">订单总数</h5>
+                <h2 class="text-primary">{{ orders.total }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">入库单总数</h5>
+                <h2 class="text-success">{{ stock_ins.total }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">订单总金额</h5>
+                <h2 class="text-info" id="orderTotalAmount">¥0.00</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">入库总金额</h5>
+                <h2 class="text-success" id="stockInTotalAmount">¥0.00</h2>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 统计总金额
+    function updateStats() {
+        let orderTotalAmount = 0;
+        let stockInTotalAmount = 0;
+        
+        // 统计订单金额
+        $('#orders tbody tr').each(function() {
+            const amountText = $(this).find('td:nth-child(6) strong').text();
+            if (amountText) {
+                const amount = parseFloat(amountText.replace('¥', '').replace(',', ''));
+                if (!isNaN(amount)) orderTotalAmount += amount;
+            }
+        });
+        
+        // 统计入库金额
+        $('#stockins tbody tr').each(function() {
+            const amountText = $(this).find('td:nth-child(6) strong').text();
+            if (amountText) {
+                const amount = parseFloat(amountText.replace('¥', '').replace(',', ''));
+                if (!isNaN(amount)) stockInTotalAmount += amount;
+            }
+        });
+        
+        $('#orderTotalAmount').text('¥' + orderTotalAmount.toFixed(2));
+        $('#stockInTotalAmount').text('¥' + stockInTotalAmount.toFixed(2));
+    }
+    
+    updateStats();
+    
+    // 处理标签页切换
+    const urlParams = new URLSearchParams(window.location.search);
+    const tab = urlParams.get('tab');
+    
+    // 优先从URL参数获取，其次从localStorage获取
+    let activeTab = tab;
+    if (!activeTab) {
+        activeTab = localStorage.getItem('purchaseActiveTab') || 'orders';
+    }
+    
+    if (activeTab === 'stockins') {
+        const stockInsTab = new bootstrap.Tab(document.querySelector('#stockins-tab'));
+        stockInsTab.show();
+    }
+    
+    // 监听标签页切换，保存到localStorage并清理URL参数
+    document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(tabEl => {
+        tabEl.addEventListener('shown.bs.tab', function (e) {
+            const targetId = e.target.getAttribute('data-bs-target');
+            if (targetId === '#orders') {
+                localStorage.setItem('purchaseActiveTab', 'orders');
+            } else if (targetId === '#stockins') {
+                localStorage.setItem('purchaseActiveTab', 'stockins');
+            }
+            
+            // 清理URL中的tab参数，保持URL干净
+            const url = new URL(window.location);
+            url.searchParams.delete('tab');
+            window.history.replaceState({}, '', url);
+        });
+    });
+});
+</script>
+{% endblock %}

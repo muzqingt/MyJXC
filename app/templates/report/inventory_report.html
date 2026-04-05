@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block header %}{{ title }}{% endblock %}
+
+{% block actions %}
+<div class="btn-group">
+    <input type="date" class="form-control" id="startDate" value="{{ start_date }}" style="width: 120px;">
+    <span class="input-group-text">至</span>
+    <input type="date" class="form-control" id="endDate" value="{{ end_date }}" style="width: 120px;">
+    <button class="btn btn-primary" onclick="loadReport()">
+        <i class="bi bi-search"></i> 查询
+    </button>
+    <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
+        <i class="bi bi-download"></i> 导出
+    </button>
+    <ul class="dropdown-menu">
+        <li><a class="dropdown-item" href="{{ url_for('report.export_inventory', start_date=start_date, end_date=end_date) }}">Excel</a></li>
+        <li><a class="dropdown-item" href="#" onclick="alert('PDF导出功能开发中')">PDF</a></li>
+    </ul>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped">
+                <thead class="table-primary">
+                    <tr>
+                        <th>序号</th>
+                        <th>商品编码</th>
+                        <th>商品名称</th>
+                        <th>单位</th>
+                        <th class="text-end">期初库存</th>
+                        <th class="text-end">采购数量</th>
+                        <th class="text-end">采购金额</th>
+                        <th class="text-end">销售数量</th>
+                        <th class="text-end">销售金额</th>
+                        <th class="text-end">期末库存</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in report_data %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ item.code }}</td>
+                        <td>{{ item.name }}</td>
+                        <td>{{ item.unit }}</td>
+                        <td class="text-end">{{ "%.2f"|format(item.beginning_stock) }}</td>
+                        <td class="text-end">{{ "%.2f"|format(item.purchase_quantity) }}</td>
+                        <td class="text-end">¥{{ "%.2f"|format(item.purchase_amount) }}</td>
+                        <td class="text-end">{{ "%.2f"|format(item.sales_quantity) }}</td>
+                        <td class="text-end">¥{{ "%.2f"|format(item.sales_amount) }}</td>
+                        <td class="text-end">{{ "%.2f"|format(item.ending_stock) }}</td>
+                        <td>
+                            <a href="{{ url_for('product.view_product', id=item.id) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i> 查看
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="11" class="text-center text-muted">暂无进销存数据</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="table-secondary">
+                        <td colspan="4" class="text-end"><strong>总计：</strong></td>
+                        <td class="text-end"><strong>{{ "%.2f"|format(report_data|sum(attribute='beginning_stock')) }}</strong></td>
+                        <td class="text-end"><strong>{{ "%.2f"|format(report_data|sum(attribute='purchase_quantity')) }}</strong></td>
+                        <td class="text-end"><strong>¥{{ "%.2f"|format(report_data|sum(attribute='purchase_amount')) }}</strong></td>
+                        <td class="text-end"><strong>{{ "%.2f"|format(report_data|sum(attribute='sales_quantity')) }}</strong></td>
+                        <td class="text-end"><strong>¥{{ "%.2f"|format(report_data|sum(attribute='sales_amount')) }}</strong></td>
+                        <td class="text-end"><strong>{{ "%.2f"|format(report_data|sum(attribute='ending_stock')) }}</strong></td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">采购金额TOP10</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    {% set top_purchase = report_data|sort(attribute='purchase_amount', reverse=True) %}
+                    {% for item in top_purchase[:10] %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="badge bg-primary me-2">{{ loop.index }}</span>
+                            {{ item.name }}
+                        </div>
+                        <span class="badge bg-success rounded-pill">¥{{ "%.2f"|format(item.purchase_amount) }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">销售金额TOP10</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    {% set top_sales = report_data|sort(attribute='sales_amount', reverse=True) %}
+                    {% for item in top_sales[:10] %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="badge bg-primary me-2">{{ loop.index }}</span>
+                            {{ item.name }}
+                        </div>
+                        <span class="badge bg-success rounded-pill">¥{{ "%.2f"|format(item.sales_amount) }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function loadReport() {
+    var startDate = document.getElementById('startDate').value;
+    var endDate = document.getElementById('endDate').value;
+    window.location.href = "{{ url_for('report.inventory_report') }}?start_date=" + startDate + "&end_date=" + endDate;
+}
+
+$(document).ready(function() {
+    // 设置日期选择器的最大值为今天
+    var today = new Date().toISOString().split('T')[0];
+    document.getElementById('startDate').max = today;
+    document.getElementById('endDate').max = today;
+    
+    console.log('进销存报表页面加载完成');
+});
+</script>
+{% endblock %}
