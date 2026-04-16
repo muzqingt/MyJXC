@@ -1,7 +1,7 @@
 from flask import render_template, redirect, url_for, flash, request, jsonify, Blueprint
 from flask_login import login_required, current_user
 from app import db
-from app.models import PurchaseOrder, PurchaseOrderItem, StockIn, StockInItem, Supplier, Warehouse, Product, StockLog, Log
+from app.models import PurchaseOrder, SystemSetting, PurchaseOrderItem, StockIn, StockInItem, Supplier, Warehouse, Product, StockLog, Log
 from app.forms import PurchaseOrderForm, PurchaseOrderItemForm, StockInForm
 from datetime import datetime
 import urllib.parse
@@ -100,6 +100,14 @@ def new_order():
         'purchase_price': float(p.purchase_price) if p.purchase_price else 0,
         'stock_quantity': float(p.stock_quantity) if p.stock_quantity else 0
     } for p in products]
+    
+    # 获取默认仓库设置
+    default_warehouse_id = SystemSetting.get_value('DEFAULT_WAREHOUSE')
+    if default_warehouse_id:
+        try:
+            default_warehouse_id = int(default_warehouse_id)
+        except (ValueError, TypeError):
+            default_warehouse_id = None
     
     if request.method == 'POST':
         action = request.form.get('action', 'save')
@@ -280,7 +288,8 @@ def new_order():
                          suppliers=suppliers_data,
                          warehouses=warehouses,
                          products=products_data,
-                         action='new')
+                         action='new',
+                         default_warehouse_id=default_warehouse_id)
 
 @bp.route('/orders/<int:id>/edit', methods=['GET', 'POST'])
 @login_required

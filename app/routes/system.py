@@ -211,6 +211,8 @@ def settings():
     
     from app.models import SystemSetting
     # 从数据库加载设置
+    from app.models import Warehouse
+    warehouses = Warehouse.query.all()
     config = {
         'COMPANY_NAME': SystemSetting.get_value('COMPANY_NAME', ''),
         'COMPANY_ADDRESS': SystemSetting.get_value('COMPANY_ADDRESS', ''),
@@ -219,9 +221,10 @@ def settings():
         'ITEMS_PER_PAGE': SystemSetting.get_value('ITEMS_PER_PAGE', '20'),
         'ENABLE_BACKUP': SystemSetting.get_value('ENABLE_BACKUP', '1') == '1',
         'ENABLE_LOGGING': SystemSetting.get_value('ENABLE_LOGGING', '1') == '1',
+        'DEFAULT_WAREHOUSE': SystemSetting.get_value('DEFAULT_WAREHOUSE', ''),
     }
     
-    return render_template('system/settings.html', title='系统设置', config=config)
+    return render_template('system/settings.html', title='系统设置', config=config, warehouses=warehouses)
 
 @bp.route('/users')
 @login_required
@@ -416,7 +419,8 @@ def save_settings():
     # 保存所有设置项
     settings_keys = [
         'COMPANY_NAME', 'COMPANY_ADDRESS', 'COMPANY_PHONE',
-        'DEFAULT_CURRENCY', 'ITEMS_PER_PAGE', 'ENABLE_BACKUP', 'ENABLE_LOGGING'
+        'DEFAULT_CURRENCY', 'ITEMS_PER_PAGE', 'ENABLE_BACKUP', 'ENABLE_LOGGING',
+        'DEFAULT_WAREHOUSE'
     ]
     
     try:

@@ -1,7 +1,7 @@
 from flask import render_template, redirect, url_for, flash, request, jsonify, Blueprint
 from flask_login import login_required, current_user
 from app import db
-from app.models import SalesOrder, SalesOrderItem, StockOut, StockOutItem, Customer, Warehouse, Product, StockLog, Log
+from app.models import SalesOrder, SystemSetting, SalesOrderItem, StockOut, StockOutItem, Customer, Warehouse, Product, StockLog, Log
 from app.forms import SalesOrderForm, SalesOrderItemForm, StockOutForm
 from datetime import datetime
 import urllib.parse
@@ -101,6 +101,14 @@ def new_order():
         'sale_price': float(p.sale_price) if p.sale_price else 0,
         'stock_quantity': float(p.stock_quantity) if p.stock_quantity else 0
     } for p in products]
+    
+    # 获取默认仓库设置
+    default_warehouse_id = SystemSetting.get_value('DEFAULT_WAREHOUSE')
+    if default_warehouse_id:
+        try:
+            default_warehouse_id = int(default_warehouse_id)
+        except (ValueError, TypeError):
+            default_warehouse_id = None
     
     if request.method == 'POST':
         order_status = request.form.get('order_status', 'draft')
@@ -216,7 +224,8 @@ def new_order():
                                      submitted_order_date=order_date,
                                      submitted_delivery_date=delivery_date,
                                      submitted_notes=notes,
-                                     order_items=order_items_list)
+                                     order_items=order_items_list,
+                                     default_warehouse_id=default_warehouse_id)
 
             # 生成出库单号
             today = datetime.now().strftime('%Y%m%d')
@@ -298,7 +307,8 @@ def new_order():
                          customers=customers_data,
                          warehouses=warehouses,
                          products=products_data,
-                         action='new')
+                         action='new',
+                         default_warehouse_id=default_warehouse_id)
 
 # 编辑订单基本信息
 @bp.route('/orders/<int:id>/edit', methods=['GET', 'POST'])

@@ -62,7 +62,7 @@
                         <select name="warehouse_id" class="form-select" required>
                             <option value="">请选择仓库</option>
                             {% for warehouse in warehouses %}
-                            <option value="{{ warehouse.id }}" {% if order and order.warehouse_id == warehouse.id %}selected{% elif submitted_warehouse_id and warehouse.id == submitted_warehouse_id %}selected{% endif %}>{{ warehouse.code }} - {{ warehouse.name }}</option>
+                            <option value="{{ warehouse.id }}" {% if order and order.warehouse_id == warehouse.id %}selected{% elif submitted_warehouse_id and warehouse.id == submitted_warehouse_id %}selected{% elif not order and not submitted_warehouse_id and default_warehouse_id and warehouse.id == default_warehouse_id %}selected{% endif %}>{{ warehouse.code }} - {{ warehouse.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -72,7 +72,7 @@
                 <div class="col-md-6">
                     <div class="mb-3">
                         <label class="form-label">订单日期 <span class="text-danger">*</span></label>
-                        <input type="date" name="order_date" class="form-control" required value="{{ submitted_order_date if submitted_order_date is not none and submitted_order_date != '' else (order.order_date.strftime('%Y-%m-%d') if order else '') }}">
+                        <input type="date" name="order_date" class="form-control" required value="{{ submitted_order_date if submitted_order_date else (order.order_date.strftime('%Y-%m-%d') if order else now().strftime('%Y-%m-%d')) }}">
                     </div>
                 </div>
                 <div class="col-md-6">
