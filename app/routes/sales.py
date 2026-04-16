@@ -445,6 +445,123 @@ def delete_order(id):
     flash('销售订单删除成功！', 'success')
     return redirect(url_for('sales.index'))
 
+@bp.route('/orders/<int:id>/quick-stock-out', methods=['POST'])
+@login_required
+def quick_stock_out(id):
+    """快捷出库：从销售订单直接出库（一次性完成）"""
+    order = SalesOrder.query.get_or_404(id)
+    
+    if order.status == 'completed':
+        flash('已完成的订单不能快捷出库！', 'danger')
+        return redirect(url_for('sales.index'))
+    
+    if len(order.items) == 0:
+        flash('此订单没有商品明细！', 'danger')
+        return redirect(url_for('sales.index'))
+    
+    # 检查库存是否充足
+    insufficient_stock = []
+    for item in order.items:
+        product = item.product
+        remaining_qty = float(item.quantity) - float(item.delivered_quantity)
+        if remaining_qty > 0 and product.stock_quantity < remaining_qty:
+            insufficient_stock.append(f"{product.code} - {product.name} (库存: {product.stock_quantity}, 需求: {remaining_qty})")
+    
+    if insufficient_stock:
+        flash(f'库存不足: {", ".join(insufficient_stock)}', 'danger')
+        return redirect(url_for('sales.index'))
+    
+    try:
+        today = datetime.now().strftime('%Y%m%d')
+        
+        last_stock_out = StockOut.query.filter(StockOut.delivery_number.like(f'OUT{today}%')).order_by(StockOut.id.desc()).first()
+        if last_stock_out:
+            last_num = int(last_stock_out.delivery_number[11:]) if len(last_stock_out.delivery_number) > 11 else 0
+            delivery_number = f'OUT{today}{last_num + 1:03d}'
+        else:
+            delivery_number = f'OUT{today}001'
+        
+        stock_out = StockOut(
+            delivery_number=delivery_number,
+            sales_order_id=order.id,
+            warehouse_id=order.warehouse_id,
+            delivery_date=datetime.now().date(),
+            handler=current_user.username,
+            notes='快捷出库',
+            created_by=current_user.id,
+            status='completed',
+            total_amount=0
+        )
+        db.session.add(stock_out)
+        db.session.flush()
+        
+        total_amount = 0
+        for item in order.items:
+            product = item.product
+            unit_price = float(item.unit_price)
+            product.sale_price = unit_price
+            remaining_qty = float(item.quantity) - float(item.delivered_quantity)
+            if remaining_qty <= 0:
+                continue
+            
+            amount = remaining_qty * unit_price
+            total_amount += amount
+            
+            stock_out_item = StockOutItem(
+                stock_out_id=stock_out.id,
+                product_id=product.id,
+                quantity=remaining_qty,
+                unit_price=unit_price,
+                amount=amount
+            )
+            db.session.add(stock_out_item)
+            
+            before_quantity = float(product.stock_quantity)
+            after_quantity = before_quantity - remaining_qty
+            product.stock_quantity = after_quantity
+            
+            log = StockLog(
+                product_id=product.id,
+                warehouse_id=order.warehouse_id,
+                change_type='out',
+                quantity=remaining_qty,
+                before_quantity=before_quantity,
+                after_quantity=after_quantity,
+                reference_id=stock_out.id,
+                reference_type='stock_out',
+                notes=f'快捷出库: {delivery_number}',
+                created_by=current_user.id
+            )
+            db.session.add(log)
+            
+            item.delivered_quantity = float(item.delivered_quantity) + remaining_qty
+        
+        stock_out.total_amount = total_amount
+        
+        # 检查订单是否全部出库
+        all_delivered = all(
+            item.delivered_quantity >= item.quantity
+            for item in order.items
+        )
+        
+        if all_delivered:
+            order.status = 'completed'
+            customer = order.customer
+            if customer:
+                customer.receivable_balance = float(customer.receivable_balance) + float(order.total_amount)
+        else:
+            order.status = 'partial'
+
+        db.session.commit()
+        flash(f'快捷出库完成！出库单号: {delivery_number}', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'出库失败: {str(e)}', 'danger')
+    
+    return redirect(url_for('sales.index', tab='stockouts'))
+
+
 # 查看订单详情
 @bp.route('/orders/<int:id>')
 @login_required

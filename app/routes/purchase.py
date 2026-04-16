@@ -444,6 +444,119 @@ def delete_order(id):
     flash('采购订单删除成功！', 'success')
     return redirect(url_for('purchase.index', tab=get_redirect_tab()))
 
+
+@bp.route('/orders/<int:id>/quick-stock-in', methods=['POST'])
+@login_required
+def quick_stock_in(id):
+    """快捷入库：从采购订单直接入库（一次性完成）"""
+    order = PurchaseOrder.query.get_or_404(id)
+    
+    if order.status == 'completed':
+        flash('此订单已入库完成！', 'danger')
+        return redirect(url_for('purchase.index', tab=get_redirect_tab()))
+    
+    if len(order.items) == 0:
+        flash('此订单没有商品明细，无法入库！', 'danger')
+        return redirect(url_for('purchase.index', tab=get_redirect_tab()))
+    
+    try:
+        today = datetime.now().strftime('%Y%m%d')
+        last_stock_in = StockIn.query.filter(StockIn.receipt_number.like(f'SI{today}%')).order_by(StockIn.id.desc()).first()
+        if last_stock_in:
+            last_num = int(last_stock_in.receipt_number[10:]) if len(last_stock_in.receipt_number) > 10 else 0
+            receipt_number = f'SI{today}{last_num + 1:03d}'
+        else:
+            receipt_number = f'SI{today}001'
+        
+        stock_in = StockIn(
+            receipt_number=receipt_number,
+            purchase_order_id=order.id,
+            warehouse_id=order.warehouse_id,
+            receipt_date=datetime.now().date(),
+            handler=current_user.username,
+            notes='快捷入库',
+            created_by=current_user.id,
+            status='completed',
+            total_amount=0
+        )
+        db.session.add(stock_in)
+        db.session.flush()
+        
+        total_amount = 0
+        has_partial = False
+        stock_in_details = []
+        for order_item in order.items:
+            remaining_qty = float(order_item.quantity) - float(order_item.received_quantity)
+            if remaining_qty <= 0:
+                continue
+            
+            has_partial = True
+            unit_price = float(order_item.unit_price)
+            amount = remaining_qty * unit_price
+            
+            item = StockInItem(
+                stock_in_id=stock_in.id,
+                product_id=order_item.product_id,
+                quantity=remaining_qty,
+                unit_price=unit_price,
+                amount=amount
+            )
+            db.session.add(item)
+            total_amount += amount
+            
+            product = order_item.product
+            product.purchase_price = unit_price
+            before_quantity = float(product.stock_quantity)
+            after_quantity = before_quantity + remaining_qty
+            product.stock_quantity = after_quantity
+            
+            log = StockLog(
+                product_id=product.id,
+                warehouse_id=order.warehouse_id,
+                change_type='in',
+                quantity=remaining_qty,
+                before_quantity=before_quantity,
+                after_quantity=after_quantity,
+                reference_id=stock_in.id,
+                reference_type='stock_in',
+                notes=f'快捷入库: {receipt_number}',
+                created_by=current_user.id
+            )
+            db.session.add(log)
+            
+            order_item.received_quantity = order_item.quantity
+            
+            stock_in_details.append(f"{product.name} 库存增加 {remaining_qty} {product.unit}")
+        
+        if not has_partial:
+            flash('此订单所有商品都已入库！', 'warning')
+            return redirect(url_for('purchase.index', tab=get_redirect_tab()))
+        
+        stock_in.total_amount = total_amount
+        
+        # 检查订单是否全部入库
+        all_received = all(
+            float(oi.received_quantity) >= float(oi.quantity)
+            for oi in order.items
+        )
+        
+        if all_received:
+            order.status = 'completed'
+            supplier = order.supplier
+            if supplier:
+                supplier.payable_balance = float(supplier.payable_balance) + float(order.total_amount)
+        else:
+            order.status = 'partial'
+        
+        db.session.commit()
+        flash(f'入库单 {receipt_number} 创建成功，库存已更新', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'入库失败: {str(e)}', 'danger')
+    
+    return redirect(url_for('purchase.index', tab=get_redirect_tab()))
+
+
 @bp.route('/orders/<int:id>')
 @login_required
 def view_order(id):

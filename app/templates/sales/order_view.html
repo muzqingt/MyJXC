@@ -26,6 +26,12 @@ function confirmQuickStockOut(btn) {
     <a href="{{ url_for('sales.edit_order', id=order.id) }}" class="btn btn-primary">
         <i class="bi bi-pencil"></i> 编辑订单
     </a>
+    <form method="post" action="{{ url_for('sales.quick_stock_out', id=order.id) }}" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-success" onclick="return confirm('确认快捷出库？')">
+            <i class="bi bi-box-arrow-up"></i> 快捷出库
+        </button>
+    </form>
     <form method="post" action="{{ url_for('sales.delete_order', id=order.id) }}" class="d-inline">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-danger" onclick="return confirm('确定删除此销售订单？')">

@@ -183,12 +183,19 @@
                                            class="btn btn-sm btn-outline-warning" title="编辑">
                                             <i class="bi bi-pencil"></i>
                                         </a>
+                                        <a href="#" onclick="if(confirm('确认快捷入库？')) {document.getElementById('qi-{{ order.id }}').submit();} return false;" 
+                                           class="btn btn-sm btn-outline-success" title="快捷入库">
+                                            <i class="bi bi-box-arrow-in-down"></i>
+                                        </a>
                                         <a href="#" onclick="if(confirm('删除此订单？')) {document.getElementById('do-{{ order.id }}').submit();} return false;" 
                                            class="btn btn-sm btn-outline-danger" title="删除">
                                             <i class="bi bi-trash"></i>
                                         </a>
                                         {% endif %}
                                     </div>
+                                    <form id="qi-{{ order.id }}" method="post" action="{{ url_for('purchase.quick_stock_in', id=order.id) }}" hidden>
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    </form>
                                     <form id="do-{{ order.id }}" method="post" action="{{ url_for('purchase.delete_order', id=order.id) }}" hidden>
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     </form>

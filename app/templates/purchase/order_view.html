@@ -26,6 +26,12 @@ function confirmQuickStockIn(btn) {
     <a href="{{ url_for('purchase.edit_order', id=order.id) }}" class="btn btn-primary">
         <i class="bi bi-pencil"></i> 编辑订单
     </a>
+    <form method="post" action="{{ url_for('purchase.quick_stock_in', id=order.id) }}" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-success" onclick="return confirm('确认快捷入库？')">
+            <i class="bi bi-box-arrow-in-down"></i> 快捷入库
+        </button>
+    </form>
     <form method="post" action="{{ url_for('purchase.delete_order', id=order.id) }}" class="d-inline">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-danger" onclick="return confirm('确定删除此采购订单？')">
