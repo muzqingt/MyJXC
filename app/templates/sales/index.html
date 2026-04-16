@@ -177,19 +177,12 @@
                                         <a href="{{ url_for('sales.edit_order', id=order.id) }}" class="btn btn-sm btn-outline-warning" title="编辑">
                                             <i class="bi bi-pencil"></i>
                                         </a>
-                                        <a href="#" onclick="if(confirm('确认快捷出库？')) {document.getElementById('qso-{{ order.id }}').submit();} return false;" 
-                                           class="btn btn-sm btn-outline-success" title="快捷出库">
-                                            <i class="bi bi-box-arrow-up"></i>
-                                        </a>
                                         <a href="#" onclick="if(confirm('删除此订单？')) {document.getElementById('dso-{{ order.id }}').submit();} return false;" 
                                            class="btn btn-sm btn-outline-danger" title="删除">
                                             <i class="bi bi-trash"></i>
                                         </a>
                                         {% endif %}
                                     </div>
-                                    <form id="qso-{{ order.id }}" method="post" action="{{ url_for('sales.quick_stock_out', id=order.id) }}" hidden>
-                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    </form>
                                     <form id="dso-{{ order.id }}" method="post" action="{{ url_for('sales.delete_order', id=order.id) }}" hidden>
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     </form>

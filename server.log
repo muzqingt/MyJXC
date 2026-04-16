@@ -1,192 +1,44 @@
 数据库初始化完成！
+[mDNS] 已注册服务: http://myjxc.local:5000
+[mDNS] 局域网IP访问: http://10.20.172.232:5000
 启动进销存管理系统...
 访问地址: http://127.0.0.1:5000
 默认账号: admin / admin123
  * Serving Flask app 'app'
- * Debug mode: on
+ * Debug mode: off
 [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on all addresses (0.0.0.0)
  * Running on http://127.0.0.1:5000
- * Running on http://10.100.131.49:5000
+ * Running on http://10.20.172.232:5000
 [33mPress CTRL+C to quit[0m
- * Restarting with stat
- * Debugger is active!
- * Debugger PIN: 111-710-851
-127.0.0.1 - - [15/Apr/2026 22:33:12] "[32mGET / HTTP/1.1[0m" 302 -
-10.100.131.1 - - [15/Apr/2026 22:33:32] "GET / HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:33:33] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:33:33] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:33:37] "GET / HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:33:37] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:33:37] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:33:42] "GET /purchase/stock-ins/new HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:33:42] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:33:42] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:33:48] "GET / HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:33:48] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:33:48] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:33:57] "GET /finance/ HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:33:57] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:33:57] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:33:57] "GET /finance/api/financial-summary HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:33:59] "GET /inventory/ HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:33:59] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:33:59] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:00] "GET /inventory/products HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:34:00] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:00] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:02] "GET /sales/index HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:34:02] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:02] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:03] "GET /purchase/index HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:34:03] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:03] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:07] "GET /purchase/index HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:34:07] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:07] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:09] "GET /sales/index HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:34:09] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:09] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:11] "GET /purchase/index?tab=stockins HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:34:11] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:11] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:16] "GET /purchase/orders/4 HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:34:16] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:16] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:27] "GET /purchase/orders/new HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:34:27] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:27] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:28] "GET /sales/orders/new HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:34:28] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:28] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:29] "GET /purchase/stock-ins/new HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:34:30] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:30] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:31] "GET /sales/stock-outs/new HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:34:31] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:31] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:32] "GET /purchase/orders/new HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:34:32] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:32] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:33] "GET /purchase/index HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:34:33] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:33] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:38] "GET /inventory/products HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:34:38] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:38] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:40] "GET /inventory/products HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:34:40] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:40] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:43] "GET /inventory/products HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:34:43] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:43] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:48] "GET /product/products HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:34:48] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:48] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:49] "GET /product/products HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:34:49] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:34:49] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:36:11] "GET /product/products HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:36:12] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:36:12] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:36:14] "GET /product/products HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:36:14] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:36:14] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:36:15] "GET / HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:36:15] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:36:15] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:36:16] "GET / HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:36:16] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:36:16] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:36:17] "GET / HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:36:17] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:36:18] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:36:18] "GET /product/products HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:36:18] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:36:18] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:36:19] "GET / HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:36:19] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:36:19] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:36:19] "GET /product/products HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:36:19] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:36:19] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:36:20] "GET / HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:36:20] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:36:20] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:36:21] "GET /product/products HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:36:21] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:36:21] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:00] "GET /product/products HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:38:00] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:00] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:03] "GET / HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:38:03] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:03] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:04] "GET / HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:38:04] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:04] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:05] "GET / HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:38:05] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:05] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:06] "GET / HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:38:06] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:06] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:06] "GET / HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:38:06] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:06] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:06] "GET / HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:38:07] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:07] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:07] "GET / HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:38:07] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:07] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:10] "GET / HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:38:10] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:10] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:16] "[32mGET /auth/logout HTTP/1.1[0m" 302 -
-10.100.131.1 - - [15/Apr/2026 22:38:16] "GET /auth/login HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:38:16] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:16] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:24] "[32mPOST /auth/login HTTP/1.1[0m" 302 -
-10.100.131.1 - - [15/Apr/2026 22:38:25] "GET /product/products HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:38:25] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:38:25] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
- * Detected change in '/data/data/com.termux/files/home/.openclaw/workspace/my-jxc-original/app/routes/auth.py', reloading
-数据库初始化完成！
-启动进销存管理系统...
-访问地址: http://127.0.0.1:5000
-默认账号: admin / admin123
- * Restarting with stat
- * Debugger is active!
- * Debugger PIN: 336-062-260
-10.100.131.1 - - [15/Apr/2026 22:40:07] "GET /product/products HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:40:07] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:40:07] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:40:09] "GET /product/products HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:40:09] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:40:09] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:40:10] "[32mGET /auth/logout HTTP/1.1[0m" 302 -
-10.100.131.1 - - [15/Apr/2026 22:40:11] "GET /auth/login HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:40:11] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:40:11] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:40:22] "[32mPOST /auth/login HTTP/1.1[0m" 302 -
-10.100.131.1 - - [15/Apr/2026 22:40:22] "GET / HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:40:23] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:40:23] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:40:24] "GET / HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:40:24] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:40:24] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:40:25] "GET / HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:40:25] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:40:25] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:40:30] "GET /finance/ HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:40:30] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:40:30] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:40:30] "GET /finance/api/financial-summary HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:40:32] "GET / HTTP/1.1" 200 -
-10.100.131.1 - - [15/Apr/2026 22:40:32] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.100.131.1 - - [15/Apr/2026 22:40:32] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-数据库初始化完成！
-启动进销存管理系统...
-访问地址: http://127.0.0.1:5000
-默认账号: admin / admin123
+127.0.0.1 - - [16/Apr/2026 12:47:37] "[32mGET /purchase/ HTTP/1.1[0m" 302 -
+10.20.172.1 - - [16/Apr/2026 12:48:07] "GET / HTTP/1.1" 200 -
+10.20.172.1 - - [16/Apr/2026 12:48:08] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+10.20.172.1 - - [16/Apr/2026 12:48:08] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+10.20.172.1 - - [16/Apr/2026 12:48:10] "GET / HTTP/1.1" 200 -
+10.20.172.1 - - [16/Apr/2026 12:48:10] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+10.20.172.1 - - [16/Apr/2026 12:48:10] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+10.20.172.1 - - [16/Apr/2026 12:48:11] "GET /purchase/index HTTP/1.1" 200 -
+10.20.172.1 - - [16/Apr/2026 12:48:11] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+10.20.172.1 - - [16/Apr/2026 12:48:11] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+10.20.172.1 - - [16/Apr/2026 12:48:13] "GET /sales/index HTTP/1.1" 200 -
+10.20.172.1 - - [16/Apr/2026 12:48:13] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+10.20.172.1 - - [16/Apr/2026 12:48:13] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+10.20.172.1 - - [16/Apr/2026 12:48:13] "GET /purchase/index HTTP/1.1" 200 -
+10.20.172.1 - - [16/Apr/2026 12:48:13] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+10.20.172.1 - - [16/Apr/2026 12:48:13] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+10.20.172.1 - - [16/Apr/2026 12:48:14] "GET /sales/index HTTP/1.1" 200 -
+10.20.172.1 - - [16/Apr/2026 12:48:14] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+10.20.172.1 - - [16/Apr/2026 12:48:14] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+10.20.172.1 - - [16/Apr/2026 12:48:15] "GET /purchase/index HTTP/1.1" 200 -
+10.20.172.1 - - [16/Apr/2026 12:48:15] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+10.20.172.1 - - [16/Apr/2026 12:48:15] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+10.20.172.1 - - [16/Apr/2026 12:48:16] "GET /sales/index HTTP/1.1" 200 -
+10.20.172.1 - - [16/Apr/2026 12:48:16] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+10.20.172.1 - - [16/Apr/2026 12:48:16] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+10.20.172.1 - - [16/Apr/2026 12:48:17] "GET /purchase/index HTTP/1.1" 200 -
+10.20.172.1 - - [16/Apr/2026 12:48:17] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+10.20.172.1 - - [16/Apr/2026 12:48:17] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+10.20.172.1 - - [16/Apr/2026 12:48:21] "GET /sales/index HTTP/1.1" 200 -
+10.20.172.1 - - [16/Apr/2026 12:48:21] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+10.20.172.1 - - [16/Apr/2026 12:48:21] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
