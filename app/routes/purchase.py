@@ -137,11 +137,11 @@ def new_order():
                                  products=products_data,
                                  action='new',
                                  submitted_supplier_id=supplier_id,
-                                 submitted_warehouse_id=warehouse_id,
+                                 submitted_warehouse_id=warehouse_id if warehouse_id else '',
                                  submitted_order_date=order_date,
                                  submitted_expected_date=expected_date,
                                  submitted_notes=notes,
-                                 orderItems=order_items_list)
+                                 order_items=order_items_list)
         
         # 生成订单号
         today = datetime.now().strftime('%Y%m%d')
@@ -354,11 +354,11 @@ def edit_order(id):
                                  products=products_data,
                                  action='edit',
                                  submitted_supplier_id=supplier_id,
-                                 submitted_warehouse_id=warehouse_id,
+                                 submitted_warehouse_id=warehouse_id if warehouse_id else '',
                                  submitted_order_date=order_date,
                                  submitted_expected_date=expected_date,
                                  submitted_notes=notes,
-                                 orderItems=order_items_list)
+                                 order_items=order_items_list)
         
         # 更新订单基本信息
         order.supplier_id = supplier_id
@@ -393,15 +393,32 @@ def edit_order(id):
         if action == 'confirm':
             if len(product_ids) == 0 or total_amount == 0:
                 flash('请先添加商品明细！', 'danger')
-                db.session.rollback()
+                # 重建商品明细数据（用于回填）
+                order_items_list = []
+                for i in range(len(product_ids)):
+                    if product_ids[i] and quantities[i] and unit_prices[i]:
+                        product = Product.query.get(int(product_ids[i]))
+                        if product:
+                            order_items_list.append({
+                                'product_id': product.id,
+                                'product_name': product.name,
+                                'product_code': product.code,
+                                'quantity': quantities[i],
+                                'unit_price': unit_prices[i]
+                            })
                 return render_template('purchase/order_items.html',
                                      title='编辑采购订单',
                                      order=order,
                                      suppliers=suppliers_data,
                                      warehouses=warehouses,
                                      products=products_data,
-                                     order_items=order_items_data,
-                                     action='edit')
+                                     action='edit',
+                                     submitted_supplier_id=supplier_id,
+                                     submitted_warehouse_id=warehouse_id if warehouse_id else '',
+                                     submitted_order_date=order_date,
+                                     submitted_expected_date=expected_date,
+                                     submitted_notes=notes,
+                                     order_items=order_items_list)
         
         db.session.commit()
         

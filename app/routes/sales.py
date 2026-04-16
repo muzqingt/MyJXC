@@ -137,11 +137,11 @@ def new_order():
                                  products=products_data,
                                  action='new',
                                  submitted_customer_id=customer_id,
-                                 submitted_warehouse_id=warehouse_id,
+                                 submitted_warehouse_id=warehouse_id if warehouse_id else '',
                                  submitted_order_date=order_date,
                                  submitted_delivery_date=delivery_date,
                                  submitted_notes=notes,
-                                 orderItems=order_items_list)
+                                 order_items=order_items_list)
 
         # 生成订单号
         today = datetime.now().strftime('%Y%m%d')
@@ -212,11 +212,11 @@ def new_order():
                                      products=products_data,
                                      action='new',
                                      submitted_customer_id=customer_id,
-                                     submitted_warehouse_id=warehouse_id,
+                                     submitted_warehouse_id=warehouse_id if warehouse_id else '',
                                      submitted_order_date=order_date,
                                      submitted_delivery_date=delivery_date,
                                      submitted_notes=notes,
-                                     orderItems=order_items_list)
+                                     order_items=order_items_list)
 
             # 生成出库单号
             today = datetime.now().strftime('%Y%m%d')
@@ -373,11 +373,11 @@ def edit_order(id):
                                  products=products_data,
                                  action='edit',
                                  submitted_customer_id=customer_id,
-                                 submitted_warehouse_id=warehouse_id,
+                                 submitted_warehouse_id=warehouse_id if warehouse_id else '',
                                  submitted_order_date=order_date,
                                  submitted_delivery_date=delivery_date,
                                  submitted_notes=notes,
-                                 orderItems=order_items_list)
+                                 order_items=order_items_list)
         
         # 更新订单基本信息
         order.customer_id = customer_id
