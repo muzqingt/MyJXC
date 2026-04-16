@@ -4,10 +4,58 @@
 """
 
 import os
+import socket
+import threading
 from app import create_app, db
 from app.models import User, Category, Product, Supplier, Customer, Warehouse
 
 app = create_app()
+
+
+def get_local_ip():
+    """获取本机局域网IP"""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+    except Exception:
+        ip = '127.0.0.1'
+    finally:
+        s.close()
+    return ip
+
+
+def register_mdns(port=5000):
+    """注册mDNS服务，实现局域网.local域名发现"""
+    try:
+        from zeroconf import ServiceInfo, Zeroconf
+    except ImportError:
+        print("[mDNS] zeroconf 未安装，跳过mDNS注册")
+        return None
+
+    local_ip = get_local_ip()
+    service_name = 'myjxc._http._tcp.local.'
+
+    try:
+        zc = Zeroconf()
+        info = ServiceInfo(
+            '_http._tcp.local.',
+            service_name,
+            addresses=[socket.inet_aton(local_ip)],
+            port=port,
+            properties={
+                'path': '/',
+                'version': '1.0.0',
+            },
+            server='myjxc.local.',
+        )
+        zc.register_service(info)
+        print(f"[mDNS] 已注册服务: http://myjxc.local:{port}")
+        print(f"[mDNS] 局域网IP访问: http://{local_ip}:{port}")
+        return zc
+    except Exception as e:
+        print(f"[mDNS] 注册失败: {e}")
+        return None
 
 @app.route('/')
 def index():
@@ -76,9 +124,17 @@ def init_database():
 if __name__ == '__main__':
     # 初始化数据库
     init_database()
-    
+
+    # 启动mDNS服务（需在启动Flask之前注册）
+    zc = register_mdns(5000)
+
     # 启动应用
     print("启动进销存管理系统...")
     print("访问地址: http://127.0.0.1:5000")
     print("默认账号: admin / admin123")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    try:
+        app.run(host='0.0.0.0', port=5000, debug=os.environ.get('FLASK_DEBUG', '0') == '1')
+    finally:
+        if zc:
+            zc.close()
+            print("[mDNS] 服务已注销")

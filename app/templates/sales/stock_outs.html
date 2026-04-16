@@ -88,12 +88,14 @@
                                     <i class="bi bi-list-check"></i>
                                 </a>
                                 <form method="post" action="{{ url_for('sales.delete_stock_out', id=stock_out.id) }}" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit" class="btn btn-outline-danger" title="删除" onclick="return confirm('确定删除此出库单？')">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
                                 {% else %}
                                 <form method="post" action="{{ url_for('sales.complete_stock_out', id=stock_out.id) }}" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit" class="btn btn-outline-warning" title="完成出库" onclick="return confirm('确认完成出库？库存将被扣减。')">
                                         <i class="bi bi-check-circle"></i>
                                     </button>

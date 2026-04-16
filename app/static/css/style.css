@@ -51,8 +51,34 @@ body {
 
 /* 按钮样式 */
 .btn {
-    border-radius: 6px;
+    border-radius: 0.25rem;
     font-weight: 500;
+}
+
+/* 操作按钮连接成一排 */
+.action-buttons {
+    display: inline-flex;
+    gap: 0;
+}
+
+.action-buttons .btn {
+    border-radius: 0;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    margin-left: -1px;
+}
+
+.action-buttons .btn:first-child {
+    border-radius: 0.2rem 0 0 0.2rem;
+    margin-left: 0;
+}
+
+.action-buttons .btn:last-child {
+    border-radius: 0 0.2rem 0.2rem 0;
+}
+
+.action-buttons .btn:only-child {
+    border-radius: 0.2rem;
 }
 
 .btn-primary {
@@ -97,11 +123,7 @@ body {
     margin-top: auto;
 }
 
-/* 数据表格操作按钮 */
-.btn-group .btn {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
-}
+
 
 /* 搜索框 */
 .search-box {
@@ -141,6 +163,7 @@ body {
         max-width: 100%;
     }
 }
+
 
 /* 打印样式 */
 @media print {

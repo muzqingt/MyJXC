@@ -191,6 +191,29 @@ $(document).ready(function() {
     function handleProductSelect(rowId, product) {
         updateRow(rowId, product);
         updateTotal();
+        
+        // 如果用户修改了价格，同步到数据库
+        const unitPriceInput = $(`#row-${rowId} .unit-price`);
+        const newUnitPrice = parseFloat(unitPriceInput.val()) || 0;
+        if (newUnitPrice > 0 && newUnitPrice !== product.purchase_price) {
+            $.ajax({
+                url: '/product/api/product/price',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    product_id: product.id,
+                    price_type: 'purchase_price',
+                    price: newUnitPrice
+                }),
+                success: function(response) {
+                    if (response.success) {
+                        product.purchase_price = newUnitPrice;
+                        const p = products.find(prod => prod.id == product.id);
+                        if (p) p.purchase_price = newUnitPrice;
+                    }
+                }
+            });
+        }
     }
 
     // 更新单行计算
@@ -242,6 +265,35 @@ $(document).ready(function() {
 
     $(document).on('change', '.quantity, .unit-price', function() {
         const rowId = $(this).data('row');
+        
+        // 如果是修改价格，与原始价格比较后同步
+        if ($(this).hasClass('unit-price')) {
+            const unitPriceInput = $(`#row-${rowId} .unit-price`);
+            const productId = $(`#row-${rowId} .product-id-input`).val();
+            const currentPrice = parseFloat(unitPriceInput.val()) || 0;
+            const product = products.find(p => String(p.id) === String(productId));
+            const originalPrice = product ? product.purchase_price : 0;
+            
+            if (currentPrice > 0 && currentPrice !== originalPrice) {
+                $.ajax({
+                    url: '/product/api/product/price',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        product_id: parseInt(productId),
+                        price_type: 'purchase_price',
+                        price: currentPrice
+                    }),
+                    success: function(response) {
+                        if (response.success) {
+                            const p = products.find(prod => String(prod.id) === String(productId));
+                            if (p) p.purchase_price = currentPrice;
+                        }
+                    }
+                });
+            }
+        }
+        
         updateRow(rowId);
         updateTotal();
     });

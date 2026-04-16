@@ -268,7 +268,9 @@ class ProductSearcher {
     constructor(options) {
         this.products = options.products || [];
         this.onSelect = options.onSelect || function() {};
+        this.onCreateNew = options.onCreateNew || null;
         this.containerClass = options.containerClass || 'product-search-container';
+        this.itemClass = 'product-search-item';
         this.rowId = options.rowId || 0;
         this.placeholder = options.placeholder || '输入商品名称或编码搜索...';
         this.selectedProductId = options.selectedProductId || null;
@@ -434,12 +436,12 @@ class ProductSearcher {
             
             // 绑定点击事件
             const self = this;
-            this.dropdown.find('.product-search-item').on('click', function() {
+            this.dropdown.find('.' + this.itemClass).on('click', function() {
                 self.selectItem($(this).data('index'));
             });
             
             // 悬停效果
-            this.dropdown.find('.product-search-item').hover(function() {
+            this.dropdown.find('.' + this.itemClass).hover(function() {
                 self.selectedIndex = $(this).data('index');
                 self.updateSelection();
             });

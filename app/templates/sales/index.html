@@ -32,7 +32,7 @@
                         <label class="form-label">订单状态</label>
                         <select class="form-select" name="status">
                             <option value="">全部状态</option>
-                            <option value="confirmed" {% if status == 'confirmed' %}selected{% endif %}>已确认</option>
+                            <option value="pending" {% if status == 'pending' %}selected{% endif %}>未出库</option>
                             <option value="partial" {% if status == 'partial' %}selected{% endif %}>部分出库</option>
                             <option value="completed" {% if status == 'completed' %}selected{% endif %}>已完成</option>
                         </select>
@@ -169,28 +169,30 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <a href="{{ url_for('sales.view_order', id=order.id) }}" class="btn btn-outline-primary" title="查看详情">
+                                    <div class="action-buttons">
+                                        <a href="{{ url_for('sales.view_order', id=order.id) }}" class="btn btn-sm btn-outline-primary" title="查看详情">
                                             <i class="bi bi-eye"></i>
                                         </a>
-                                        {% if order.status != 'completed' and order.status != 'cancelled' %}
-                                        <a href="{{ url_for('sales.edit_order', id=order.id) }}" class="btn btn-outline-warning" title="编辑">
+                                        {% if order.status != 'completed' %}
+                                        <a href="{{ url_for('sales.edit_order', id=order.id) }}" class="btn btn-sm btn-outline-warning" title="编辑">
                                             <i class="bi bi-pencil"></i>
                                         </a>
-                                        <form method="post" action="{{ url_for('sales.quick_stock_out', id=order.id) }}" class="d-inline" onsubmit="return confirm('确认快捷出库？');">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <button type="submit" class="btn btn-outline-success" title="快捷出库">
-                                                <i class="bi bi-box-arrow-up"></i> 出库
-                                            </button>
-                                        </form>
-                                        <form method="post" action="{{ url_for('sales.delete_order', id=order.id) }}" class="d-inline" onsubmit="return confirm('删除此订单？');">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <button type="submit" class="btn btn-outline-danger" title="删除">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </form>
+                                        <a href="#" onclick="if(confirm('确认快捷出库？')) {document.getElementById('qso-{{ order.id }}').submit();} return false;" 
+                                           class="btn btn-sm btn-outline-success" title="快捷出库">
+                                            <i class="bi bi-box-arrow-up"></i>
+                                        </a>
+                                        <a href="#" onclick="if(confirm('删除此订单？')) {document.getElementById('dso-{{ order.id }}').submit();} return false;" 
+                                           class="btn btn-sm btn-outline-danger" title="删除">
+                                            <i class="bi bi-trash"></i>
+                                        </a>
                                         {% endif %}
                                     </div>
+                                    <form id="qso-{{ order.id }}" method="post" action="{{ url_for('sales.quick_stock_out', id=order.id) }}" hidden>
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    </form>
+                                    <form id="dso-{{ order.id }}" method="post" action="{{ url_for('sales.delete_order', id=order.id) }}" hidden>
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    </form>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -262,8 +264,8 @@
                                     <strong class="text-primary">¥{{ "%.2f"|format(stock_out.total_amount) }}</strong>
                                 </td>
                                 <td>
-                                    {% if stock_out.status == 'draft' %}
-                                    <span class="badge bg-secondary">草稿</span>
+                                    {% if stock_out.status == 'pending' %}
+                                    <span class="badge bg-warning">未出库</span>
                                     {% elif stock_out.status == 'completed' %}
                                     <span class="badge bg-success">已完成</span>
                                     {% endif %}
@@ -276,30 +278,34 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <a href="{{ url_for('sales.view_stock_out', id=stock_out.id) }}" class="btn btn-outline-primary" title="查看">
+                                    <div class="action-buttons">
+                                        <a href="{{ url_for('sales.view_stock_out', id=stock_out.id) }}" class="btn btn-sm btn-outline-primary" title="查看">
                                             <i class="bi bi-eye"></i>
                                         </a>
-                                        {% if stock_out.status == 'draft' %}
-                                        <a href="{{ url_for('sales.edit_stock_out_items', id=stock_out.id) }}" class="btn btn-outline-info" title="编辑明细">
+                                        {% if stock_out.status == 'pending' %}
+                                        <a href="{{ url_for('sales.edit_stock_out_items', id=stock_out.id) }}" class="btn btn-sm btn-outline-info" title="编辑明细">
                                             <i class="bi bi-list-check"></i>
                                         </a>
                                         {% if stock_out.items|length > 0 %}
-                                        <form method="post" action="{{ url_for('sales.complete_stock_out', id=stock_out.id) }}" class="d-inline" onsubmit="return confirm('确认完成出库？');">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <button type="submit" class="btn btn-outline-success" title="完成出库">
-                                                <i class="bi bi-check-circle"></i>
-                                            </button>
-                                        </form>
+                                        <a href="#" onclick="if(confirm('确认完成出库？')) {document.getElementById('cso-{{ stock_out.id }}').submit();} return false;" 
+                                           class="btn btn-sm btn-outline-success" title="完成出库">
+                                            <i class="bi bi-check-circle"></i>
+                                        </a>
                                         {% endif %}
-                                        <form method="post" action="{{ url_for('sales.delete_stock_out', id=stock_out.id) }}" class="d-inline" onsubmit="return confirm('删除此出库单？');">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <button type="submit" class="btn btn-outline-danger" title="删除">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </form>
+                                        <a href="#" onclick="if(confirm('删除此出库单？')) {document.getElementById('dso2-{{ stock_out.id }}').submit();} return false;" 
+                                           class="btn btn-sm btn-outline-danger" title="删除">
+                                            <i class="bi bi-trash"></i>
+                                        </a>
                                         {% endif %}
                                     </div>
+                                    {% if stock_out.status == 'pending' and stock_out.items|length > 0 %}
+                                    <form id="cso-{{ stock_out.id }}" method="post" action="{{ url_for('sales.complete_stock_out', id=stock_out.id) }}" hidden>
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    </form>
+                                    {% endif %}
+                                    <form id="dso2-{{ stock_out.id }}" method="post" action="{{ url_for('sales.delete_stock_out', id=stock_out.id) }}" hidden>
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    </form>
                                 </td>
                             </tr>
                             {% endfor %}

@@ -65,6 +65,13 @@ def stock_check():
             product_ids = request.form.getlist('product_id[]')
             actual_quantities = request.form.getlist('actual_quantity[]')
             notes = request.form.get('notes', '')
+            warehouse_id = int(request.form.get('warehouse_id', 1))
+            
+            # 校验仓库是否存在
+            warehouse = Warehouse.query.get(warehouse_id)
+            if not warehouse:
+                flash('仓库不存在！', 'danger')
+                return redirect(url_for('inventory.stock_check'))
             
             for i in range(len(product_ids)):
                 if product_ids[i] and actual_quantities[i]:
@@ -81,7 +88,7 @@ def stock_check():
                             
                             log = StockLog(
                                 product_id=product.id,
-                                warehouse_id=int(request.form.get('warehouse_id', 1)),
+                                warehouse_id=warehouse_id,
                                 change_type=change_type,
                                 quantity=abs(diff),
                                 before_quantity=book_quantity,
@@ -132,6 +139,8 @@ def stock_transfer():
                                 db.session.rollback()
                                 return redirect(url_for('inventory.stock_transfer'))
                             
+                            warehouse = Warehouse.query.get(to_warehouse_id)
+                            warehouse_name = warehouse.name if warehouse else '未知仓库'
                             # 减少源仓库库存
                             product.stock_quantity -= quantity
                             log_out = StockLog(
@@ -142,7 +151,7 @@ def stock_transfer():
                                 before_quantity=product.stock_quantity + quantity,
                                 after_quantity=product.stock_quantity,
                                 reference_type='stock_transfer',
-                                notes=f'调拨出库至{Warehouse.query.get(to_warehouse_id).name}: {notes}',
+                                notes=f'调拨出库至{warehouse_name}: {notes}',
                                 created_by=current_user.id
                             )
                             db.session.add(log_out)

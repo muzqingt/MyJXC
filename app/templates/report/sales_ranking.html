@@ -12,13 +12,9 @@
     <button class="btn btn-primary" onclick="loadReport()">
         <i class="bi bi-search"></i> 查询
     </button>
-    <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
-        <i class="bi bi-download"></i> 导出
-    </button>
-    <ul class="dropdown-menu">
-        <li><a class="dropdown-item" href="{{ url_for('report.export_sales_ranking', start_date=start_date, end_date=end_date) }}">Excel</a></li>
-        <li><a class="dropdown-item" href="#" onclick="alert('PDF导出功能开发中')">PDF</a></li>
-    </ul>
+    <a class="btn btn-outline-primary" href="{{ url_for('report.export_sales_ranking', start_date=start_date, end_date=end_date) }}">
+        <i class="bi bi-download"></i> 导出Excel
+    </a>
 </div>
 {% endblock %}
 

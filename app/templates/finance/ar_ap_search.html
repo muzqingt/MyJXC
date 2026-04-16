@@ -129,9 +129,7 @@
                             <td>{{ order.order_date.strftime('%Y-%m-%d') }}</td>
                             <td class="text-end">¥{{ "%.2f"|format(order.total_amount) }}</td>
                             <td>
-                                {% if order.status == 'draft' %}
-                                <span class="badge bg-secondary">草稿</span>
-                                {% elif order.status == 'confirmed' %}
+                                {% if order.status == 'confirmed' %}
                                 <span class="badge bg-info">已确认</span>
                                 {% elif order.status == 'partial' %}
                                 <span class="badge bg-warning">部分完成</span>
@@ -285,9 +283,7 @@
                             <td>{{ order.order_date.strftime('%Y-%m-%d') }}</td>
                             <td class="text-end">¥{{ "%.2f"|format(order.total_amount) }}</td>
                             <td>
-                                {% if order.status == 'draft' %}
-                                <span class="badge bg-secondary">草稿</span>
-                                {% elif order.status == 'confirmed' %}
+                                {% if order.status == 'confirmed' %}
                                 <span class="badge bg-info">已确认</span>
                                 {% elif order.status == 'partial' %}
                                 <span class="badge bg-warning">部分完成</span>

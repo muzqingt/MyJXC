@@ -84,8 +84,8 @@
                 {% if product.description %}
                 <div class="mt-4">
                     <h5>商品描述</h5>
-                    <div class="border rounded p-3 bg-light">
-                        {{ product.description|replace('\n', '<br>')|safe }}
+                    <div class="border rounded p-3 bg-light" style="white-space: pre-wrap;">
+                        {{ product.description }}
                     </div>
                 </div>
                 {% endif %}
@@ -189,6 +189,7 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                 <form method="post" action="{{ url_for('product.delete_product', id=product.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-danger">确认删除</button>
                 </form>
             </div>

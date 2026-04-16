@@ -119,7 +119,7 @@ class PurchaseOrder(db.Model):
     order_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
     expected_date = db.Column(db.Date)
     total_amount = db.Column(db.Numeric(12, 2), default=0)
-    status = db.Column(db.String(20), default='draft')  # draft, confirmed, partial, completed, cancelled
+    status = db.Column(db.String(20), default='confirmed')  # confirmed, partial, completed
     notes = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -156,7 +156,7 @@ class StockIn(db.Model):
     warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouses.id'), nullable=False)
     receipt_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
     total_amount = db.Column(db.Numeric(12, 2), default=0)
-    status = db.Column(db.String(20), default='draft')  # draft, completed
+    status = db.Column(db.String(20), default='pending')  # pending, completed
     handler = db.Column(db.String(100))
     notes = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
@@ -194,7 +194,7 @@ class SalesOrder(db.Model):
     order_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
     delivery_date = db.Column(db.Date)
     total_amount = db.Column(db.Numeric(12, 2), default=0)
-    status = db.Column(db.String(20), default='draft')  # draft, confirmed, partial, completed, cancelled
+    status = db.Column(db.String(20), default='confirmed')  # confirmed, partial, completed
     notes = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -231,7 +231,7 @@ class StockOut(db.Model):
     warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouses.id'), nullable=False)
     delivery_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
     total_amount = db.Column(db.Numeric(12, 2), default=0)
-    status = db.Column(db.String(20), default='draft')  # draft, completed
+    status = db.Column(db.String(20), default='pending')  # pending, completed
     handler = db.Column(db.String(100))
     notes = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'))

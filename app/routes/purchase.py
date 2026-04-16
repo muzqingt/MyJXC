@@ -103,7 +103,6 @@ def new_order():
     
     if request.method == 'POST':
         action = request.form.get('action', 'save')
-        order_status = request.form.get('order_status', 'unstocked')
         
         # 获取表单数据
         supplier_id = request.form.get('supplier_id', type=int)
@@ -174,82 +173,7 @@ def new_order():
         
         order.total_amount = total_amount
         
-        # 如果选择已入库，直接完成入库
-        if order_status == 'completed':
-            # 生成入库单号
-            last_stock_in = StockIn.query.filter(StockIn.receipt_number.like(f'SI{today}%')).order_by(StockIn.id.desc()).first()
-            if last_stock_in:
-                last_num = int(last_stock_in.receipt_number[10:]) if len(last_stock_in.receipt_number) > 10 else 0
-                receipt_number = f'SI{today}{last_num + 1:03d}'
-            else:
-                receipt_number = f'SI{today}001'
-            
-            stock_in = StockIn(
-                receipt_number=receipt_number,
-                purchase_order_id=order.id,
-                warehouse_id=warehouse_id,
-                receipt_date=datetime.now().date(),
-                handler=current_user.username,
-                notes='创建订单时直接入库',
-                created_by=current_user.id,
-                status='completed',
-                total_amount=total_amount
-            )
-            db.session.add(stock_in)
-            db.session.flush()
-            
-            # 创建入库明细并更新库存
-            for item_data in order_items_list:
-                product = item_data['product']
-                quantity = item_data['quantity']
-                unit_price = item_data['unit_price']
-                amount = item_data['amount']
-                
-                # 创建入库明细
-                stock_in_item = StockInItem(
-                    stock_in_id=stock_in.id,
-                    product_id=product.id,
-                    quantity=quantity,
-                    unit_price=unit_price,
-                    amount=amount
-                )
-                db.session.add(stock_in_item)
-                
-                # 更新库存
-                before_quantity = float(product.stock_quantity)
-                after_quantity = before_quantity + quantity
-                product.stock_quantity = after_quantity
-                
-                # 记录库存流水
-                log = StockLog(
-                    product_id=product.id,
-                    warehouse_id=warehouse_id,
-                    change_type='in',
-                    quantity=quantity,
-                    before_quantity=before_quantity,
-                    after_quantity=product.stock_quantity,
-                    reference_id=stock_in.id,
-                    reference_type='stock_in',
-                    notes=f'创建订单时直接入库: {receipt_number}',
-                    created_by=current_user.id
-                )
-                db.session.add(log)
-                
-                # 更新订单明细已入库数量
-                for order_item in order.items:
-                    if order_item.product_id == product.id:
-                        order_item.received_quantity = quantity
-            
-            order.status = 'completed'
-            
-            # 更新供应商应付余额
-            supplier = order.supplier
-            if supplier:
-                supplier.payable_balance = float(supplier.payable_balance) + float(total_amount)
-            
-            flash(f'采购订单创建并入库完成！入库单号: {receipt_number}', 'success')
-        else:
-            flash('采购订单创建成功！', 'success')
+        flash('采购订单创建成功！', 'success')
         
         db.session.commit()
         return redirect(url_for('purchase.index', tab=get_redirect_tab()))
@@ -266,8 +190,8 @@ def new_order():
 def edit_order(id):
     order = PurchaseOrder.query.get_or_404(id)
     
-    if order.status in ['completed', 'cancelled']:
-        flash('已完成或已取消的订单不能修改！', 'danger')
+    if order.status == 'completed':
+        flash('已完成的订单不能修改！', 'danger')
         return redirect(url_for('purchase.index', tab=get_redirect_tab()))
     
     suppliers = Supplier.query.all()
@@ -363,14 +287,10 @@ def edit_order(id):
                                      products=products_data,
                                      order_items=order_items_data,
                                      action='edit')
-            order.status = 'confirmed'
         
         db.session.commit()
         
-        if action == 'confirm':
-            flash('采购订单修改并确认成功！', 'success')
-        else:
-            flash('采购订单修改成功！', 'success')
+        flash('采购订单修改成功！', 'success')
         return redirect(url_for('purchase.index', tab=get_redirect_tab()))
     
     return render_template('purchase/order_items.html', 
@@ -388,157 +308,25 @@ def edit_order(id):
 def edit_order_items(id):
     return redirect(url_for('purchase.edit_order', id=id))
 
-@bp.route('/orders/<int:id>/confirm', methods=['POST'])
-@login_required
-def confirm_order(id):
-    order = PurchaseOrder.query.get_or_404(id)
-    
-    if order.status != 'draft':
-        flash('只有草稿状态的订单可以确认！', 'danger')
-        return redirect(url_for('purchase.index', tab=get_redirect_tab()))
-
-    if len(order.items) == 0:
-        flash('请先添加商品明细！', 'danger')
-        return redirect(url_for('purchase.edit_order', id=order.id))
-
-    order.status = 'confirmed'
-    db.session.commit()
-
-    flash('采购订单确认成功！', 'success')
-    return redirect(url_for('purchase.index', tab=get_redirect_tab()))
-
-@bp.route('/orders/<int:id>/cancel', methods=['POST'])
-@login_required
-def cancel_order(id):
-    order = PurchaseOrder.query.get_or_404(id)
-    
-    if order.status not in ['draft', 'confirmed']:
-        flash('只有草稿或已确认状态的订单可以取消！', 'danger')
-        return redirect(url_for('purchase.index', tab=get_redirect_tab()))
-
-    order.status = 'cancelled'
-    db.session.commit()
-
-    flash('采购订单已取消！', 'success')
-    return redirect(url_for('purchase.index', tab=get_redirect_tab()))
-
 @bp.route('/orders/<int:id>/delete', methods=['POST'])
 @login_required
 def delete_order(id):
     order = PurchaseOrder.query.get_or_404(id)
+    
+    # 检查是否有关联的入库单
+    if order.stock_ins:
+        flash('此订单有关联的入库单，无法删除！', 'danger')
+        return redirect(url_for('purchase.index', tab=get_redirect_tab()))
+    
+    # 检查是否有库存流水记录
+    from app.models import StockLog
+    if StockLog.query.filter_by(reference_type='purchase_order', reference_id=order.id).first():
+        flash('此订单已有库存操作记录，无法删除！', 'danger')
+        return redirect(url_for('purchase.index', tab=get_redirect_tab()))
+    
     db.session.delete(order)
     db.session.commit()
     flash('采购订单删除成功！', 'success')
-    return redirect(url_for('purchase.index', tab=get_redirect_tab()))
-
-@bp.route('/orders/<int:id>/quick-stock-in', methods=['POST'])
-@login_required
-def quick_stock_in(id):
-    order = PurchaseOrder.query.get_or_404(id)
-    
-    if order.status == 'completed':
-        flash('此订单已入库完成！', 'danger')
-        return redirect(url_for('purchase.index', tab=get_redirect_tab()))
-    
-    if len(order.items) == 0:
-        flash('此订单没有商品明细，无法入库！', 'danger')
-        return redirect(url_for('purchase.index', tab=get_redirect_tab()))
-    
-    try:
-        today = datetime.now().strftime('%Y%m%d')
-        last_stock_in = StockIn.query.filter(StockIn.receipt_number.like(f'SI{today}%')).order_by(StockIn.id.desc()).first()
-        if last_stock_in:
-            last_num = int(last_stock_in.receipt_number[10:]) if len(last_stock_in.receipt_number) > 10 else 0
-            receipt_number = f'SI{today}{last_num + 1:03d}'
-        else:
-            receipt_number = f'SI{today}001'
-        
-        stock_in = StockIn(
-            receipt_number=receipt_number,
-            purchase_order_id=order.id,
-            warehouse_id=order.warehouse_id,
-            receipt_date=datetime.now().date(),
-            handler=current_user.username,
-            notes='快捷入库',
-            created_by=current_user.id
-        )
-        db.session.add(stock_in)
-        db.session.flush()
-        
-        total_amount = 0
-        has_partial = False
-        stock_in_details = []
-        for order_item in order.items:
-            remaining_qty = float(order_item.quantity) - float(order_item.received_quantity)
-            if remaining_qty <= 0:
-                continue
-            
-            has_partial = True
-            unit_price = float(order_item.unit_price)
-            amount = remaining_qty * unit_price
-            
-            item = StockInItem(
-                stock_in_id=stock_in.id,
-                product_id=order_item.product_id,
-                quantity=remaining_qty,
-                unit_price=unit_price,
-                amount=amount
-            )
-            db.session.add(item)
-            total_amount += amount
-            
-            product = order_item.product
-            before_quantity = float(product.stock_quantity)
-            after_quantity = before_quantity + remaining_qty
-            product.stock_quantity = after_quantity
-            
-            log = StockLog(
-                product_id=product.id,
-                warehouse_id=order.warehouse_id,
-                change_type='in',
-                quantity=remaining_qty,
-                before_quantity=before_quantity,
-                after_quantity=after_quantity,
-                reference_id=stock_in.id,
-                reference_type='stock_in',
-                notes=f'快捷入库: {receipt_number}',
-                created_by=current_user.id
-            )
-            db.session.add(log)
-            
-            order_item.received_quantity = order_item.quantity
-            
-            stock_in_details.append(f"{product.name} 库存增加 {remaining_qty} {product.unit}")
-        
-        if not has_partial:
-            flash('此订单所有商品都已入库！', 'warning')
-            return redirect(url_for('purchase.index', tab=get_redirect_tab()))
-        
-        stock_in.total_amount = total_amount
-        stock_in.status = 'completed'
-        
-        # 检查订单是否全部入库
-        all_received = True
-        for item in order.items:
-            if float(item.received_quantity) < float(item.quantity):
-                all_received = False
-                break
-        
-        if all_received:
-            order.status = 'completed'
-            # 更新供应商应付余额（入库增加应付）
-            supplier = order.supplier
-            if supplier:
-                supplier.payable_balance = float(supplier.payable_balance) + float(order.total_amount)
-        else:
-            order.status = 'partial'
-        
-        db.session.commit()
-        flash(f'入库单 {receipt_number} 创建成功，{ ", ".join(stock_in_details) }', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'入库失败: {str(e)}', 'danger')
-    
     return redirect(url_for('purchase.index', tab=get_redirect_tab()))
 
 @bp.route('/orders/<int:id>')
@@ -592,7 +380,7 @@ def new_stock_in_from_order(id):
         handler=current_user.username,  # 经办人为当前账号
         notes=f'从采购订单 {order.order_number} 创建入库单',
         created_by=current_user.id,
-        status='draft'
+        status='pending'
     )
     
     db.session.add(stock_in)
@@ -612,6 +400,8 @@ def new_stock_in_from_order(id):
                 amount=amount
             )
             db.session.add(stock_in_item)
+            # 同步更新商品进价
+            order_item.product.purchase_price = unit_price
             total_amount += amount
     
     stock_in.total_amount = total_amount
@@ -650,7 +440,8 @@ def new_stock_in():
             receipt_date=form.receipt_date.data,
             handler=form.handler.data,
             notes=form.notes.data,
-            created_by=current_user.id
+            created_by=current_user.id,
+            status='pending'
         )
         
         db.session.add(stock_in)
@@ -750,6 +541,11 @@ def complete_stock_in(id):
         flash('此入库单已经完成，不能重复确认！', 'danger')
         return redirect(url_for('purchase.index', tab='stockins'))
     
+    # 检查状态是否为未入库
+    if stock_in.status != 'pending':
+        flash('此入库单状态异常，无法确认！', 'danger')
+        return redirect(url_for('purchase.index', tab='stockins'))
+    
     if len(stock_in.items) == 0:
         flash('请先添加商品明细！', 'danger')
         return redirect(url_for('purchase.edit_stock_in_items', id=stock_in.id))
@@ -784,20 +580,24 @@ def complete_stock_in(id):
             )
             db.session.add(log)
         
-        # 如果有关联采购订单，更新已入库数量
+        # 如果有关联采购订单，重新计算已入库数量（基于所有已完成入库单）
         if stock_in.purchase_order:
             order = stock_in.purchase_order
             for order_item in order.items:
-                for stock_in_item in stock_in.items:
-                    if order_item.product_id == stock_in_item.product_id:
-                        order_item.received_quantity = float(order_item.received_quantity) + float(stock_in_item.quantity)
+                total_received = sum(
+                    si_item.quantity
+                    for si in order.stock_ins
+                    if si.status == 'completed'
+                    for si_item in si.items
+                    if si_item.product_id == order_item.product_id
+                )
+                order_item.received_quantity = total_received
             
             # 检查订单是否全部入库
-            all_received = True
-            for item in order.items:
-                if item.received_quantity < item.quantity:
-                    all_received = False
-                    break
+            all_received = all(
+                oi.received_quantity >= oi.quantity
+                for oi in order.items
+            )
             
             if all_received:
                 order.status = 'completed'
@@ -825,6 +625,11 @@ def complete_stock_in(id):
 @login_required
 def delete_stock_in(id):
     stock_in = StockIn.query.get_or_404(id)
+    
+    # 只有未入库状态的入库单可以删除
+    if stock_in.status != 'pending':
+        flash('只有未入库状态的入库单可以删除！', 'danger')
+        return redirect(url_for('purchase.index', tab='stockins'))
     
     db.session.delete(stock_in)
     db.session.commit()

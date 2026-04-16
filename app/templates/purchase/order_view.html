@@ -22,36 +22,21 @@ function confirmQuickStockIn(btn) {
     <a href="{{ url_for('purchase.index') }}" class="btn btn-secondary">
         <i class="bi bi-arrow-left"></i> 返回列表
     </a>
-    {% if order.status == 'draft' %}
+    {% if order.status != 'completed' %}
     <a href="{{ url_for('purchase.edit_order', id=order.id) }}" class="btn btn-primary">
         <i class="bi bi-pencil"></i> 编辑订单
     </a>
-    <a href="{{ url_for('purchase.edit_order_items', id=order.id) }}" class="btn btn-success">
-        <i class="bi bi-list-check"></i> 编辑明细
-    </a>
-    <form method="post" action="{{ url_for('purchase.confirm_order', id=order.id) }}" class="d-inline">
+    <form method="post" action="{{ url_for('purchase.quick_stock_in', id=order.id) }}" class="d-inline">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="btn btn-warning" onclick="return confirm('确认此采购订单？')">
-            <i class="bi bi-check-circle"></i> 确认订单
+        <button type="submit" class="btn btn-success" data-items="{% for item in order_items_data %}{{ item.name }} x {{ item.remaining }} {{ item.unit }}{% if not loop.last %}
+{% endif %}{% endfor %}" onclick="return confirmQuickStockIn(this);">
+            <i class="bi bi-box-arrow-in-down"></i> 快速入库
         </button>
     </form>
     <form method="post" action="{{ url_for('purchase.delete_order', id=order.id) }}" class="d-inline">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-danger" onclick="return confirm('确定删除此采购订单？')">
             <i class="bi bi-trash"></i> 删除订单
-        </button>
-    </form>
-    {% elif order.status in ['confirmed', 'partial'] %}
-    <form method="post" action="{{ url_for('purchase.quick_stock_in', id=order.id) }}" class="d-inline">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="btn btn-success" data-items="{% for item in order_items_data %}{{ item.name }} x {{ item.remaining }} {{ item.unit }}{% if not loop.last %}\n{% endif %}{% endfor %}" onclick="return confirmQuickStockIn(this);">
-            <i class="bi bi-box-arrow-in-down"></i> 快速入库
-        </button>
-    </form>
-    <form method="post" action="{{ url_for('purchase.cancel_order', id=order.id) }}" class="d-inline">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="btn btn-danger" onclick="return confirm('确定取消此采购订单？')">
-            <i class="bi bi-x-circle"></i> 取消订单
         </button>
     </form>
     {% endif %}
@@ -104,16 +89,12 @@ function confirmQuickStockIn(btn) {
                             <tr>
                                 <th>订单状态：</th>
                                 <td>
-                                    {% if order.status == 'draft' %}
-                                    <span class="badge bg-secondary">草稿</span>
-                                    {% elif order.status == 'confirmed' %}
-                                    <span class="badge bg-primary">已确认</span>
+                                    {% if order.status == 'confirmed' %}
+                                    <span class="badge bg-secondary">待入库</span>
                                     {% elif order.status == 'partial' %}
                                     <span class="badge bg-warning">部分入库</span>
                                     {% elif order.status == 'completed' %}
                                     <span class="badge bg-success">已完成</span>
-                                    {% elif order.status == 'cancelled' %}
-                                    <span class="badge bg-danger">已取消</span>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -210,12 +191,6 @@ function confirmQuickStockIn(btn) {
                         <span>创建人</span>
                         <span class="text-muted">{{ order.creator.username if order.creator else '系统' }}</span>
                     </li>
-                    {% if order.status != 'draft' %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <span>确认时间</span>
-                        <span class="text-muted">{{ order.updated_at.strftime('%Y-%m-%d %H:%M') }}</span>
-                    </li>
-                    {% endif %}
                 </ul>
             </div>
         </div>
@@ -242,7 +217,7 @@ function confirmQuickStockIn(btn) {
                 <p class="text-muted text-center mb-0">暂无入库记录</p>
                 {% endif %}
                 
-                {% if order.status in ['confirmed', 'partial'] %}
+                {% if order.status != 'completed' %}
                 <div class="mt-3">
                     <a href="{{ url_for('purchase.new_stock_in_from_order', id=order.id) }}" class="btn btn-primary w-100">
                         <i class="bi bi-box-arrow-down"></i> 创建入库单

@@ -53,6 +53,11 @@ def new_product():
     form.category_id.choices = [(0, '无分类')] + [(c.id, c.name) for c in Category.query.all()]
     
     if form.validate_on_submit():
+        # 检查编号是否已存在
+        if Product.query.filter_by(code=form.code.data).first():
+            flash('商品编号已存在，请使用其他编号！', 'danger')
+            return render_template('product/edit.html', title='新建商品', form=form)
+        
         product = Product(
             code=form.code.data,
             name=form.name.data,
@@ -105,6 +110,12 @@ def edit_product(id):
     form.category_id.choices = [(0, '无分类')] + [(c.id, c.name) for c in Category.query.all()]
     
     if form.validate_on_submit():
+        # 检查编号是否已存在（排除自身）
+        existing = Product.query.filter_by(code=form.code.data).first()
+        if existing and existing.id != product.id:
+            flash('商品编号已存在，请使用其他编号！', 'danger')
+            return render_template('product/edit.html', title='编辑商品', form=form, product=product)
+        
         product.code = form.code.data
         product.name = form.name.data
         product.category_id = form.category_id.data if form.category_id.data != 0 else None
@@ -284,6 +295,11 @@ def new_supplier():
     form = SupplierForm()
     
     if form.validate_on_submit():
+        # 检查编号是否已存在
+        if Supplier.query.filter_by(code=form.code.data).first():
+            flash('供应商编号已存在，请使用其他编号！', 'danger')
+            return render_template('product/supplier_edit.html', title='添加供应商', form=form, action='new')
+        
         supplier = Supplier(
             code=form.code.data,
             name=form.name.data,
@@ -311,6 +327,12 @@ def edit_supplier(id):
     form = SupplierForm(obj=supplier)
     
     if form.validate_on_submit():
+        # 检查编号是否已存在（排除自身）
+        existing = Supplier.query.filter_by(code=form.code.data).first()
+        if existing and existing.id != supplier.id:
+            flash('供应商编号已存在，请使用其他编号！', 'danger')
+            return render_template('product/supplier_edit.html', title='编辑供应商', form=form, supplier=supplier)
+        
         supplier.code = form.code.data
         supplier.name = form.name.data
         supplier.contact_person = form.contact_person.data
@@ -359,6 +381,11 @@ def new_customer():
     form = CustomerForm()
     
     if form.validate_on_submit():
+        # 检查编号是否已存在
+        if Customer.query.filter_by(code=form.code.data).first():
+            flash('客户编号已存在，请使用其他编号！', 'danger')
+            return render_template('product/customer_edit.html', title='添加客户', form=form, action='new')
+        
         customer = Customer(
             code=form.code.data,
             name=form.name.data,
@@ -386,6 +413,12 @@ def edit_customer(id):
     form = CustomerForm(obj=customer)
     
     if form.validate_on_submit():
+        # 检查编号是否已存在（排除自身）
+        existing = Customer.query.filter_by(code=form.code.data).first()
+        if existing and existing.id != customer.id:
+            flash('客户编号已存在，请使用其他编号！', 'danger')
+            return render_template('product/customer_edit.html', title='编辑客户', form=form, customer=customer)
+        
         customer.code = form.code.data
         customer.name = form.name.data
         customer.contact_person = form.contact_person.data
@@ -434,6 +467,11 @@ def new_warehouse():
     form = WarehouseForm()
     
     if form.validate_on_submit():
+        # 检查编号是否已存在
+        if Warehouse.query.filter_by(code=form.code.data).first():
+            flash('仓库编号已存在，请使用其他编号！', 'danger')
+            return render_template('product/warehouse_edit.html', title='添加仓库', form=form, action='new')
+        
         warehouse = Warehouse(
             code=form.code.data,
             name=form.name.data,
@@ -460,6 +498,12 @@ def edit_warehouse(id):
     form = WarehouseForm(obj=warehouse)
     
     if form.validate_on_submit():
+        # 检查编号是否已存在（排除自身）
+        existing = Warehouse.query.filter_by(code=form.code.data).first()
+        if existing and existing.id != warehouse.id:
+            flash('仓库编号已存在，请使用其他编号！', 'danger')
+            return render_template('product/warehouse_edit.html', title='编辑仓库', form=form, warehouse=warehouse)
+        
         warehouse.code = form.code.data
         warehouse.name = form.name.data
         warehouse.address = form.address.data
@@ -513,7 +557,6 @@ def api_products():
 
 @bp.route('/api/product/price', methods=['POST'])
 @login_required
-@csrf.exempt
 def api_update_price():
     """更新商品价格"""
     data = request.get_json()

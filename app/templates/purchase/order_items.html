@@ -39,11 +39,11 @@
                     <div class="mb-3">
                         <label class="form-label">订单状态</label>
                         {% if order %}
-                        <input type="text" class="form-control" value="{% if order.status == 'draft' %}草稿{% elif order.status == 'confirmed' %}已确认{% elif order.status == 'partial' %}部分入库{% elif order.status == 'completed' %}已入库{% elif order.status == 'cancelled' %}已取消{% endif %}" readonly>
+                        <input type="text" class="form-control" value="{% if order.status == 'confirmed' %}待入库{% elif order.status == 'partial' %}部分入库{% elif order.status == 'completed' %}已入库{% endif %}" readonly>
                         {% else %}
                         <select name="order_status" class="form-select" id="orderStatus">
-                            <option value="unstocked">未入库</option>
-                            <option value="completed">已入库</option>
+                            <option value="pending">未入库</option>
+                            <option value="completed">直接入库</option>
                         </select>
                         {% endif %}
                     </div>
@@ -124,14 +124,7 @@
                     </button>
                 </div>
                 <div>
-                    {% if order and order.status == 'draft' %}
-                    <button type="submit" name="action" value="save" class="btn btn-primary">
-                        <i class="bi bi-save"></i> 保存草稿
-                    </button>
-                    <button type="submit" name="action" value="confirm" class="btn btn-warning">
-                        <i class="bi bi-check-circle"></i> 确认订单
-                    </button>
-                    {% elif order and order.status in ['confirmed', 'partial'] %}
+                    {% if order and order.status != 'completed' %}
                     <button type="submit" name="action" value="save" class="btn btn-primary">
                         <i class="bi bi-save"></i> 保存修改
                     </button>

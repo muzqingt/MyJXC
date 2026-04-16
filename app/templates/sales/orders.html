@@ -21,11 +21,9 @@
                 <label for="status" class="form-label">订单状态</label>
                 <select name="status" id="status" class="form-select">
                     <option value="">全部状态</option>
-                    <option value="draft" {% if status == 'draft' %}selected{% endif %}>草稿</option>
-                    <option value="confirmed" {% if status == 'confirmed' %}selected{% endif %}>已确认</option>
+                    <option value="pending" {% if status == 'pending' %}selected{% endif %}>未出库</option>
                     <option value="partial" {% if status == 'partial' %}selected{% endif %}>部分出库</option>
                     <option value="completed" {% if status == 'completed' %}selected{% endif %}>已完成</option>
-                    <option value="cancelled" {% if status == 'cancelled' %}selected{% endif %}>已取消</option>
                 </select>
             </div>
             <div class="col-md-3">
@@ -83,44 +81,33 @@
                         <td>{{ order.delivery_date.strftime('%Y-%m-%d') if order.delivery_date else '-' }}</td>
                         <td class="text-end">¥{{ "%.2f"|format(order.total_amount) }}</td>
                         <td>
-                            {% if order.status == 'draft' %}
-                            <span class="badge bg-secondary">草稿</span>
-                            {% elif order.status == 'confirmed' %}
-                            <span class="badge bg-primary">已确认</span>
+                            {% if order.status == 'confirmed' %}
+                            <span class="badge bg-secondary">未出库</span>
                             {% elif order.status == 'partial' %}
                             <span class="badge bg-warning">部分出库</span>
                             {% elif order.status == 'completed' %}
                             <span class="badge bg-success">已完成</span>
-                            {% elif order.status == 'cancelled' %}
-                            <span class="badge bg-danger">已取消</span>
                             {% endif %}
                         </td>
                         <td>
                             <div class="btn-group btn-group-sm">
-                                <a href="{{ url_for('sales.view_order', id=order.id) }}" class="btn btn-outline-info" title="查看">
+                                <a href="{{ url_for('sales.view_order', id=order.id) }}" class="btn btn-outline-primary" title="查看详情">
                                     <i class="bi bi-eye"></i>
                                 </a>
-                                {% if order.status == 'draft' %}
-                                <a href="{{ url_for('sales.edit_order', id=order.id) }}" class="btn btn-outline-primary" title="编辑">
+                                {% if order.status != 'completed' %}
+                                <a href="{{ url_for('sales.edit_order', id=order.id) }}" class="btn btn-outline-warning" title="编辑">
                                     <i class="bi bi-pencil"></i>
                                 </a>
-                                <a href="{{ url_for('sales.edit_order_items', id=order.id) }}" class="btn btn-outline-success" title="编辑明细">
-                                    <i class="bi bi-list-check"></i>
-                                </a>
-                                <form method="post" action="{{ url_for('sales.confirm_order', id=order.id) }}" class="d-inline">
-                                    <button type="submit" class="btn btn-outline-warning" title="确认订单" onclick="return confirm('确认此销售订单？')">
-                                        <i class="bi bi-check-circle"></i>
+                                <form method="post" action="{{ url_for('sales.quick_stock_out', id=order.id) }}" class="d-inline" onsubmit="return confirm('确认快捷出库？');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-outline-success" title="快捷出库">
+                                        <i class="bi bi-box-arrow-up"></i> 出库
                                     </button>
                                 </form>
-                                <form method="post" action="{{ url_for('sales.delete_order', id=order.id) }}" class="d-inline">
-                                    <button type="submit" class="btn btn-outline-danger" title="删除" onclick="return confirm('确定删除此销售订单？')">
+                                <form method="post" action="{{ url_for('sales.delete_order', id=order.id) }}" class="d-inline" onsubmit="return confirm('删除此订单？');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-outline-danger" title="删除">
                                         <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
-                                {% elif order.status == 'confirmed' %}
-                                <form method="post" action="{{ url_for('sales.cancel_order', id=order.id) }}" class="d-inline">
-                                    <button type="submit" class="btn btn-outline-danger" title="取消订单" onclick="return confirm('确定取消此销售订单？')">
-                                        <i class="bi bi-x-circle"></i>
                                     </button>
                                 </form>
                                 {% endif %}

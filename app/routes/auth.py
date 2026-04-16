@@ -11,7 +11,7 @@ bp = Blueprint('auth', __name__, url_prefix='/auth')
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('product.index'))
+        return redirect(url_for('main.index'))
     
     form = LoginForm()
     if form.validate_on_submit():
@@ -41,7 +41,7 @@ def login():
         flash('登录成功！', 'success')
         next_page = request.args.get('next')
         if not next_page or not next_page.startswith('/'):
-            next_page = url_for('product.index')
+            next_page = url_for('main.index')
         return redirect(next_page)
     
     return render_template('auth/login.html', title='登录', form=form)
@@ -49,7 +49,7 @@ def login():
 @bp.route('/register', methods=['GET', 'POST'])
 def register():
     if current_user.is_authenticated:
-        return redirect(url_for('product.index'))
+        return redirect(url_for('main.index'))
     
     form = RegistrationForm()
     if form.validate_on_submit():

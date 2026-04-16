@@ -29,7 +29,7 @@ def create_app(config_class='config.Config'):
     login_manager.init_app(app)
     
     # 注册蓝图
-    from app.routes import auth, product, purchase, sales, inventory, finance, report, system
+    from app.routes import auth, product, purchase, sales, inventory, finance, report, system, main
     app.register_blueprint(auth.bp)
     app.register_blueprint(product.bp)
     app.register_blueprint(purchase.bp)
@@ -38,6 +38,7 @@ def create_app(config_class='config.Config'):
     app.register_blueprint(finance.bp)
     app.register_blueprint(report.bp)
     app.register_blueprint(system.bp)
+    app.register_blueprint(main.bp)
     
     # 创建数据库表
     with app.app_context():
