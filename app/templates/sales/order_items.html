@@ -62,7 +62,7 @@
                         <select name="warehouse_id" class="form-select" required>
                             <option value="">请选择仓库</option>
                             {% for warehouse in warehouses %}
-                            <option value="{{ warehouse.id }}" {% if order and order.warehouse_id == warehouse.id %}selected{% elif submitted_warehouse_id and warehouse.id == submitted_warehouse_id %}selected{% elif not order and not submitted_warehouse_id and loop.first %}selected{% endif %}>{{ warehouse.code }} - {{ warehouse.name }}</option>
+                            <option value="{{ warehouse.id }}" {% if order and order.warehouse_id == warehouse.id %}selected{% elif submitted_warehouse_id and warehouse.id == submitted_warehouse_id %}selected{% endif %}>{{ warehouse.code }} - {{ warehouse.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
