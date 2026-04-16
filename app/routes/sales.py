@@ -103,6 +103,8 @@ def new_order():
     } for p in products]
     
     if request.method == 'POST':
+        order_status = request.form.get('order_status', 'draft')
+        
         # 获取表单数据
         customer_id = request.form.get('customer_id', type=int)
         warehouse_id = request.form.get('warehouse_id', type=int)
@@ -191,7 +193,102 @@ def new_order():
 
         order.total_amount = total_amount
 
-        flash('销售订单创建成功！', 'success')
+        # 如果选择直接出库
+        if order_status == 'completed':
+            # 检查库存是否充足
+            insufficient_stock = []
+            for item_data in order_items_list:
+                product = item_data['product']
+                if product.stock_quantity < item_data['quantity']:
+                    insufficient_stock.append(f"{product.code} - {product.name} (库存: {product.stock_quantity}, 需求: {item_data['quantity']})")
+            
+            if insufficient_stock:
+                db.session.rollback()
+                flash(f'库存不足: {", ".join(insufficient_stock)}', 'danger')
+                return render_template('sales/order_items.html',
+                                     title='新建销售订单',
+                                     customers=customers_data,
+                                     warehouses=warehouses,
+                                     products=products_data,
+                                     action='new',
+                                     submitted_customer_id=customer_id,
+                                     submitted_warehouse_id=warehouse_id,
+                                     submitted_order_date=order_date,
+                                     submitted_delivery_date=delivery_date,
+                                     submitted_notes=notes,
+                                     orderItems=order_items_list)
+
+            # 生成出库单号
+            today = datetime.now().strftime('%Y%m%d')
+            last_stock_out = StockOut.query.filter(StockOut.delivery_number.like(f'OUT{today}%')).order_by(StockOut.id.desc()).first()
+            if last_stock_out:
+                last_num = int(last_stock_out.delivery_number[11:]) if len(last_stock_out.delivery_number) > 11 else 0
+                delivery_number = f'OUT{today}{last_num + 1:03d}'
+            else:
+                delivery_number = f'OUT{today}001'
+
+            stock_out = StockOut(
+                delivery_number=delivery_number,
+                sales_order_id=order.id,
+                warehouse_id=warehouse_id,
+                delivery_date=datetime.now().date(),
+                handler=current_user.username,
+                notes='创建订单时直接出库',
+                created_by=current_user.id,
+                status='completed',
+                total_amount=total_amount
+            )
+            db.session.add(stock_out)
+            db.session.flush()
+
+            # 创建出库明细并更新库存
+            for item_data in order_items_list:
+                product = item_data['product']
+                quantity = item_data['quantity']
+                unit_price = item_data['unit_price']
+                amount = item_data['amount']
+
+                stock_out_item = StockOutItem(
+                    stock_out_id=stock_out.id,
+                    product_id=product.id,
+                    quantity=quantity,
+                    unit_price=unit_price,
+                    amount=amount
+                )
+                db.session.add(stock_out_item)
+
+                before_quantity = float(product.stock_quantity)
+                after_quantity = before_quantity - quantity
+                product.stock_quantity = after_quantity
+                product.sale_price = unit_price
+
+                log = StockLog(
+                    product_id=product.id,
+                    warehouse_id=warehouse_id,
+                    change_type='out',
+                    quantity=quantity,
+                    before_quantity=before_quantity,
+                    after_quantity=after_quantity,
+                    reference_id=stock_out.id,
+                    reference_type='stock_out',
+                    notes=f'创建订单时直接出库: {delivery_number}',
+                    created_by=current_user.id
+                )
+                db.session.add(log)
+
+                for order_item in order.items:
+                    if order_item.product_id == product.id:
+                        order_item.delivered_quantity = quantity
+
+            order.status = 'completed'
+
+            customer = order.customer
+            if customer:
+                customer.receivable_balance = float(customer.receivable_balance) + float(total_amount)
+
+            flash(f'销售订单创建并出库完成！出库单号: {delivery_number}', 'success')
+        else:
+            flash('销售订单创建成功！', 'success')
 
         db.session.commit()
         return redirect(url_for('sales.index'))

@@ -103,6 +103,7 @@ def new_order():
     
     if request.method == 'POST':
         action = request.form.get('action', 'save')
+        order_status = request.form.get('order_status', 'draft')
         
         # 获取表单数据
         supplier_id = request.form.get('supplier_id', type=int)
@@ -192,7 +193,84 @@ def new_order():
         
         order.total_amount = total_amount
         
-        flash('采购订单创建成功！', 'success')
+        # 如果选择直接入库，完成入库流程
+        if order_status == 'completed':
+            # 生成入库单号
+            last_stock_in = StockIn.query.filter(StockIn.receipt_number.like(f'SI{today}%')).order_by(StockIn.id.desc()).first()
+            if last_stock_in:
+                last_num = int(last_stock_in.receipt_number[10:]) if len(last_stock_in.receipt_number) > 10 else 0
+                receipt_number = f'SI{today}{last_num + 1:03d}'
+            else:
+                receipt_number = f'SI{today}001'
+            
+            stock_in = StockIn(
+                receipt_number=receipt_number,
+                purchase_order_id=order.id,
+                warehouse_id=warehouse_id,
+                receipt_date=datetime.now().date(),
+                handler=current_user.username,
+                notes='创建订单时直接入库',
+                created_by=current_user.id,
+                status='completed',
+                total_amount=total_amount
+            )
+            db.session.add(stock_in)
+            db.session.flush()
+            
+            # 创建入库明细并更新库存
+            for item_data in order_items_list:
+                product = item_data['product']
+                quantity = item_data['quantity']
+                unit_price = item_data['unit_price']
+                amount = item_data['amount']
+                
+                # 创建入库明细
+                stock_in_item = StockInItem(
+                    stock_in_id=stock_in.id,
+                    product_id=product.id,
+                    quantity=quantity,
+                    unit_price=unit_price,
+                    amount=amount
+                )
+                db.session.add(stock_in_item)
+                
+                # 更新库存
+                before_quantity = float(product.stock_quantity)
+                after_quantity = before_quantity + quantity
+                product.stock_quantity = after_quantity
+                # 同步更新商品进价
+                product.purchase_price = unit_price
+                
+                # 记录库存流水
+                log = StockLog(
+                    product_id=product.id,
+                    warehouse_id=warehouse_id,
+                    change_type='in',
+                    quantity=quantity,
+                    before_quantity=before_quantity,
+                    after_quantity=after_quantity,
+                    reference_id=stock_in.id,
+                    reference_type='stock_in',
+                    notes=f'创建订单时直接入库: {receipt_number}',
+                    created_by=current_user.id
+                )
+                db.session.add(log)
+                
+                # 更新订单明细已入库数量
+                for order_item in order.items:
+                    if order_item.product_id == product.id:
+                        order_item.received_quantity = quantity
+            
+            order.status = 'completed'
+            
+            # 更新供应商应付余额
+            supplier = order.supplier
+            if supplier:
+                supplier.payable_balance = float(supplier.payable_balance) + float(total_amount)
+            
+            flash(f'采购订单创建并入库完成！入库单号: {receipt_number}', 'success')
+        else:
+            flash('采购订单创建成功！', 'success')
         
         db.session.commit()
         return redirect(url_for('purchase.index', tab=get_redirect_tab()))

@@ -41,6 +41,10 @@
                         {% if order %}
                         <input type="text" class="form-control" value="{% if order.status == 'confirmed' %}待入库{% elif order.status == 'partial' %}部分入库{% elif order.status == 'completed' %}已入库{% endif %}" readonly>
                         {% else %}
+                        <select name="order_status" class="form-select" id="orderStatus">
+                            <option value="draft">普通创建</option>
+                            <option value="completed">直接入库</option>
+                        </select>
                         {% endif %}
                     </div>
                 </div>
