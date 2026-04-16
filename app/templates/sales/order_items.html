@@ -41,10 +41,6 @@
                         {% if order %}
                         <input type="text" class="form-control" value="{% if order.status == 'confirmed' %}待出库{% elif order.status == 'partial' %}部分出库{% elif order.status == 'completed' %}已完成{% endif %}" readonly>
                         {% else %}
-                        <select name="order_status" class="form-select" id="orderStatus">
-                            <option value="pending">未出库</option>
-                            <option value="completed">直接出库</option>
-                        </select>
                         {% endif %}
                     </div>
                 </div>
@@ -62,7 +58,7 @@
                         <select name="warehouse_id" class="form-select" required>
                             <option value="">请选择仓库</option>
                             {% for warehouse in warehouses %}
-                            <option value="{{ warehouse.id }}" {% if order and order.warehouse_id == warehouse.id %}selected{% elif not order and loop.first %}selected{% endif %}>{{ warehouse.code }} - {{ warehouse.name }}</option>
+                            <option value="{{ warehouse.id }}" {% if order and order.warehouse_id == warehouse.id %}selected{% elif submitted_warehouse_id and warehouse.id == submitted_warehouse_id %}selected{% elif not order and not submitted_warehouse_id and loop.first %}selected{% endif %}>{{ warehouse.code }} - {{ warehouse.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -72,19 +68,19 @@
                 <div class="col-md-6">
                     <div class="mb-3">
                         <label class="form-label">订单日期 <span class="text-danger">*</span></label>
-                        <input type="date" name="order_date" class="form-control" required value="{{ order.order_date.strftime('%Y-%m-%d') if order else '' }}">
+                        <input type="date" name="order_date" class="form-control" required value="{{ submitted_order_date if submitted_order_date else (order.order_date.strftime('%Y-%m-%d') if order else '') }}">
                     </div>
                 </div>
                 <div class="col-md-6">
                     <div class="mb-3">
                         <label class="form-label">预计发货日期</label>
-                        <input type="date" name="delivery_date" class="form-control" value="{{ order.delivery_date.strftime('%Y-%m-%d') if order and order.delivery_date else '' }}">
+                        <input type="date" name="delivery_date" class="form-control" value="{{ submitted_delivery_date if submitted_delivery_date is not none else (order.delivery_date.strftime('%Y-%m-%d') if order and order.delivery_date else '') }}">
                     </div>
                 </div>
             </div>
             <div class="mb-4">
                 <label class="form-label">备注</label>
-                <textarea name="notes" class="form-control" rows="2">{{ order.notes if order else '' }}</textarea>
+                <textarea name="notes" class="form-control" rows="2">{{ submitted_notes if submitted_notes is not none else (order.notes if order else '') }}</textarea>
             </div>
 
             <!-- 商品明细 -->
@@ -196,29 +192,16 @@ $(document).ready(function() {
 
     // 初始化客户搜索
     let customerSearcher = null;
-    const selectedCustomerId = '{{ order.customer_id if order else "" }}';
-    if (selectedCustomerId) {
-        const customer = customers.find(c => String(c.id) === String(selectedCustomerId));
-        if (customer) {
-            customerSearcher = initEntitySearch('#customer-search-container', customers, function(customer) {}, {
-                containerClass: 'customer-search',
-                fieldCode: 'code',
-                fieldName: 'name',
-                placeholder: '输入客户名称或编码搜索...',
-                selectedId: customer.id,
-                hiddenName: 'customer_id'
-            });
-        }
-    } else {
-        customerSearcher = initEntitySearch('#customer-search-container', customers, function(customer) {}, {
-            containerClass: 'customer-search',
-            fieldCode: 'code',
-            fieldName: 'name',
-            placeholder: '输入客户名称或编码搜索...',
-            selectedId: null,
-            hiddenName: 'customer_id'
-        });
-    }
+    const selectedCustomerId = '{{ submitted_customer_id if submitted_customer_id else "" }}';
+    const preSelectedCustomer = selectedCustomerId ? customers.find(c => String(c.id) === String(selectedCustomerId)) : null;
+    customerSearcher = initEntitySearch('#customer-search-container', customers, function(customer) {}, {
+        containerClass: 'customer-search',
+        fieldCode: 'code',
+        fieldName: 'name',
+        placeholder: '输入客户名称或编码搜索...',
+        selectedId: preSelectedCustomer ? preSelectedCustomer.id : null,
+        hiddenName: 'customer_id'
+    });
 
     // 存储每个商品的原始价格
     let originalPrices = {};
@@ -311,6 +294,12 @@ $(document).ready(function() {
         
         updateRow(rowId, product);
         updateTotal();
+        
+        // 更新搜索框显示所选商品信息
+        const searcher = window['searcher_' + rowId];
+        if (searcher) {
+            searcher.input.val(product.code + ' - ' + product.name);
+        }
         
         // 自动添加新行
         var hasEmptyRow = false;

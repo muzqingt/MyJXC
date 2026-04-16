@@ -115,12 +115,31 @@ def new_order():
         
         if not customer_id or not warehouse_id or not order_date:
             flash('请填写必填字段！', 'danger')
+            # 重建商品明细数据（用于回填）
+            order_items_list = []
+            for i in range(len(product_ids)):
+                if product_ids[i] and quantities[i] and unit_prices[i]:
+                    product = Product.query.get(int(product_ids[i]))
+                    if product:
+                        order_items_list.append({
+                            'product_id': product.id,
+                            'product_name': product.name,
+                            'product_code': product.code,
+                            'quantity': quantities[i],
+                            'unit_price': unit_prices[i]
+                        })
             return render_template('sales/order_items.html',
                                  title='新建销售订单',
                                  customers=customers_data,
                                  warehouses=warehouses,
                                  products=products_data,
-                                 action='new')
+                                 action='new',
+                                 submitted_customer_id=customer_id,
+                                 submitted_warehouse_id=warehouse_id,
+                                 submitted_order_date=order_date,
+                                 submitted_delivery_date=delivery_date,
+                                 submitted_notes=notes,
+                                 orderItems=order_items_list)
 
         # 生成订单号
         today = datetime.now().strftime('%Y%m%d')
@@ -236,14 +255,32 @@ def edit_order(id):
         
         if not customer_id or not warehouse_id or not order_date:
             flash('请填写必填字段！', 'danger')
+            # 重建商品明细数据（用于回填）
+            order_items_list = []
+            for i in range(len(product_ids)):
+                if product_ids[i] and quantities[i] and unit_prices[i]:
+                    product = Product.query.get(int(product_ids[i]))
+                    if product:
+                        order_items_list.append({
+                            'product_id': product.id,
+                            'product_name': product.name,
+                            'product_code': product.code,
+                            'quantity': quantities[i],
+                            'unit_price': unit_prices[i]
+                        })
             return render_template('sales/order_items.html',
                                  title='编辑销售订单',
                                  order=order,
                                  customers=customers_data,
                                  warehouses=warehouses,
                                  products=products_data,
-                                 order_items=order_items_data,
-                                 action='edit')
+                                 action='edit',
+                                 submitted_customer_id=customer_id,
+                                 submitted_warehouse_id=warehouse_id,
+                                 submitted_order_date=order_date,
+                                 submitted_delivery_date=delivery_date,
+                                 submitted_notes=notes,
+                                 orderItems=order_items_list)
         
         # 更新订单基本信息
         order.customer_id = customer_id

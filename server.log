@@ -11,34 +11,4 @@
  * Running on http://127.0.0.1:5000
  * Running on http://10.20.172.232:5000
 [33mPress CTRL+C to quit[0m
-127.0.0.1 - - [16/Apr/2026 12:47:37] "[32mGET /purchase/ HTTP/1.1[0m" 302 -
-10.20.172.1 - - [16/Apr/2026 12:48:07] "GET / HTTP/1.1" 200 -
-10.20.172.1 - - [16/Apr/2026 12:48:08] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.20.172.1 - - [16/Apr/2026 12:48:08] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.20.172.1 - - [16/Apr/2026 12:48:10] "GET / HTTP/1.1" 200 -
-10.20.172.1 - - [16/Apr/2026 12:48:10] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.20.172.1 - - [16/Apr/2026 12:48:10] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.20.172.1 - - [16/Apr/2026 12:48:11] "GET /purchase/index HTTP/1.1" 200 -
-10.20.172.1 - - [16/Apr/2026 12:48:11] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.20.172.1 - - [16/Apr/2026 12:48:11] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.20.172.1 - - [16/Apr/2026 12:48:13] "GET /sales/index HTTP/1.1" 200 -
-10.20.172.1 - - [16/Apr/2026 12:48:13] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.20.172.1 - - [16/Apr/2026 12:48:13] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.20.172.1 - - [16/Apr/2026 12:48:13] "GET /purchase/index HTTP/1.1" 200 -
-10.20.172.1 - - [16/Apr/2026 12:48:13] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.20.172.1 - - [16/Apr/2026 12:48:13] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.20.172.1 - - [16/Apr/2026 12:48:14] "GET /sales/index HTTP/1.1" 200 -
-10.20.172.1 - - [16/Apr/2026 12:48:14] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.20.172.1 - - [16/Apr/2026 12:48:14] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.20.172.1 - - [16/Apr/2026 12:48:15] "GET /purchase/index HTTP/1.1" 200 -
-10.20.172.1 - - [16/Apr/2026 12:48:15] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.20.172.1 - - [16/Apr/2026 12:48:15] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.20.172.1 - - [16/Apr/2026 12:48:16] "GET /sales/index HTTP/1.1" 200 -
-10.20.172.1 - - [16/Apr/2026 12:48:16] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.20.172.1 - - [16/Apr/2026 12:48:16] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.20.172.1 - - [16/Apr/2026 12:48:17] "GET /purchase/index HTTP/1.1" 200 -
-10.20.172.1 - - [16/Apr/2026 12:48:17] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.20.172.1 - - [16/Apr/2026 12:48:17] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
-10.20.172.1 - - [16/Apr/2026 12:48:21] "GET /sales/index HTTP/1.1" 200 -
-10.20.172.1 - - [16/Apr/2026 12:48:21] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
-10.20.172.1 - - [16/Apr/2026 12:48:21] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+127.0.0.1 - - [16/Apr/2026 12:58:01] "[32mGET /purchase/orders/new HTTP/1.1[0m" 302 -
