@@ -9,13 +9,9 @@
     <a href="{{ url_for('finance.add_payment') }}" class="btn btn-primary">
         <i class="bi bi-plus-circle"></i> 添加付款
     </a>
-    <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
-        <i class="bi bi-download"></i> 导出
-    </button>
-    <ul class="dropdown-menu">
-        <li><a class="dropdown-item" href="#">Excel</a></li>
-        <li><a class="dropdown-item" href="#">PDF</a></li>
-    </ul>
+    <a href="{{ url_for('finance.export_payments') }}" class="btn btn-outline-primary">
+        <i class="bi bi-download"></i> 导出Excel
+    </a>
 </div>
 {% endblock %}
 

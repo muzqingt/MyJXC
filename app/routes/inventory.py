@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import json
 from app import db
 from app.models import Product, Warehouse, StockLog, StockIn, StockOut, Category, PurchaseOrder, SalesOrder
+from app.forms import StockAdjustForm, StockTransferForm
 
 # 创建蓝图
 bp = Blueprint('inventory', __name__, url_prefix='/inventory')
@@ -117,56 +118,10 @@ def stock_check():
 @login_required
 def stock_transfer():
     """库存调拨"""
-    if request.method == 'POST':
-        try:
-            product_ids = request.form.getlist('product_id[]')
-            quantities = request.form.getlist('quantity[]')
-            from_warehouse_id = int(request.form.get('from_warehouse'))
-            to_warehouse_id = int(request.form.get('to_warehouse'))
-            notes = request.form.get('remark', '')
-            
-            if from_warehouse_id == to_warehouse_id:
-                flash('调出仓库和调入仓库不能相同！', 'danger')
-            else:
-                for i in range(len(product_ids)):
-                    if product_ids[i] and quantities[i]:
-                        product = Product.query.get(int(product_ids[i]))
-                        if product:
-                            quantity = float(quantities[i])
-                            
-                            if product.stock_quantity < quantity:
-                                flash(f'{product.name} 库存不足！', 'danger')
-                                db.session.rollback()
-                                return redirect(url_for('inventory.stock_transfer'))
-                            
-                            warehouse = Warehouse.query.get(to_warehouse_id)
-                            warehouse_name = warehouse.name if warehouse else '未知仓库'
-                            # 减少源仓库库存
-                            product.stock_quantity -= quantity
-                            log_out = StockLog(
-                                product_id=product.id,
-                                warehouse_id=from_warehouse_id,
-                                change_type='out',
-                                quantity=quantity,
-                                before_quantity=product.stock_quantity + quantity,
-                                after_quantity=product.stock_quantity,
-                                reference_type='stock_transfer',
-                                notes=f'调拨出库至{warehouse_name}: {notes}',
-                                created_by=current_user.id
-                            )
-                            db.session.add(log_out)
-                
-                db.session.commit()
-                flash('库存调拨完成！', 'success')
-                return redirect(url_for('inventory.stock_transfer'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'调拨失败: {str(e)}', 'danger')
-    
     warehouses = Warehouse.query.all()
     products = Product.query.all()
     today = datetime.now().strftime('%Y-%m-%d')
-    
+
     # 将产品转换为JSON格式供前端使用
     products_json = json.dumps([{
         'id': p.id,
@@ -177,13 +132,201 @@ def stock_transfer():
         'stock_quantity': float(p.stock_quantity) if p.stock_quantity else 0,
         'purchase_price': float(p.purchase_price) if p.purchase_price else 0
     } for p in products])
-    
+
+    # 创建表单并设置仓库选项
+    form = StockTransferForm()
+    form.from_warehouse.choices = [(w.id, f"{w.code} - {w.name}") for w in warehouses]
+    form.to_warehouse.choices = form.from_warehouse.choices
+    form.transfer_date.data = datetime.now().date()
+
+    # 设置产品选项（动态）
+    product_choices = [(p.id, f"{p.code} - {p.name}") for p in products]
+    for entry in form.items.entries:
+        entry.form.product_id.choices = product_choices
+
+    # 用于存储验证失败时回填JS表格的数据
+    items_data = []
+
+    if form.validate_on_submit():
+        try:
+            # 使用 WTForms FieldList 获取数据
+            items = form.items.data
+            from_warehouse_id = form.from_warehouse.data
+            to_warehouse_id = form.to_warehouse.data
+            notes = form.remark.data or ''
+
+            if from_warehouse_id == to_warehouse_id:
+                flash('调出仓库和调入仓库不能相同！', 'danger')
+                items_data = [
+                    {'product_id': item['product_id'], 'quantity': item['quantity']}
+                    for item in items
+                    if item['product_id']
+                ]
+                return render_template('inventory/stock_transfer.html',
+                                     title='库存调拨',
+                                     form=form,
+                                     warehouses=warehouses,
+                                     products=products,
+                                     products_json=products_json,
+                                     today=today,
+                                     items_data=items_data)
+
+            warehouse = Warehouse.query.get(to_warehouse_id)
+            warehouse_name = warehouse.name if warehouse else '未知仓库'
+
+            for item in items:
+                if item['product_id'] and item['quantity']:
+                    product = Product.query.get(item['product_id'])
+                    if product:
+                        quantity = float(item['quantity'])
+
+                        if product.stock_quantity < quantity:
+                            flash(f'{product.name} 库存不足！', 'danger')
+                            items_data = [
+                                {'product_id': i['product_id'], 'quantity': i['quantity']}
+                                for i in items
+                                if i['product_id']
+                            ]
+                            db.session.rollback()
+                            return render_template('inventory/stock_transfer.html',
+                                                 title='库存调拨',
+                                                 form=form,
+                                                 warehouses=warehouses,
+                                                 products=products,
+                                                 products_json=products_json,
+                                                 today=today,
+                                                 items_data=items_data)
+
+                        # 减少源仓库库存
+                        product.stock_quantity -= quantity
+                        log_out = StockLog(
+                            product_id=product.id,
+                            warehouse_id=from_warehouse_id,
+                            change_type='out',
+                            quantity=quantity,
+                            before_quantity=product.stock_quantity + quantity,
+                            after_quantity=product.stock_quantity,
+                            reference_type='stock_transfer',
+                            notes=f'调拨出库至{warehouse_name}: {notes}',
+                            created_by=current_user.id
+                        )
+                        db.session.add(log_out)
+
+                        # 增加目标仓库库存
+                        product.stock_quantity += quantity
+                        log_in = StockLog(
+                            product_id=product.id,
+                            warehouse_id=to_warehouse_id,
+                            change_type='in',
+                            quantity=quantity,
+                            before_quantity=product.stock_quantity - quantity,
+                            after_quantity=product.stock_quantity,
+                            reference_type='stock_transfer',
+                            notes=f'调拨入库自{warehouse_name}: {notes}',
+                            created_by=current_user.id
+                        )
+                        db.session.add(log_in)
+
+            db.session.commit()
+            flash('库存调拨完成！', 'success')
+            return redirect(url_for('inventory.stock_transfer'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'调拨失败: {str(e)}', 'danger')
+
+    # 验证失败时，从 form.items 构建 items_data 供 JS 回填
+    if form.items.data:
+        items_data = [
+            {'product_id': item['product_id'], 'quantity': item['quantity']}
+            for item in form.items.data
+            if item['product_id']
+        ]
+
     return render_template('inventory/stock_transfer.html',
                          title='库存调拨',
+                         form=form,
                          warehouses=warehouses,
                          products=products,
                          products_json=products_json,
-                         today=today)
+                         today=today,
+                         items_data=items_data)
+
+
+@bp.route('/export-warehouse-stock/<int:warehouse_id>')
+@login_required
+def export_warehouse_stock(warehouse_id):
+    """导出仓库库存报表"""
+    from urllib.parse import quote
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+
+    warehouse = Warehouse.query.get_or_404(warehouse_id)
+    products = Product.query.all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f'{warehouse.name}库存'
+
+    header_font = Font(bold=True, color='FFFFFF')
+    header_fill = PatternFill(start_color='4472C4', end_color='4472C4', fill_type='solid')
+    header_alignment = Alignment(horizontal='center', vertical='center')
+    thin_border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+
+    headers = ['商品编码', '商品名称', '规格', '单位', '当前库存', '安全库存', '采购价', '销售价', '库存状态']
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = thin_border
+
+    for row_idx, product in enumerate(products, 2):
+        stock = float(product.stock_quantity or 0)
+        safety = float(product.safety_stock or 0)
+        if stock <= 0:
+            status = '零库存'
+        elif stock <= safety:
+            status = '低库存'
+        else:
+            status = '正常'
+
+        ws.cell(row=row_idx, column=1, value=product.code).border = thin_border
+        ws.cell(row=row_idx, column=2, value=product.name).border = thin_border
+        ws.cell(row=row_idx, column=3, value=product.specification or '').border = thin_border
+        ws.cell(row=row_idx, column=4, value=product.unit or '').border = thin_border
+        ws.cell(row=row_idx, column=5, value=stock).border = thin_border
+        ws.cell(row=row_idx, column=5).number_format = '#,##0.00'
+        ws.cell(row=row_idx, column=6, value=safety).border = thin_border
+        ws.cell(row=row_idx, column=6).number_format = '#,##0.00'
+        ws.cell(row=row_idx, column=7, value=float(product.purchase_price or 0)).border = thin_border
+        ws.cell(row=row_idx, column=7).number_format = '#,##0.02'
+        ws.cell(row=row_idx, column=8, value=float(product.sales_price or 0)).border = thin_border
+        ws.cell(row=row_idx, column=8).number_format = '#,##0.02'
+        ws.cell(row=row_idx, column=9, value=status).border = thin_border
+
+    ws.column_dimensions['A'].width = 12
+    ws.column_dimensions['B'].width = 20
+    ws.column_dimensions['C'].width = 15
+    ws.column_dimensions['D'].width = 8
+    ws.column_dimensions['E'].width = 12
+    ws.column_dimensions['F'].width = 12
+    ws.column_dimensions['G'].width = 12
+    ws.column_dimensions['H'].width = 12
+    ws.column_dimensions['I'].width = 10
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    filename = f'warehouse_stock_{warehouse.name}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8''{quote(filename)}'
+    return response
+
 
 @bp.route('/logs')
 @login_required
@@ -420,53 +563,63 @@ def api_stock_check():
 @login_required
 def stock_adjust():
     """库存调整"""
-    if request.method == 'POST':
+    products = Product.query.all()
+    warehouses = Warehouse.query.all()
+
+    form = StockAdjustForm()
+    # 设置SelectField选项
+    form.product_id.choices = [(p.id, f"{p.code} - {p.name}") for p in products]
+    form.warehouse_id.choices = [(w.id, f"{w.code} - {w.name}") for w in warehouses]
+
+    if form.validate_on_submit():
         try:
-            product_id = request.form.get('product_id', type=int)
-            adjust_type = request.form.get('adjust_type')
-            quantity = request.form.get('quantity', type=float)
-            warehouse_id = request.form.get('warehouse_id', 1, type=int)
-            notes = request.form.get('notes', '')
-            
-            product = Product.query.get_or_404(product_id)
+            product = Product.query.get_or_404(form.product_id.data)
             before_quantity = float(product.stock_quantity)
-            
-            if adjust_type == 'adjust_in':
+            quantity = float(form.quantity.data)
+
+            if form.adjust_type.data == 'adjust_in':
                 product.stock_quantity += quantity
                 after_quantity = float(product.stock_quantity)
-            elif adjust_type == 'adjust_out':
+            elif form.adjust_type.data == 'adjust_out':
                 if product.stock_quantity < quantity:
                     flash('库存不足，无法调整！', 'danger')
-                    return redirect(url_for('inventory.stock_adjust'))
+                    return render_template('inventory/stock_adjust.html',
+                                         title='库存调整',
+                                         form=form,
+                                         products=products,
+                                         warehouses=warehouses)
                 product.stock_quantity -= quantity
                 after_quantity = float(product.stock_quantity)
             else:
                 flash('无效的调整类型！', 'danger')
-                return redirect(url_for('inventory.stock_adjust'))
-            
+                return render_template('inventory/stock_adjust.html',
+                                     title='库存调整',
+                                     form=form,
+                                     products=products,
+                                     warehouses=warehouses)
+
             log = StockLog(
                 product_id=product.id,
-                warehouse_id=warehouse_id,
-                change_type=adjust_type,
+                warehouse_id=form.warehouse_id.data,
+                change_type=form.adjust_type.data,
                 quantity=quantity,
                 before_quantity=before_quantity,
                 after_quantity=after_quantity,
                 reference_type='stock_adjust',
-                notes=notes,
+                notes=form.notes.data or '',
                 created_by=current_user.id
             )
             db.session.add(log)
             db.session.commit()
-            
+
             flash('库存调整成功！', 'success')
             return redirect(url_for('inventory.product_list'))
         except Exception as e:
             db.session.rollback()
             flash(f'调整失败: {str(e)}', 'danger')
-    
-    products = Product.query.all()
-    warehouses = Warehouse.query.all()
+
     return render_template('inventory/stock_adjust.html',
                          title='库存调整',
+                         form=form,
                          products=products,
                          warehouses=warehouses)

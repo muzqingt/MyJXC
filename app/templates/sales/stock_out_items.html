@@ -63,7 +63,7 @@
                             <th width="40">#</th>
                             <th>商品</th>
                             <th width="100">出库前库存</th>
-                            <th width="100">出库数量</th>
+                            <th width="140">出库数量</th>
                             <th width="100">出库后库存</th>
                             <th width="100">单价</th>
                             <th width="120">金额</th>
@@ -100,6 +100,9 @@
                 </div>
             </div>
         </form>
+        <div id="order-items-data" style="display: none;">
+            {{ order_items|tojson|safe if order_items else '[]' }}
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -107,6 +110,10 @@
 {% block extra_js %}
 <script>
 $(document).ready(function() {
+    function getCsrfToken() {
+        return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    }
+
     let itemCount = 0;
     const products = JSON.parse('{{ products|tojson|safe }}').map(function(product) {
         return {
@@ -189,31 +196,37 @@ $(document).ready(function() {
 
     // 处理商品选择
     function handleProductSelect(rowId, product) {
+        const unitPriceInput = $(`#row-${rowId} .unit-price`);
+        const prevProductId = unitPriceInput.data('product-id');
+        const prevPrice = parseFloat(unitPriceInput.val()) || 0;
+
+        // 切换商品时：先把旧商品的自定义价格同步到数据库
+        if (prevProductId && String(prevProductId) !== String(product.id) && prevPrice > 0) {
+            const oldProduct = products.find(p => String(p.id) === String(prevProductId));
+            if (oldProduct && prevPrice !== oldProduct.sale_price) {
+                oldProduct.sale_price = prevPrice;
+                $.ajax({
+                    url: '/product/api/product/price',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    headers: {'X-CSRFToken': getCsrfToken()},
+                    data: JSON.stringify({
+                        product_id: parseInt(prevProductId),
+                        price_type: 'sale_price',
+                        price: prevPrice
+                    })
+                });
+            }
+        }
+
+        // 标记当前商品ID，新商品用默认价填充（如果输入框为空）
+        unitPriceInput.data('product-id', product.id);
+        if (!unitPriceInput.val() && product.sale_price > 0) {
+            unitPriceInput.val(product.sale_price);
+        }
+
         updateRow(rowId, product);
         updateTotal();
-        
-        // 如果用户修改了价格，同步到数据库
-        const unitPriceInput = $(`#row-${rowId} .unit-price`);
-        const newUnitPrice = parseFloat(unitPriceInput.val()) || 0;
-        if (newUnitPrice > 0 && newUnitPrice !== product.sale_price) {
-            $.ajax({
-                url: '/product/api/product/price',
-                type: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({
-                    product_id: product.id,
-                    price_type: 'sale_price',
-                    price: newUnitPrice
-                }),
-                success: function(response) {
-                    if (response.success) {
-                        product.sale_price = newUnitPrice;
-                        const p = products.find(prod => prod.id == product.id);
-                        if (p) p.sale_price = newUnitPrice;
-                    }
-                }
-            });
-        }
     }
 
     // 更新单行计算
@@ -263,38 +276,39 @@ $(document).ready(function() {
         addItemRow();
     });
 
-    $(document).on('change', '.quantity, .unit-price', function() {
+    $(document).on('input', '.quantity, .unit-price', function() {
         const rowId = $(this).data('row');
-        
-        // 如果是修改价格，与原始价格比较后同步
-        if ($(this).hasClass('unit-price')) {
-            const unitPriceInput = $(`#row-${rowId} .unit-price`);
-            const productId = $(`#row-${rowId} .product-id-input`).val();
+        const productId = $(`#row-${rowId} .product-id-input`).val();
+        const unitPriceInput = $(`#row-${rowId} .unit-price`);
+
+        // 如果是修改价格，实时同步到数据库
+        if ($(this).hasClass('unit-price') && productId) {
             const currentPrice = parseFloat(unitPriceInput.val()) || 0;
             const product = products.find(p => String(p.id) === String(productId));
-            const originalPrice = product ? product.sale_price : 0;
-            
-            if (currentPrice > 0 && currentPrice !== originalPrice) {
+
+            if (currentPrice > 0 && product && currentPrice !== product.sale_price) {
+                // 立即更新本地数组，下次选择该商品时直接用新价格
+                product.sale_price = currentPrice;
                 $.ajax({
                     url: '/product/api/product/price',
                     type: 'POST',
                     contentType: 'application/json',
+                    headers: {'X-CSRFToken': getCsrfToken()},
                     data: JSON.stringify({
                         product_id: parseInt(productId),
                         price_type: 'sale_price',
                         price: currentPrice
-                    }),
-                    success: function(response) {
-                        if (response.success) {
-                            const p = products.find(prod => String(prod.id) === String(productId));
-                            if (p) p.sale_price = currentPrice;
-                        }
-                    }
+                    })
                 });
             }
         }
-        
+
         updateRow(rowId);
+        updateTotal();
+    });
+
+    $(document).on('change', '.quantity, .unit-price', function() {
+        updateRow($(this).data('row'));
         updateTotal();
     });
 
@@ -308,8 +322,18 @@ $(document).ready(function() {
         updateTotal();
     });
 
-    // 初始化时添加一行
-    addItemRow();
+    // 解析已有订单明细（用于表单验证失败后回填）
+    const orderItems = JSON.parse($('#order-items-data').text() || '[]');
+    if (orderItems && orderItems.length > 0) {
+        orderItems.forEach(function(item) {
+            if (item.product_id) {
+                addItemRow(item.product_id, item.quantity || '', item.unit_price || '');
+            }
+        });
+    } else {
+        addItemRow();
+    }
+
 });
 </script>
 {% endblock %}

@@ -560,11 +560,14 @@ def api_products():
 def api_update_price():
     """更新商品价格"""
     data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'message': '无效的JSON数据'})
+
     product_id = data.get('product_id')
     price_type = data.get('price_type')  # 'sale_price' or 'purchase_price'
     price = data.get('price')
-    
-    if not product_id or not price_type or price is None:
+
+    if not product_id or not price_type or price is None or price is False:
         return jsonify({'success': False, 'message': '参数不完整'})
     
     try:

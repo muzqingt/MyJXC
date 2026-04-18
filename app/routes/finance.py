@@ -85,7 +85,7 @@ def add_receipt():
             receipt_date=form.receipt_date.data,
             payment_method=form.payment_method.data,
             reference_type=form.reference_type.data,
-            reference_id=form.reference_id.data if form.reference_id.data else None,
+            reference_id=form.reference_id.data.strip() if form.reference_id.data else None,
             notes=form.notes.data,
             created_by=current_user.id
         )
@@ -101,12 +101,24 @@ def add_receipt():
         return redirect(url_for('finance.receipts'))
     
     customers = Customer.query.all()
-    sales_orders = SalesOrder.query.filter_by(status='completed').all()
+    customers_data = [{"id": c.id, "code": c.code, "name": c.name, "phone": c.phone or "", "contact_person": c.contact_person or ""} for c in customers]
+    sales_orders_raw = SalesOrder.query.filter_by(status='completed').all()
+    # 计算每个订单的已收款金额
+    sales_orders_data = []
+    for order in sales_orders_raw:
+        paid_amount = sum(float(r.amount) for r in Receipt.query.filter_by(
+            reference_type='sales_order').filter(Receipt.reference_id.cast(db.String).like(f'%{order.id}%')).all())
+        sales_orders_data.append({
+            'order': order,
+            'order_id': order.id,
+            'paid_amount': paid_amount,
+            'balance': float(order.total_amount or 0) - paid_amount
+        })
     return render_template('finance/receipt_edit.html',
                          title='添加收款',
                          form=form,
-                         customers=customers,
-                         sales_orders=sales_orders)
+                         customers=customers_data,
+                         sales_orders=sales_orders_data)
 
 @bp.route('/payments')
 @login_required
@@ -146,7 +158,7 @@ def add_payment():
             payment_date=form.payment_date.data,
             payment_method=form.payment_method.data,
             reference_type=form.reference_type.data,
-            reference_id=form.reference_id.data if form.reference_id.data else None,
+            reference_id=form.reference_id.data.strip() if form.reference_id.data else None,
             notes=form.notes.data,
             created_by=current_user.id
         )
@@ -162,12 +174,24 @@ def add_payment():
         return redirect(url_for('finance.payments'))
     
     suppliers = Supplier.query.all()
-    purchase_orders = PurchaseOrder.query.filter_by(status='completed').all()
+    suppliers_data = [{"id": s.id, "code": s.code, "name": s.name, "phone": s.phone or "", "contact_person": s.contact_person or ""} for s in suppliers]
+    purchase_orders_raw = PurchaseOrder.query.filter_by(status='completed').all()
+    # 计算每个订单的已付款金额
+    purchase_orders_data = []
+    for order in purchase_orders_raw:
+        paid_amount = sum(float(p.amount) for p in Payment.query.filter_by(
+            reference_type='purchase_order').filter(Payment.reference_id.cast(db.String).like(f'%{order.id}%')).all())
+        purchase_orders_data.append({
+            'order': order,
+            'order_id': order.id,
+            'paid_amount': paid_amount,
+            'balance': float(order.total_amount or 0) - paid_amount
+        })
     return render_template('finance/payment_edit.html',
                          title='添加付款',
                          form=form,
-                         suppliers=suppliers,
-                         purchase_orders=purchase_orders)
+                         suppliers=suppliers_data,
+                         purchase_orders=purchase_orders_data)
 
 @bp.route('/expenses')
 @login_required
@@ -257,7 +281,7 @@ def edit_receipt(receipt_id):
         receipt.receipt_date = form.receipt_date.data
         receipt.payment_method = form.payment_method.data
         receipt.reference_type = form.reference_type.data
-        receipt.reference_id = form.reference_id.data if form.reference_id.data else None
+        receipt.reference_id = form.reference_id.data.strip() if form.reference_id.data else None
         receipt.notes = form.notes.data
         
         # 更新客户应收余额（如果金额变化）
@@ -271,10 +295,24 @@ def edit_receipt(receipt_id):
         return redirect(url_for('finance.view_receipt', receipt_id=receipt.id))
     
     customers = Customer.query.all()
+    customers_data = [{"id": c.id, "code": c.code, "name": c.name, "phone": c.phone or "", "contact_person": c.contact_person or ""} for c in customers]
+    # Build sales_orders_data for edit mode too
+    sales_orders_raw = SalesOrder.query.filter_by(status='completed').all()
+    sales_orders_data = []
+    for order in sales_orders_raw:
+        paid_amount = sum(float(r.amount) for r in Receipt.query.filter_by(
+            reference_type='sales_order').filter(Receipt.reference_id.cast(db.String).like(f'%{order.id}%')).all())
+        sales_orders_data.append({
+            'order': order,
+            'order_id': order.id,
+            'paid_amount': paid_amount,
+            'balance': float(order.total_amount or 0) - paid_amount
+        })
     return render_template('finance/receipt_edit.html',
                          title='编辑收款',
                          receipt=receipt,
-                         customers=customers,
+                         customers=customers_data,
+                         sales_orders=sales_orders_data,
                          form=form)
 
 @bp.route('/payment/<int:payment_id>')
@@ -301,7 +339,7 @@ def edit_payment(payment_id):
         payment.payment_date = form.payment_date.data
         payment.payment_method = form.payment_method.data
         payment.reference_type = form.reference_type.data
-        payment.reference_id = form.reference_id.data if form.reference_id.data else None
+        payment.reference_id = form.reference_id.data.strip() if form.reference_id.data else None
         payment.notes = form.notes.data
         
         # 更新供应商应付余额（如果金额变化）
@@ -315,10 +353,24 @@ def edit_payment(payment_id):
         return redirect(url_for('finance.view_payment', payment_id=payment.id))
     
     suppliers = Supplier.query.all()
+    suppliers_data = [{"id": s.id, "code": s.code, "name": s.name, "phone": s.phone or "", "contact_person": s.contact_person or ""} for s in suppliers]
+    # Build purchase_orders_data for edit mode too
+    purchase_orders_raw = PurchaseOrder.query.filter_by(status='completed').all()
+    purchase_orders_data = []
+    for order in purchase_orders_raw:
+        paid_amount = sum(float(p.amount) for p in Payment.query.filter_by(
+            reference_type='purchase_order').filter(Payment.reference_id.cast(db.String).like(f'%{order.id}%')).all())
+        purchase_orders_data.append({
+            'order': order,
+            'order_id': order.id,
+            'paid_amount': paid_amount,
+            'balance': float(order.total_amount or 0) - paid_amount
+        })
     return render_template('finance/payment_edit.html',
                          title='编辑付款',
                          payment=payment,
-                         suppliers=suppliers,
+                         suppliers=suppliers_data,
+                         purchase_orders=purchase_orders_data,
                          form=form)
 
 @bp.route('/api/financial-summary')
@@ -355,6 +407,8 @@ def ar_ap_search():
     """应收应付检索页面"""
     customers = Customer.query.all()
     suppliers = Supplier.query.all()
+    customers_data = [{"id": c.id, "code": c.code, "name": c.name, "phone": c.phone or "", "contact_person": c.contact_person or ""} for c in customers]
+    suppliers_data = [{"id": s.id, "code": s.code, "name": s.name, "phone": s.phone or "", "contact_person": s.contact_person or ""} for s in suppliers]
     
     # 获取查询参数
     customer_id = request.args.get('customer_id', type=int)
@@ -430,8 +484,8 @@ def ar_ap_search():
     
     return render_template('finance/ar_ap_search.html',
                          title='应收应付检索',
-                         customers=customers,
-                         suppliers=suppliers,
+                         customers=customers_data,
+                         suppliers=suppliers_data,
                          customer_info=customer_info,
                          customer_total_amount=customer_total_amount,
                          customer_received_amount=customer_received_amount,
@@ -627,6 +681,159 @@ def export_customer_ar(customer_id):
     response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     response.headers['Content-Disposition'] = f'attachment; filename=customer_ar_{customer.code}_{datetime.now().strftime("%Y%m%d")}.xlsx'
     return response
+
+@bp.route('/export-payments')
+@login_required
+def export_payments():
+    """导出付款记录"""
+    from urllib.parse import quote
+
+    payments_list = Payment.query.order_by(Payment.payment_date.desc()).all()
+
+    # 创建工作簿
+    wb = Workbook()
+    ws = wb.active
+    ws.title = '付款记录'
+
+    # 设置表头样式
+    header_font = Font(bold=True, color='FFFFFF')
+    header_fill = PatternFill(start_color='4472C4', end_color='4472C4', fill_type='solid')
+    header_alignment = Alignment(horizontal='center', vertical='center')
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+
+    # 写入表头
+    headers = ['付款单号', '供应商', '付款金额', '付款日期', '支付方式', '关联订单', '备注', '创建时间']
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = thin_border
+
+    # 支付方式映射
+    payment_method_map = {
+        'cash': '现金',
+        'bank_transfer': '银行转账',
+        'wechat': '微信支付',
+        'alipay': '支付宝'
+    }
+
+    # 写入数据
+    for row, payment in enumerate(payments_list, 2):
+        ws.cell(row=row, column=1, value=payment.payment_number).border = thin_border
+        ws.cell(row=row, column=2, value=payment.supplier.name if payment.supplier else '').border = thin_border
+        ws.cell(row=row, column=3, value=float(payment.amount) if payment.amount else 0).border = thin_border
+        ws.cell(row=row, column=3).number_format = '#,##0.02'
+        ws.cell(row=row, column=4, value=payment.payment_date.strftime('%Y-%m-%d') if payment.payment_date else '').border = thin_border
+        ws.cell(row=row, column=5, value=payment_method_map.get(payment.payment_method, payment.payment_method or '')).border = thin_border
+        ws.cell(row=row, column=6, value=payment.reference_type or '').border = thin_border
+        ws.cell(row=row, column=7, value=payment.notes or '').border = thin_border
+        ws.cell(row=row, column=8, value=payment.created_at.strftime('%Y-%m-%d %H:%M:%S') if payment.created_at else '').border = thin_border
+
+    # 设置列宽
+    ws.column_dimensions['A'].width = 15
+    ws.column_dimensions['B'].width = 20
+    ws.column_dimensions['C'].width = 12
+    ws.column_dimensions['D'].width = 12
+    ws.column_dimensions['E'].width = 12
+    ws.column_dimensions['F'].width = 15
+    ws.column_dimensions['G'].width = 30
+    ws.column_dimensions['H'].width = 20
+
+    # 保存到BytesIO
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    filename = f'payments_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8\'{quote(filename)}'
+    return response
+
+
+@bp.route('/export-profit-analysis')
+@login_required
+def export_profit_analysis():
+    """导出利润分析报表"""
+    from urllib.parse import quote
+
+    # 获取销售数据
+    sales_data = db.session.query(
+        db.func.strftime('%Y-%m', SalesOrder.order_date).label('month'),
+        db.func.sum(SalesOrder.total_amount).label('sales_amount')
+    ).filter(SalesOrder.status == 'completed').group_by('month').all()
+
+    # 获取采购数据
+    purchase_data = db.session.query(
+        db.func.strftime('%Y-%m', PurchaseOrder.order_date).label('month'),
+        db.func.sum(PurchaseOrder.total_amount).label('purchase_amount')
+    ).filter(PurchaseOrder.status == 'completed').group_by('month').all()
+
+    # 创建工作簿
+    wb = Workbook()
+    ws = wb.active
+    ws.title = '利润分析'
+
+    header_font = Font(bold=True, color='FFFFFF')
+    header_fill = PatternFill(start_color='4472C4', end_color='4472C4', fill_type='solid')
+    header_alignment = Alignment(horizontal='center', vertical='center')
+    thin_border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+
+    headers = ['月份', '销售金额', '采购成本', '毛利', '毛利率(%)']
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = thin_border
+
+    # 合并数据（以销售数据月份为基准）
+    sales_dict = {str(s.month): float(s.sales_amount or 0) for s in sales_data}
+    purchase_dict = {str(p.month): float(p.purchase_amount or 0) for p in purchase_data}
+    all_months = sorted(set(sales_dict.keys()) | set(purchase_dict.keys()), reverse=True)
+
+    for row_idx, month in enumerate(all_months, 2):
+        sales = sales_dict.get(month, 0)
+        purchase = purchase_dict.get(month, 0)
+        profit = sales - purchase
+        margin = (profit / sales * 100) if sales > 0 else 0
+
+        ws.cell(row=row_idx, column=1, value=month).border = thin_border
+        ws.cell(row=row_idx, column=2, value=sales).border = thin_border
+        ws.cell(row=row_idx, column=2).number_format = '#,##0.00'
+        ws.cell(row=row_idx, column=3, value=purchase).border = thin_border
+        ws.cell(row=row_idx, column=3).number_format = '#,##0.02'
+        ws.cell(row=row_idx, column=4, value=profit).border = thin_border
+        ws.cell(row=row_idx, column=4).number_format = '#,##0.02'
+        ws.cell(row=row_idx, column=5, value=margin).border = thin_border
+        ws.cell(row=row_idx, column=5).number_format = '0.00'
+
+    ws.column_dimensions['A'].width = 12
+    ws.column_dimensions['B'].width = 15
+    ws.column_dimensions['C'].width = 15
+    ws.column_dimensions['D'].width = 15
+    ws.column_dimensions['E'].width = 12
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    filename = f'profit_analysis_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8''{quote(filename)}'
+    return response
+
 
 @bp.route('/export-expenses')
 @login_required

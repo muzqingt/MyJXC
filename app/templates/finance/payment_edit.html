@@ -17,12 +17,8 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">供应商</label>
-                            <select name="supplier_id" class="form-select">
-                                {% for supplier in suppliers %}
-                                <option value="{{ supplier.id }}" {% if payment.supplier_id == supplier.id %}selected{% endif %}>{{ supplier.name }}</option>
-                                {% endfor %}
-                            </select>
-                            <small class="form-text text-muted">选择付款供应商</small>
+                            <div id="supplier-search-container"></div>
+                            <small class="form-text text-muted">输入供应商名称或编码搜索</small>
                         </div>
                         
                         <div class="col-md-6 mb-3">
@@ -70,11 +66,12 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             {{ form.supplier_id.label(class="form-label") }}
-                            {{ form.supplier_id(class="form-select" + (" is-invalid" if form.supplier_id.errors else "")) }}
+                            <div id="supplier-search-container"></div>
+                            <input type="hidden" name="supplier_id" id="supplier-id-hidden" value="">
                             {% for error in form.supplier_id.errors %}
                             <div class="invalid-feedback">{{ error }}</div>
                             {% endfor %}
-                            <small class="form-text text-muted">选择付款供应商</small>
+                            <small class="form-text text-muted">输入供应商名称或编码搜索</small>
                         </div>
                         
                         <div class="col-md-6 mb-3">
@@ -116,14 +113,13 @@
                             {% endfor %}
                             <small class="form-text text-muted">选择关联类型</small>
                         </div>
-                        
+
                         <div class="col-md-6 mb-3">
-                            {{ form.reference_id.label(class="form-label") }}
-                            {{ form.reference_id(class="form-control" + (" is-invalid" if form.reference_id.errors else "")) }}
-                            {% for error in form.reference_id.errors %}
-                            <div class="invalid-feedback">{{ error }}</div>
-                            {% endfor %}
-                            <small class="form-text text-muted">输入关联ID（如采购订单号）</small>
+                            <label class="form-label">已选采购订单</label>
+                            <div id="selected-orders-display" class="d-flex flex-wrap gap-1 mb-1"></div>
+                            <input type="hidden" name="reference_id" id="reference-id-hidden" value="{{ payment.reference_id if payment and payment.reference_id else '' }}">
+                            <input type="text" id="selected-orders-text" class="form-control form-control-sm" readonly placeholder="点击订单行的勾选框选择">
+                            <small class="form-text text-muted">选择关联的采购订单（可多选）</small>
                         </div>
                     </div>
                     
@@ -147,7 +143,7 @@
             </div>
         </div>
         
-        {% if purchase_orders and not payment %}
+        {% if purchase_orders %}
         <div class="card mt-3">
             <div class="card-header">
                 <h5 class="mb-0">可关联的采购订单</h5>
@@ -157,6 +153,7 @@
                     <table class="table table-sm">
                         <thead>
                             <tr>
+                                <th style="width:40px;">选</th>
                                 <th>订单号</th>
                                 <th>供应商</th>
                                 <th>订单金额</th>
@@ -166,15 +163,16 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for order in purchase_orders %}
-                            <tr>
-                                <td>{{ order.order_number }}</td>
-                                <td>{{ order.supplier.name if order.supplier else '未知供应商' }}</td>
-                                <td>{{ order.total_amount|float }}</td>
-                                <td>{{ order.paid_amount|float }}</td>
-                                <td>{{ (order.total_amount - order.paid_amount)|float }}</td>
+                            {% for item in purchase_orders %}
+                            <tr data-order-id="{{ item.order_id }}" data-order-number="{{ item.order.order_number }}">
+                                <td><input type="checkbox" class="order-checkbox" data-order-id="{{ item.order_id }}" data-order-number="{{ item.order.order_number }}"></td>
+                                <td>{{ item.order.order_number }}</td>
+                                <td>{{ item.order.supplier.name if item.order.supplier else '未知供应商' }}</td>
+                                <td>{{ item.order.total_amount|float }}</td>
+                                <td>{{ item.paid_amount|float }}</td>
+                                <td>{{ item.balance|float }}</td>
                                 <td>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectOrder({{ order.id }}, '{{ order.order_number }}')">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="toggleOrder({{ item.order_id }}, '{{ item.order.order_number }}')">
                                         选择
                                     </button>
                                 </td>
@@ -188,6 +186,9 @@
         {% endif %}
     </div>
 </div>
+
+<!-- 供应商数据 -->
+<div id="suppliers-data" style="display: none;">{{ suppliers|tojson|safe if suppliers else '[]' }}</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -202,15 +203,73 @@ $(document).ready(function() {
     
     // 自动聚焦金额输入框
     $('input[name="amount"]').focus();
+    
+    // 供应商数据
+    let suppliers = [];
+    try {
+        suppliers = JSON.parse($('#suppliers-data').text()).map(function(s) {
+            return { id: s.id, code: s.code || '', name: s.name || '' };
+        });
+    } catch(e) {}
+    
+    // 初始化供应商搜索
+    const selectedSupplierId = '{{ payment.supplier_id if payment else "" }}';
+    const preSelectedSupplier = selectedSupplierId ? suppliers.find(s => String(s.id) === String(selectedSupplierId)) : null;
+    
+    initEntitySearch('#supplier-search-container', suppliers, function(supplier) {}, {
+        containerClass: 'supplier-search',
+        fieldCode: 'code',
+        fieldName: 'name',
+        placeholder: '输入供应商名称或编码搜索...',
+        selectedId: preSelectedSupplier ? preSelectedSupplier.id : null,
+        hiddenName: 'supplier_id'
+    });
 });
 
-function selectOrder(orderId, orderNumber) {
+function toggleOrder(orderId, orderNumber) {
+    var checkbox = $('.order-checkbox[data-order-id="' + orderId + '"]');
+    checkbox.prop('checked', !checkbox.prop('checked'));
+    updateSelectedOrders();
     // 设置关联类型为采购订单
     $('select[name="reference_type"]').val('purchase_order');
-    // 设置关联ID
-    $('input[name="reference_id"]').val(orderId);
-    // 显示提示信息
-    alert('已选择采购订单: ' + orderNumber);
 }
+
+function updateSelectedOrders() {
+    var selectedIds = [];
+    var selectedNumbers = [];
+    $('.order-checkbox:checked').each(function() {
+        selectedIds.push($(this).data('order-id'));
+        selectedNumbers.push($(this).data('order-number'));
+    });
+    $('#reference-id-hidden').val(selectedIds.join(','));
+    $('#selected-orders-text').val(selectedNumbers.join(', '));
+    // Update badge display
+    var display = $('#selected-orders-display');
+    display.empty();
+    selectedNumbers.forEach(function(num) {
+        display.append('<span class="badge bg-primary me-1">' + num + '</span>');
+    });
+}
+
+$(document).ready(function() {
+    // Bind checkbox change events
+    $('.order-checkbox').on('change', function() {
+        updateSelectedOrders();
+        $('select[name="reference_type"]').val('purchase_order');
+    });
+
+    // Initialize from existing payment reference_id (edit mode)
+    var initialRefId = $('#reference-id-hidden').val();
+    if (initialRefId) {
+        var ids = initialRefId.split(',').map(function(s) { return s.trim(); });
+        ids.forEach(function(id) {
+            if (id) {
+                $('.order-checkbox[data-order-id="' + id + '"]').prop('checked', true);
+            }
+        });
+        updateSelectedOrders();
+        $('select[name="reference_type"]').val('purchase_order');
+    }
+});
 </script>
 {% endblock %}

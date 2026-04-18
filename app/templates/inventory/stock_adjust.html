@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-0 text-gray-800">{{ title }}</h1>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="post">
+        {{ form.hidden_tag() }}
+
+        <div class="row">
+            <div class="col-lg-8">
+                <!-- 基本信息 -->
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">调整信息</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="product_id">{{ form.product_id.label.text }}</label>
+                                    <div id="product-search-container"></div>
+                                    <input type="hidden" name="product_id" id="product-id-hidden" value="">
+                                    {% if form.product_id.errors %}
+                                        <small class="text-danger">{{ form.product_id.errors[0] }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="warehouse_id">{{ form.warehouse_id.label.text }}</label>
+                                    <div id="warehouse-search-container"></div>
+                                    <input type="hidden" name="warehouse_id" id="warehouse-id-hidden" value="">
+                                    {% if form.warehouse_id.errors %}
+                                        <small class="text-danger">{{ form.warehouse_id.errors[0] }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="adjust_type">{{ form.adjust_type.label.text }}</label>
+                                    {{ form.adjust_type(class="form-select") }}
+                                    {% if form.adjust_type.errors %}
+                                        <small class="text-danger">{{ form.adjust_type.errors[0] }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="quantity">{{ form.quantity.label.text }}</label>
+                                    {{ form.quantity(class="form-control", step="0.01", min="0.01") }}
+                                    {% if form.quantity.errors %}
+                                        <small class="text-danger">{{ form.quantity.errors[0] }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-group mb-3">
+                                    <label for="notes">{{ form.notes.label.text }}</label>
+                                    {{ form.notes(class="form-control", rows="3", placeholder="输入调整原因或说明") }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 提交按钮 -->
+                <div class="d-flex justify-content-between mb-4">
+                    <a href="{{ url_for('inventory.product_list') }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> 返回
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> 保存调整
+                    </button>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <!-- 说明 -->
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">调整说明</h6>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>盘盈入库：</strong>实际库存多于系统库存时使用，系统库存将增加。</p>
+                        <p><strong>盘亏出库：</strong>实际库存少于系统库存时使用，系统库存将减少。</p>
+                        <hr>
+                        <p class="text-muted small">每次调整都会记录库存变动日志，可在库存流水页面查看。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- 商品数据 -->
+<div id="products-data" style="display: none;">{{ products|tojson|safe if products else '[]' }}</div>
+<!-- 仓库数据 -->
+<div id="warehouses-data" style="display: none;">{{ warehouses|tojson|safe if warehouses else '[]' }}</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 商品数据
+    let products = [];
+    try {
+        products = JSON.parse($('#products-data').text()).map(function(p) {
+            return { id: p.id, code: p.code || '', name: p.name || '' };
+        });
+    } catch(e) {}
+    
+    // 仓库数据
+    let warehouses = [];
+    try {
+        warehouses = JSON.parse($('#warehouses-data').text()).map(function(w) {
+            return { id: w.id, code: w.code || '', name: w.name || '' };
+        });
+    } catch(e) {}
+    
+    // 初始化商品搜索
+    initEntitySearch('#product-search-container', products, function(product) {}, {
+        containerClass: 'product-search',
+        fieldCode: 'code',
+        fieldName: 'name',
+        placeholder: '输入商品名称或编码搜索...',
+        hiddenName: 'product_id'
+    });
+    
+    // 初始化仓库搜索
+    initEntitySearch('#warehouse-search-container', warehouses, function(warehouse) {}, {
+        containerClass: 'warehouse-search',
+        fieldCode: 'code',
+        fieldName: 'name',
+        placeholder: '输入仓库名称或编码搜索...',
+        hiddenName: 'warehouse_id'
+    });
+});
+</script>
+{% endblock %}

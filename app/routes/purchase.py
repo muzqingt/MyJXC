@@ -720,7 +720,61 @@ def edit_stock_in_items(id):
         quantities = request.form.getlist('quantity[]')
         unit_prices = request.form.getlist('unit_price[]')
         
-        # 删除原有明细
+        # 构建 products_data（供验证失败时重新渲染模板用）
+        products = Product.query.all()
+        products_data = [{
+            'id': p.id,
+            'code': p.code,
+            'name': p.name,
+            'specification': p.specification or '',
+            'unit': p.unit,
+            'purchase_price': float(p.purchase_price) if p.purchase_price else 0,
+            'stock_quantity': float(p.stock_quantity) if p.stock_quantity else 0
+        } for p in products]
+        
+        # 验证：至少要有一行商品明细
+        has_items = False
+        for i in range(len(product_ids)):
+            if product_ids[i] and quantities[i] and unit_prices[i]:
+                has_items = True
+                # 验证数量和单价为正数
+                try:
+                    qty = float(quantities[i])
+                    price = float(unit_prices[i])
+                    if qty <= 0 or price < 0:
+                        flash('数量必须大于0，单价不能为负数！', 'danger')
+                        items_data = [{
+                            'product_id': int(product_ids[i]),
+                            'quantity': qty,
+                            'unit_price': price
+                        } for i in range(len(product_ids)) if product_ids[i]]
+                        return render_template('purchase/stock_in_items.html',
+                            title='编辑入库明细',
+                            stock_in=stock_in,
+                            products=products_data,
+                            order_items=items_data)
+                except (ValueError, TypeError):
+                    flash('数量和单价必须是有效数字！', 'danger')
+                    items_data = [{
+                        'product_id': int(product_ids[i]) if product_ids[i] else 0,
+                        'quantity': float(quantities[i]) if quantities[i] else 0,
+                        'unit_price': float(unit_prices[i]) if unit_prices[i] else 0
+                    } for i in range(len(product_ids)) if product_ids[i]]
+                    return render_template('purchase/stock_in_items.html',
+                        title='编辑入库明细',
+                        stock_in=stock_in,
+                        products=products_data,
+                        order_items=items_data)
+        
+        if not has_items:
+            flash('请至少添加一个商品明细！', 'danger')
+            return render_template('purchase/stock_in_items.html',
+                                 title='编辑入库明细',
+                                 stock_in=stock_in,
+                                 products=products_data,
+                                 order_items=[])
+        
+        # 删除原有明细并重建
         StockInItem.query.filter_by(stock_in_id=stock_in.id).delete()
         
         total_amount = 0
@@ -764,7 +818,24 @@ def edit_stock_in_items(id):
     
     # 获取采购订单的商品信息和剩余未入库数量
     order_items_data = []
-    if stock_in.purchase_order:
+    # 获取已保存的入库明细
+    saved_items = []
+    for item in stock_in.items:
+        saved_items.append({
+            'product_id': item.product_id,
+            'product_code': item.product.code,
+            'product_name': item.product.name,
+            'specification': item.product.specification or '',
+            'unit': item.product.unit,
+            'quantity': float(item.quantity),
+            'unit_price': float(item.unit_price),
+            'remaining_quantity': float(item.quantity)
+        })
+    
+    # 如果没有采购订单关联，使用已保存的明细
+    if not stock_in.purchase_order and saved_items:
+        order_items_data = saved_items
+    elif stock_in.purchase_order:
         for order_item in stock_in.purchase_order.items:
             remaining_qty = float(order_item.quantity) - float(order_item.received_quantity)
             order_items_data.append({

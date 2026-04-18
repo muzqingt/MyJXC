@@ -17,12 +17,8 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">客户</label>
-                            <select name="customer_id" class="form-select">
-                                {% for customer in customers %}
-                                <option value="{{ customer.id }}" {% if receipt and receipt.customer_id == customer.id %}selected{% endif %}>{{ customer.name }}</option>
-                                {% endfor %}
-                            </select>
-                            <small class="form-text text-muted">选择收款客户</small>
+                            <div id="customer-search-container"></div>
+                            <small class="form-text text-muted">输入客户名称或编码搜索</small>
                         </div>
                         
                         <div class="col-md-6 mb-3">
@@ -78,11 +74,12 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             {{ form.customer_id.label(class="form-label") }}
-                            {{ form.customer_id(class="form-select" + (" is-invalid" if form.customer_id.errors else "")) }}
+                            <div id="customer-search-container"></div>
+                            <input type="hidden" name="customer_id" id="customer-id-hidden" value="">
                             {% for error in form.customer_id.errors %}
                             <div class="invalid-feedback">{{ error }}</div>
                             {% endfor %}
-                            <small class="form-text text-muted">选择收款客户</small>
+                            <small class="form-text text-muted">输入客户名称或编码搜索</small>
                         </div>
                         
                         <div class="col-md-6 mb-3">
@@ -124,14 +121,13 @@
                             {% endfor %}
                             <small class="form-text text-muted">选择关联类型</small>
                         </div>
-                        
+
                         <div class="col-md-6 mb-3">
-                            {{ form.reference_id.label(class="form-label") }}
-                            {{ form.reference_id(class="form-control" + (" is-invalid" if form.reference_id.errors else "")) }}
-                            {% for error in form.reference_id.errors %}
-                            <div class="invalid-feedback">{{ error }}</div>
-                            {% endfor %}
-                            <small class="form-text text-muted">输入关联ID（如销售订单号）</small>
+                            <label class="form-label">已选销售订单</label>
+                            <div id="selected-orders-display" class="d-flex flex-wrap gap-1 mb-1"></div>
+                            <input type="hidden" name="reference_id" id="reference-id-hidden" value="{{ receipt.reference_id if receipt and receipt.reference_id else '' }}">
+                            <input type="text" id="selected-orders-text" class="form-control form-control-sm" readonly placeholder="点击订单行的勾选框选择">
+                            <small class="form-text text-muted">选择关联的销售订单（可多选）</small>
                         </div>
                     </div>
                     
@@ -165,6 +161,7 @@
                     <table class="table table-sm">
                         <thead>
                             <tr>
+                                <th style="width:40px;">选</th>
                                 <th>订单号</th>
                                 <th>客户</th>
                                 <th>订单金额</th>
@@ -174,15 +171,16 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for order in sales_orders %}
-                            <tr>
-                                <td>{{ order.order_number }}</td>
-                                <td>{{ order.customer.name if order.customer else '未知客户' }}</td>
-                                <td>{{ order.total_amount|float }}</td>
-                                <td>{{ order.paid_amount|float }}</td>
-                                <td>{{ (order.total_amount - order.paid_amount)|float }}</td>
+                            {% for item in sales_orders %}
+                            <tr data-order-id="{{ item.order_id }}" data-order-number="{{ item.order.order_number }}">
+                                <td><input type="checkbox" class="order-checkbox" data-order-id="{{ item.order_id }}" data-order-number="{{ item.order.order_number }}"></td>
+                                <td>{{ item.order.order_number }}</td>
+                                <td>{{ item.order.customer.name if item.order.customer else '未知客户' }}</td>
+                                <td>{{ item.order.total_amount|float }}</td>
+                                <td>{{ item.paid_amount|float }}</td>
+                                <td>{{ item.balance|float }}</td>
                                 <td>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectOrder({{ order.id }}, '{{ order.order_number }}')">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="toggleOrder({{ item.order_id }}, '{{ item.order.order_number }}')">
                                         选择
                                     </button>
                                 </td>
@@ -196,6 +194,9 @@
         {% endif %}
     </div>
 </div>
+
+<!-- 客户数据 -->
+<div id="customers-data" style="display: none;">{{ customers|tojson|safe if customers else '[]' }}</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -210,15 +211,73 @@ $(document).ready(function() {
     
     // 自动聚焦金额输入框
     $('input[name="amount"]').focus();
+    
+    // 客户数据
+    let customers = [];
+    try {
+        customers = JSON.parse($('#customers-data').text()).map(function(c) {
+            return { id: c.id, code: c.code || '', name: c.name || '' };
+        });
+    } catch(e) {}
+    
+    // 初始化客户搜索
+    const selectedCustomerId = '{{ receipt.customer_id if receipt else "" }}';
+    const preSelectedCustomer = selectedCustomerId ? customers.find(c => String(c.id) === String(selectedCustomerId)) : null;
+    
+    initEntitySearch('#customer-search-container', customers, function(customer) {}, {
+        containerClass: 'customer-search',
+        fieldCode: 'code',
+        fieldName: 'name',
+        placeholder: '输入客户名称或编码搜索...',
+        selectedId: preSelectedCustomer ? preSelectedCustomer.id : null,
+        hiddenName: 'customer_id'
+    });
 });
 
-function selectOrder(orderId, orderNumber) {
+function toggleOrder(orderId, orderNumber) {
+    var checkbox = $('.order-checkbox[data-order-id="' + orderId + '"]');
+    checkbox.prop('checked', !checkbox.prop('checked'));
+    updateSelectedOrders();
     // 设置关联类型为销售订单
     $('select[name="reference_type"]').val('sales_order');
-    // 设置关联ID
-    $('input[name="reference_id"]').val(orderId);
-    // 显示提示信息
-    alert('已选择销售订单: ' + orderNumber);
 }
+
+function updateSelectedOrders() {
+    var selectedIds = [];
+    var selectedNumbers = [];
+    $('.order-checkbox:checked').each(function() {
+        selectedIds.push($(this).data('order-id'));
+        selectedNumbers.push($(this).data('order-number'));
+    });
+    $('#reference-id-hidden').val(selectedIds.join(','));
+    $('#selected-orders-text').val(selectedNumbers.join(', '));
+    // Update badge display
+    var display = $('#selected-orders-display');
+    display.empty();
+    selectedNumbers.forEach(function(num) {
+        display.append('<span class="badge bg-primary me-1">' + num + '</span>');
+    });
+}
+
+$(document).ready(function() {
+    // Bind checkbox change events
+    $('.order-checkbox').on('change', function() {
+        updateSelectedOrders();
+        $('select[name="reference_type"]').val('sales_order');
+    });
+
+    // Initialize from existing receipt reference_id (edit mode)
+    var initialRefId = $('#reference-id-hidden').val();
+    if (initialRefId) {
+        var ids = initialRefId.split(',').map(function(s) { return s.trim(); });
+        ids.forEach(function(id) {
+            if (id) {
+                $('.order-checkbox[data-order-id="' + id + '"]').prop('checked', true);
+            }
+        });
+        updateSelectedOrders();
+        $('select[name="reference_type"]').val('sales_order');
+    }
+});
 </script>
 {% endblock %}

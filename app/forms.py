@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField, TextAreaField, SelectField, DateField, DecimalField, IntegerField, FileField, BooleanField
+from wtforms import StringField, PasswordField, SubmitField, TextAreaField, SelectField, DateField, DecimalField, IntegerField, FileField, BooleanField, FieldList, FormField
 from wtforms.validators import DataRequired, Email, Length, EqualTo, ValidationError, Optional, NumberRange
 from app.models import User
 
@@ -128,7 +128,7 @@ class ReceiptForm(FlaskForm):
         ('sales_order', '销售订单'),
         ('other', '其他')
     ], validators=[Optional()])
-    reference_id = IntegerField('关联ID', validators=[Optional()])
+    reference_id = StringField('关联订单', validators=[Optional()])
     notes = TextAreaField('备注')
     submit = SubmitField('保存收款单')
 
@@ -146,7 +146,7 @@ class PaymentForm(FlaskForm):
         ('purchase_order', '采购订单'),
         ('other', '其他')
     ], validators=[Optional()])
-    reference_id = IntegerField('关联ID', validators=[Optional()])
+    reference_id = StringField('关联订单', validators=[Optional()])
     notes = TextAreaField('备注')
     submit = SubmitField('保存付款单')
 
@@ -165,15 +165,27 @@ class ExpenseForm(FlaskForm):
     submit = SubmitField('保存费用')
 
 class StockAdjustForm(FlaskForm):
-    product_id = SelectField('商品', coerce=int, validators=[DataRequired()])
-    warehouse_id = SelectField('仓库', coerce=int, validators=[DataRequired()])
+    product_id = SelectField('商品', coerce=int, validators=[DataRequired(message='请选择商品')])
+    warehouse_id = SelectField('仓库', coerce=int, validators=[DataRequired(message='请选择仓库')])
     adjust_type = SelectField('调整类型', choices=[
         ('adjust_in', '盘盈入库'),
         ('adjust_out', '盘亏出库')
-    ], validators=[DataRequired()])
-    quantity = DecimalField('数量', validators=[DataRequired(), NumberRange(min=0.01)], places=2)
+    ], validators=[DataRequired(message='请选择调整类型')])
+    quantity = DecimalField('数量', validators=[DataRequired(message='请填写数量'), NumberRange(min=0.01, message='数量必须大于0')], places=2)
     notes = TextAreaField('备注')
     submit = SubmitField('保存调整')
+
+class StockTransferItemForm(FlaskForm):
+    product_id = SelectField('商品', coerce=int, validators=[DataRequired(message='请选择商品')])
+    quantity = DecimalField('数量', validators=[DataRequired(message='请填写数量'), NumberRange(min=0.01, message='数量必须大于0')], places=2)
+
+class StockTransferForm(FlaskForm):
+    from_warehouse = SelectField('调出仓库', coerce=int, validators=[DataRequired(message='请选择调出仓库')])
+    to_warehouse = SelectField('调入仓库', coerce=int, validators=[DataRequired(message='请选择调入仓库')])
+    transfer_date = DateField('调拨日期', validators=[DataRequired(message='请选择调拨日期')])
+    remark = TextAreaField('备注')
+    items = FieldList(FormField(StockTransferItemForm), min_entries=10)
+    submit = SubmitField('提交调拨')
 
 class SearchForm(FlaskForm):
     keyword = StringField('关键词', validators=[Optional()])

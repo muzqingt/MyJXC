@@ -5,15 +5,9 @@
 {% block header %}{{ title }}{% endblock %}
 
 {% block actions %}
-<div class="btn-group">
-    <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
-        <i class="bi bi-download"></i> 导出
-    </button>
-    <ul class="dropdown-menu">
-        <li><a class="dropdown-item" href="#">Excel</a></li>
-        <li><a class="dropdown-item" href="#">PDF</a></li>
-    </ul>
-</div>
+<a href="{{ url_for('finance.export_profit_analysis') }}" class="btn btn-outline-primary">
+    <i class="bi bi-download"></i> 导出Excel
+</a>
 {% endblock %}
 
 {% block content %}

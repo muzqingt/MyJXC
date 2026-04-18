@@ -31,26 +31,12 @@
         <div class="card-body">
             <form method="GET" action="{{ url_for('finance.ar_ap_search') }}" class="row g-3">
                 <div class="col-md-5">
-                    <label for="customer_id" class="form-label">客户名称（应收）</label>
-                    <select class="form-select" id="customer_id" name="customer_id">
-                        <option value="">-- 请选择客户 --</option>
-                        {% for customer in customers %}
-                        <option value="{{ customer.id }}" {% if customer_info and customer_info.id == customer.id %}selected{% endif %}>
-                            {{ customer.code }} - {{ customer.name }}
-                        </option>
-                        {% endfor %}
-                    </select>
+                    <label class="form-label">客户名称（应收）</label>
+                    <div id="customer-search-container"></div>
                 </div>
                 <div class="col-md-5">
-                    <label for="supplier_id" class="form-label">供应商名称（应付）</label>
-                    <select class="form-select" id="supplier_id" name="supplier_id">
-                        <option value="">-- 请选择供应商 --</option>
-                        {% for supplier in suppliers %}
-                        <option value="{{ supplier.id }}" {% if supplier_info and supplier_info.id == supplier.id %}selected{% endif %}>
-                            {{ supplier.code }} - {{ supplier.name }}
-                        </option>
-                        {% endfor %}
-                    </select>
+                    <label class="form-label">供应商名称（应付）</label>
+                    <div id="supplier-search-container"></div>
                 </div>
                 <div class="col-md-2 d-flex align-items-end">
                     <button type="submit" class="btn btn-primary w-100">
@@ -375,9 +361,32 @@
         <div class="card-body text-center py-5">
             <i class="bi bi-search fa-4x text-muted mb-3"></i>
             <h5 class="text-muted">请选择客户或供应商进行检索</h5>
-            <p class="text-muted">上方下拉框选择客户可查看应收信息，选择供应商可查看应付信息</p>
+            <p class="text-muted">上方搜索框输入客户名称可查看应收信息，输入供应商名称可查看应付信息</p>
         </div>
     </div>
     {% endif %}
+    <!-- 隐藏数据 -->
+    <div id="customers-data" style="display:none">{{ customers|tojson }}</div>
+    <div id="suppliers-data" style="display:none">{{ suppliers|tojson }}</div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // 客户搜索
+    initEntitySearch('#customer-search-container', {{ customers|tojson|safe }}, function(customer) {}, {
+        containerClass: 'customer-search',
+        hiddenName: 'customer_id',
+        selectedId: '{{ customer_info.id if customer_info else "" }}'
+    });
+
+    // 供应商搜索
+    initEntitySearch('#supplier-search-container', {{ suppliers|tojson|safe }}, function(supplier) {}, {
+        containerClass: 'supplier-search',
+        hiddenName: 'supplier_id',
+        selectedId: '{{ supplier_info.id if supplier_info else "" }}'
+    });
+});
+</script>
 {% endblock %}

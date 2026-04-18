@@ -16,13 +16,9 @@
         <li><hr class="dropdown-divider"></li>
         <li><a class="dropdown-item" href="#">按分类筛选</a></li>
     </ul>
-    <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
-        <i class="bi bi-download"></i> 导出
-    </button>
-    <ul class="dropdown-menu">
-        <li><a class="dropdown-item" href="#">Excel</a></li>
-        <li><a class="dropdown-item" href="#">PDF</a></li>
-    </ul>
+    <a href="{{ url_for('inventory.export_warehouse_stock', warehouse_id=warehouse.id) }}" class="btn btn-outline-primary">
+        <i class="bi bi-download"></i> 导出Excel
+    </a>
 </div>
 {% endblock %}
 

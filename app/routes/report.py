@@ -92,7 +92,7 @@ def inventory_report():
             'code': product.code,
             'name': product.name,
             'unit': product.unit,
-            'beginning_stock': 0,  # 需要实现期初库存计算
+            'beginning_stock': float(product.stock_quantity or 0) - float(purchase.purchase_quantity if purchase else 0) + float(sales.sales_quantity if sales else 0),
             'purchase_quantity': purchase.purchase_quantity if purchase else 0,
             'purchase_amount': float(purchase.purchase_amount) if purchase else 0,
             'sales_quantity': sales.sales_quantity if sales else 0,
