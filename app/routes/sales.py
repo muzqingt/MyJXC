@@ -886,10 +886,7 @@ def complete_stock_out(id):
             
             if all_delivered:
                 order.status = 'completed'
-                # 更新客户应收余额（出库增加应收）
-                customer = order.customer
-                if customer:
-                    customer.receivable_balance = float(customer.receivable_balance) + float(order.total_amount)
+                # 更新客户应收余额（在new_order或quick_stock_out中已更新，此处不再重复更新）
             else:
                 order.status = 'partial'
         

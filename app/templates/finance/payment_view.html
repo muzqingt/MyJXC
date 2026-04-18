@@ -73,8 +73,20 @@
                 
                 <div class="row mb-3">
                     <div class="col-md-6">
-                        <strong>关联ID：</strong>
-                        <p>{{ payment.reference_id or 'N/A' }}</p>
+                        <strong>关联订单：</strong>
+                        <p>
+                            {% if payment.reference_type == 'purchase_order' and payment.reference_id %}
+                                {% set ids = payment.reference_id.split(',') %}
+                                {% for oid in ids %}
+                                    {% if oid.strip() %}
+                                        {% set po = db.session.get(PurchaseOrder, oid.strip()|int) %}
+                                        {{ po.order_number if po else '订单' + oid.strip() }}{% if not loop.last %}，{% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                            {% else %}
+                                {{ payment.reference_id or '无' }}
+                            {% endif %}
+                        </p>
                     </div>
                     <div class="col-md-6">
                         <strong>创建人：</strong>

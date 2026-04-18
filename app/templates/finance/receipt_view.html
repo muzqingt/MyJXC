@@ -73,8 +73,20 @@
                 
                 <div class="row mb-3">
                     <div class="col-md-6">
-                        <strong>关联ID：</strong>
-                        <p>{{ receipt.reference_id or 'N/A' }}</p>
+                        <strong>关联订单：</strong>
+                        <p>
+                            {% if receipt.reference_type == 'sales_order' and receipt.reference_id %}
+                                {% set ids = receipt.reference_id.split(',') %}
+                                {% for oid in ids %}
+                                    {% if oid.strip() %}
+                                        {% set so = db.session.get(SalesOrder, oid.strip()|int) %}
+                                        {{ so.order_number if so else '订单' + oid.strip() }}{% if not loop.last %}，{% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                            {% else %}
+                                {{ receipt.reference_id or '无' }}
+                            {% endif %}
+                        </p>
                     </div>
                     <div class="col-md-6">
                         <strong>创建人：</strong>

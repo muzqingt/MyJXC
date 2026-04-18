@@ -326,11 +326,11 @@ class Receipt(db.Model):
     receipt_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
     payment_method = db.Column(db.String(50), default='cash')  # cash, bank_transfer, wechat, alipay
     reference_type = db.Column(db.String(50))  # sales_order, other
-    reference_id = db.Column(db.Integer)
+    reference_id = db.Column(db.String(500), nullable=True)  # 改为String支持多订单，以逗号分隔存储
     notes = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     customer = db.relationship('Customer', backref='receipts')
     creator = db.relationship('User', backref='created_receipts')
     
@@ -346,11 +346,11 @@ class Payment(db.Model):
     payment_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
     payment_method = db.Column(db.String(50), default='cash')  # cash, bank_transfer, wechat, alipay
     reference_type = db.Column(db.String(50))  # purchase_order, other
-    reference_id = db.Column(db.Integer)
+    reference_id = db.Column(db.String(500), nullable=True)  # 改为String支持多订单，以逗号分隔存储
     notes = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     supplier = db.relationship('Supplier', backref='payments')
     creator = db.relationship('User', backref='created_payments')
     

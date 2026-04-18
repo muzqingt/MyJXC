@@ -926,10 +926,7 @@ def complete_stock_in(id):
             
             if all_received:
                 order.status = 'completed'
-                # 更新供应商应付余额（入库增加应付）
-                supplier = order.supplier
-                if supplier:
-                    supplier.payable_balance = float(supplier.payable_balance) + float(order.total_amount)
+                # 更新供应商应付余额（在new_order或quick_stock_in中已更新，此处不再重复更新）
             else:
                 order.status = 'partial'
         
