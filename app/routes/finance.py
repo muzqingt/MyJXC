@@ -287,6 +287,7 @@ def edit_receipt(receipt_id):
 
     if form.validate_on_submit():
         original_amount = receipt.amount
+        original_customer_id = receipt.customer_id
         receipt.customer_id = form.customer_id.data
         receipt.amount = form.amount.data
         receipt.receipt_date = form.receipt_date.data
@@ -295,12 +296,20 @@ def edit_receipt(receipt_id):
         receipt.reference_id = form.reference_id.data.strip() if form.reference_id.data else None
         receipt.notes = form.notes.data
 
-        # 更新客户应收余额（如果金额变化）
-        # 当收款金额增加时，应收余额应减少；当收款金额减少时，应收余额应增加
-        if original_amount != receipt.amount:
+        # 更新客户应收余额
+        if original_customer_id != receipt.customer_id:
+            # 换了客户：回滚旧客户的余额，增加新客户的应收
+            old_customer = Customer.query.get(original_customer_id)
+            if old_customer:
+                old_customer.receivable_balance += original_amount
+            new_customer = Customer.query.get(receipt.customer_id)
+            if new_customer:
+                new_customer.receivable_balance -= receipt.amount
+        elif original_amount != receipt.amount:
+            # 金额变化：调整当前客户余额
             customer = Customer.query.get(receipt.customer_id)
             if customer:
-                customer.receivable_balance += (receipt.amount - original_amount)
+                customer.receivable_balance -= (receipt.amount - original_amount)
 
         db.session.commit()
         flash('收款记录已更新成功!', 'success')
@@ -345,6 +354,7 @@ def edit_payment(payment_id):
 
     if form.validate_on_submit():
         original_amount = payment.amount
+        original_supplier_id = payment.supplier_id
         payment.supplier_id = form.supplier_id.data
         payment.amount = form.amount.data
         payment.payment_date = form.payment_date.data
@@ -353,12 +363,20 @@ def edit_payment(payment_id):
         payment.reference_id = form.reference_id.data.strip() if form.reference_id.data else None
         payment.notes = form.notes.data
 
-        # 更新供应商应付余额（如果金额变化）
-        # 当付款金额增加时，应付余额应减少；当付款金额减少时，应付余额应增加
-        if original_amount != payment.amount:
+        # 更新供应商应付余额
+        if original_supplier_id != payment.supplier_id:
+            # 换了供应商：回滚旧供应商的余额，增加新供应商的应付
+            old_supplier = Supplier.query.get(original_supplier_id)
+            if old_supplier:
+                old_supplier.payable_balance += original_amount
+            new_supplier = Supplier.query.get(payment.supplier_id)
+            if new_supplier:
+                new_supplier.payable_balance -= payment.amount
+        elif original_amount != payment.amount:
+            # 金额变化：调整当前供应商余额
             supplier = Supplier.query.get(payment.supplier_id)
             if supplier:
-                supplier.payable_balance += (payment.amount - original_amount)
+                supplier.payable_balance -= (payment.amount - original_amount)
 
         db.session.commit()
         flash('付款记录已更新成功!', 'success')
