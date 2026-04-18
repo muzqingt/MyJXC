@@ -85,7 +85,7 @@
                 <div class="mt-4">
                     <h5>商品描述</h5>
                     <div class="border rounded p-3 bg-light" style="white-space: pre-wrap;">
-                        {{ product.description }}
+                        {{ product.description | e }}
                     </div>
                 </div>
                 {% endif %}

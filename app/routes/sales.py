@@ -448,6 +448,11 @@ def delete_order(id):
     if order.stock_outs:
         flash('此订单有关联的发货单，无法删除！', 'danger')
         return redirect(url_for('sales.index'))
+
+    # 检查是否有库存流水记录（包括退货等关联操作）
+    if StockLog.query.filter_by(reference_type='sales_order', reference_id=order.id).first():
+        flash('此订单已有库存操作记录，无法删除！', 'danger')
+        return redirect(url_for('sales.index'))
     
     db.session.delete(order)
     db.session.commit()
