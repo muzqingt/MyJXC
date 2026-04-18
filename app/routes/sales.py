@@ -561,9 +561,6 @@ def quick_stock_out(id):
         
         if all_delivered:
             order.status = 'completed'
-            customer = order.customer
-            if customer:
-                customer.receivable_balance = float(customer.receivable_balance) + float(order.total_amount)
         else:
             order.status = 'partial'
 
