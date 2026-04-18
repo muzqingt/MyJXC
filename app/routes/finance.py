@@ -14,14 +14,19 @@ bp = Blueprint('finance', __name__, url_prefix='/finance')
 
 def calc_order_paid_amount(order_id, order_type):
     """计算订单已收/已付金额，支持逗号分隔的多订单ID"""
+    def parse_ids(ref_id):
+        # 兼容旧数据：reference_id 可能是 int 或 str
+        s = str(ref_id) if ref_id is not None else ''
+        return [int(x.strip()) for x in s.split(',') if x.strip()]
+
     if order_type == 'sales_order':
         receipts = Receipt.query.filter_by(reference_type='sales_order').all()
         return sum(float(r.amount) for r in receipts
-                   if r.reference_id and order_id in [int(x.strip()) for x in r.reference_id.split(',') if x.strip()])
+                   if r.reference_id and order_id in parse_ids(r.reference_id))
     else:
         payments = Payment.query.filter_by(reference_type='purchase_order').all()
         return sum(float(p.amount) for p in payments
-                   if p.reference_id and order_id in [int(x.strip()) for x in p.reference_id.split(',') if x.strip()])
+                   if p.reference_id and order_id in parse_ids(p.reference_id))
 
 
 @bp.route('/')

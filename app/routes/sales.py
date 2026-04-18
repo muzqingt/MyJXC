@@ -454,6 +454,11 @@ def delete_order(id):
         flash('此订单已有库存操作记录，无法删除！', 'danger')
         return redirect(url_for('sales.index'))
     
+    # 回滚客户应收余额（订单创建时已累加）
+    customer = order.customer
+    if customer and order.status in ['confirmed', 'partial', 'completed']:
+        customer.receivable_balance -= float(order.total_amount)
+    
     db.session.delete(order)
     db.session.commit()
     

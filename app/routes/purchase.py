@@ -465,6 +465,11 @@ def delete_order(id):
         flash('此订单已有库存操作记录，无法删除！', 'danger')
         return redirect(url_for('purchase.index', tab=get_redirect_tab()))
     
+    # 回滚供应商应付余额（订单创建时已累加）
+    supplier = order.supplier
+    if supplier and order.status in ['confirmed', 'partial', 'completed']:
+        supplier.payable_balance -= float(order.total_amount)
+    
     db.session.delete(order)
     db.session.commit()
     flash('采购订单删除成功！', 'success')
