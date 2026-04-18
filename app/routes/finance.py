@@ -11,6 +11,19 @@ import io
 # 创建蓝图
 bp = Blueprint('finance', __name__, url_prefix='/finance')
 
+
+def calc_order_paid_amount(order_id, order_type):
+    """计算订单已收/已付金额，支持逗号分隔的多订单ID"""
+    if order_type == 'sales_order':
+        receipts = Receipt.query.filter_by(reference_type='sales_order').all()
+        return sum(float(r.amount) for r in receipts
+                   if r.reference_id and order_id in [int(x.strip()) for x in r.reference_id.split(',') if x.strip()])
+    else:
+        payments = Payment.query.filter_by(reference_type='purchase_order').all()
+        return sum(float(p.amount) for p in payments
+                   if p.reference_id and order_id in [int(x.strip()) for x in p.reference_id.split(',') if x.strip()])
+
+
 @bp.route('/')
 @login_required
 def index():
@@ -106,9 +119,7 @@ def add_receipt():
     # 计算每个订单的已收款金额
     sales_orders_data = []
     for order in sales_orders_raw:
-        ids = [int(x.strip()) for x in (r.reference_id or '').split(',') if x.strip()]
-        paid_amount = sum(float(r.amount) for r in Receipt.query.filter_by(
-            reference_type='sales_order').all() if r.reference_id and order.id in ids)
+        paid_amount = calc_order_paid_amount(order.id, 'sales_order')
         sales_orders_data.append({
             'order': order,
             'order_id': order.id,
@@ -180,9 +191,7 @@ def add_payment():
     # 计算每个订单的已付款金额
     purchase_orders_data = []
     for order in purchase_orders_raw:
-        ids = [int(x.strip()) for x in (p.reference_id or '').split(',') if x.strip()]
-        paid_amount = sum(float(p.amount) for p in Payment.query.filter_by(
-            reference_type='purchase_order').all() if p.reference_id and order.id in ids)
+        paid_amount = calc_order_paid_amount(order.id, 'purchase_order')
         purchase_orders_data.append({
             'order': order,
             'order_id': order.id,
@@ -303,9 +312,7 @@ def edit_receipt(receipt_id):
     sales_orders_raw = SalesOrder.query.filter_by(status='completed').all()
     sales_orders_data = []
     for order in sales_orders_raw:
-        ids = [int(x.strip()) for x in (r.reference_id or '').split(',') if x.strip()]
-        paid_amount = sum(float(r.amount) for r in Receipt.query.filter_by(
-            reference_type='sales_order').all() if r.reference_id and order.id in ids)
+        paid_amount = calc_order_paid_amount(order.id, 'sales_order')
         sales_orders_data.append({
             'order': order,
             'order_id': order.id,
@@ -363,9 +370,7 @@ def edit_payment(payment_id):
     purchase_orders_raw = PurchaseOrder.query.filter_by(status='completed').all()
     purchase_orders_data = []
     for order in purchase_orders_raw:
-        ids = [int(x.strip()) for x in (p.reference_id or '').split(',') if x.strip()]
-        paid_amount = sum(float(p.amount) for p in Payment.query.filter_by(
-            reference_type='purchase_order').all() if p.reference_id and order.id in ids)
+        paid_amount = calc_order_paid_amount(order.id, 'purchase_order')
         purchase_orders_data.append({
             'order': order,
             'order_id': order.id,
@@ -443,13 +448,15 @@ def ar_ap_search():
             SalesOrder.status.in_(['confirmed', 'partial', 'completed'])
         ).order_by(SalesOrder.order_date.desc()).all()
 
-        # 为每个订单添加商品名称
+        # 为每个订单添加商品名称（N+1优化：一次性加载所有订单的明细）
+        customer_order_ids = [o.id for o in customer_orders]
+        all_items = db.session.query(SalesOrderItem).filter(SalesOrderItem.order_id.in_(customer_order_ids)).all() if customer_order_ids else []
+        items_by_order = {}
+        for item in all_items:
+            items_by_order.setdefault(item.order_id, []).append(item)
         for order in customer_orders:
-            items = SalesOrderItem.query.filter_by(order_id=order.id).all()
-            product_names = []
-            for item in items:
-                if item.product:
-                    product_names.append(item.product.name)
+            items = items_by_order.get(order.id, [])
+            product_names = [item.product.name for item in items if item.product]
             order.product_names = '、'.join(product_names) if product_names else None
 
         # 计算应收总额
@@ -470,13 +477,15 @@ def ar_ap_search():
             PurchaseOrder.status.in_(['confirmed', 'partial', 'completed'])
         ).order_by(PurchaseOrder.order_date.desc()).all()
 
-        # 为每个订单添加商品名称
+        # 为每个订单添加商品名称（N+1优化：一次性加载所有订单的明细）
+        supplier_order_ids = [o.id for o in supplier_orders]
+        all_supplier_items = db.session.query(PurchaseOrderItem).filter(PurchaseOrderItem.order_id.in_(supplier_order_ids)).all() if supplier_order_ids else []
+        supplier_items_by_order = {}
+        for item in all_supplier_items:
+            supplier_items_by_order.setdefault(item.order_id, []).append(item)
         for order in supplier_orders:
-            items = PurchaseOrderItem.query.filter_by(order_id=order.id).all()
-            product_names = []
-            for item in items:
-                if item.product:
-                    product_names.append(item.product.name)
+            items = supplier_items_by_order.get(order.id, [])
+            product_names = [item.product.name for item in items if item.product]
             order.product_names = '、'.join(product_names) if product_names else None
 
         # 计算应付总额
@@ -583,6 +592,7 @@ def supplier_ap_detail(supplier_id):
 @login_required
 def export_customer_ar(customer_id):
     """导出客户应收报表"""
+    # TODO: 添加业务级权限检查，例如检查当前用户是否有权访问该客户的数据
     customer = Customer.query.get_or_404(customer_id)
 
     # 获取销售订单
@@ -931,6 +941,7 @@ def export_expenses():
 @login_required
 def export_supplier_ap(supplier_id):
     """导出供应商应付报表"""
+    # TODO: 添加业务级权限检查，例如检查当前用户是否有权访问该供应商的数据
     supplier = Supplier.query.get_or_404(supplier_id)
 
     # 获取采购订单

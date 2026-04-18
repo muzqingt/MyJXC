@@ -180,6 +180,7 @@ def stock_transfer():
                     if product:
                         quantity = float(item['quantity'])
 
+                        # TODO: 当前使用全局库存检查，多仓库时应该查询对应仓库的库存记录
                         if product.stock_quantity < quantity:
                             flash(f'{product.name} 库存不足！', 'danger')
                             items_data = [

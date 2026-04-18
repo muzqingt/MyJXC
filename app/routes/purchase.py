@@ -570,7 +570,7 @@ def quick_stock_in(id):
             order.status = 'completed'
             supplier = order.supplier
             if supplier:
-                supplier.payable_balance = float(supplier.payable_balance) + float(order.total_amount)
+                supplier.payable_balance = float(supplier.payable_balance) + float(stock_in.total_amount)
         else:
             order.status = 'partial'
         

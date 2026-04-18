@@ -92,6 +92,7 @@ def inventory_report():
             'code': product.code,
             'name': product.name,
             'unit': product.unit,
+            # 注：期初 = 当前库存 - 本期入库 + 本月出库，假设当前库存为期末库存
             'beginning_stock': float(product.stock_quantity or 0) - float(purchase.purchase_quantity if purchase else 0) + float(sales.sales_quantity if sales else 0),
             'purchase_quantity': purchase.purchase_quantity if purchase else 0,
             'purchase_amount': float(purchase.purchase_amount) if purchase else 0,
@@ -155,8 +156,7 @@ def customer_statistics():
         db.func.count(SalesOrder.id).label('order_count'),
         db.func.sum(SalesOrder.total_amount).label('total_amount'),
         db.func.avg(SalesOrder.total_amount).label('avg_amount')
-    ).outerjoin(SalesOrder, Customer.id == SalesOrder.customer_id)\
-     .filter(SalesOrder.status == 'completed')\
+    ).outerjoin(SalesOrder, db.and_(Customer.id == SalesOrder.customer_id, SalesOrder.status == 'completed'))\
      .group_by(Customer.id)\
      .order_by(db.func.sum(SalesOrder.total_amount).desc())\
      .all()
@@ -177,8 +177,7 @@ def supplier_statistics():
         db.func.count(PurchaseOrder.id).label('order_count'),
         db.func.sum(PurchaseOrder.total_amount).label('total_amount'),
         db.func.avg(PurchaseOrder.total_amount).label('avg_amount')
-    ).outerjoin(PurchaseOrder, Supplier.id == PurchaseOrder.supplier_id)\
-     .filter(PurchaseOrder.status == 'completed')\
+    ).outerjoin(PurchaseOrder, db.and_(Supplier.id == PurchaseOrder.supplier_id, PurchaseOrder.status == 'completed'))\
      .group_by(Supplier.id)\
      .order_by(db.func.sum(PurchaseOrder.total_amount).desc())\
      .all()
@@ -415,8 +414,7 @@ def export_customer():
         db.func.count(SalesOrder.id).label('order_count'),
         db.func.sum(SalesOrder.total_amount).label('total_amount'),
         db.func.avg(SalesOrder.total_amount).label('avg_amount')
-    ).outerjoin(SalesOrder, Customer.id == SalesOrder.customer_id)\
-     .filter(SalesOrder.status == 'completed')\
+    ).outerjoin(SalesOrder, db.and_(Customer.id == SalesOrder.customer_id, SalesOrder.status == 'completed'))\
      .group_by(Customer.id)\
      .order_by(db.func.sum(SalesOrder.total_amount).desc())\
      .all()
@@ -468,8 +466,7 @@ def export_supplier():
         db.func.count(PurchaseOrder.id).label('order_count'),
         db.func.sum(PurchaseOrder.total_amount).label('total_amount'),
         db.func.avg(PurchaseOrder.total_amount).label('avg_amount')
-    ).outerjoin(PurchaseOrder, Supplier.id == PurchaseOrder.supplier_id)\
-     .filter(PurchaseOrder.status == 'completed')\
+    ).outerjoin(PurchaseOrder, db.and_(Supplier.id == PurchaseOrder.supplier_id, PurchaseOrder.status == 'completed'))\
      .group_by(Supplier.id)\
      .order_by(db.func.sum(PurchaseOrder.total_amount).desc())\
      .all()

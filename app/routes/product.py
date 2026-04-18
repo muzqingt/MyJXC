@@ -72,13 +72,23 @@ def new_product():
         
         # 处理图片上传
         if form.image.data:
-            filename = secure_filename(form.image.data.filename)
+            file = form.image.data
+            if file.content_type not in ['image/jpeg', 'image/png', 'image/gif', 'image/jpg']:
+                flash('只能上传 JPG/PNG/GIF 格式图片', 'danger')
+                return redirect(url_for('product.new_product'))
+            file.seek(0, 2)  # seek to end
+            size = file.tell()
+            file.seek(0)  # reset
+            if size > 2 * 1024 * 1024:  # 2MB limit
+                flash('图片大小不能超过 2MB', 'danger')
+                return redirect(url_for('product.new_product'))
+            filename = secure_filename(file.filename)
             if filename:
                 file_ext = os.path.splitext(filename)[1].lower()
                 if file_ext in ['.jpg', '.jpeg', '.png', '.gif']:
                     new_filename = f"product_{product.code}{file_ext}"
                     filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], new_filename)
-                    form.image.data.save(filepath)
+                    file.save(filepath)
                     product.image_path = new_filename
         
         db.session.add(product)
@@ -129,7 +139,17 @@ def edit_product(id):
         
         # 处理图片上传
         if form.image.data:
-            filename = secure_filename(form.image.data.filename)
+            file = form.image.data
+            if file.content_type not in ['image/jpeg', 'image/png', 'image/gif', 'image/jpg']:
+                flash('只能上传 JPG/PNG/GIF 格式图片', 'danger')
+                return redirect(url_for('product.edit_product', id=product.id))
+            file.seek(0, 2)  # seek to end
+            size = file.tell()
+            file.seek(0)  # reset
+            if size > 2 * 1024 * 1024:  # 2MB limit
+                flash('图片大小不能超过 2MB', 'danger')
+                return redirect(url_for('product.edit_product', id=product.id))
+            filename = secure_filename(file.filename)
             if filename:
                 file_ext = os.path.splitext(filename)[1].lower()
                 if file_ext in ['.jpg', '.jpeg', '.png', '.gif']:
@@ -141,7 +161,7 @@ def edit_product(id):
                     
                     new_filename = f"product_{product.code}{file_ext}"
                     filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], new_filename)
-                    form.image.data.save(filepath)
+                    file.save(filepath)
                     product.image_path = new_filename
         
         db.session.commit()
