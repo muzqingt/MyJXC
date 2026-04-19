@@ -370,6 +370,7 @@ def edit_order(id):
                                  order_items=order_items_list)
         
         # 更新订单基本信息
+        old_supplier = order.supplier
         order.supplier_id = supplier_id
         order.warehouse_id = warehouse_id
         order.order_date = datetime.strptime(order_date, '%Y-%m-%d').date()
@@ -379,6 +380,7 @@ def edit_order(id):
         # 更新商品明细
         PurchaseOrderItem.query.filter_by(order_id=order.id).delete()
         
+        original_total = float(order.total_amount)
         total_amount = 0
         for i in range(len(product_ids)):
             if product_ids[i] and quantities[i] and unit_prices[i]:
@@ -398,6 +400,18 @@ def edit_order(id):
                     total_amount += amount
         
         order.total_amount = total_amount
+        
+        # 调整供应商余额（差额）
+        if order.status in ['confirmed', 'partial', 'completed']:
+            if old_supplier and old_supplier.id != supplier_id:
+                # 换了供应商：回滚旧供应商余额，增加新供应商余额
+                old_supplier.payable_balance -= original_total
+                new_supplier = Supplier.query.get(supplier_id)
+                if new_supplier:
+                    new_supplier.payable_balance += total_amount
+            elif order.supplier:
+                # 同供应商：调整差额
+                order.supplier.payable_balance += (total_amount - original_total)
         
         if action == 'confirm':
             if len(product_ids) == 0 or total_amount == 0:

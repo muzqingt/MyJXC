@@ -390,6 +390,7 @@ def edit_order(id):
                                  order_items=order_items_list)
         
         # 更新订单基本信息
+        old_customer = order.customer
         order.customer_id = customer_id
         order.warehouse_id = warehouse_id
         order.order_date = datetime.strptime(order_date, '%Y-%m-%d').date()
@@ -399,6 +400,7 @@ def edit_order(id):
         # 更新商品明细
         SalesOrderItem.query.filter_by(order_id=order.id).delete()
         
+        original_total = float(order.total_amount)
         total_amount = 0
         for i in range(len(product_ids)):
             if product_ids[i] and quantities[i] and unit_prices[i]:
@@ -418,6 +420,18 @@ def edit_order(id):
                     total_amount += amount
         
         order.total_amount = total_amount
+        
+        # 调整客户应收余额（差额）
+        if order.status in ['confirmed', 'partial', 'completed']:
+            if old_customer and old_customer.id != customer_id:
+                # 换了客户：回滚旧客户余额，增加新客户余额
+                old_customer.receivable_balance -= original_total
+                new_customer = Customer.query.get(customer_id)
+                if new_customer:
+                    new_customer.receivable_balance += total_amount
+            elif order.customer:
+                # 同客户：调整差额
+                order.customer.receivable_balance += (total_amount - original_total)
         
         db.session.commit()
         flash('销售订单修改成功！', 'success')
