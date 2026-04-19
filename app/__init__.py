@@ -47,8 +47,16 @@ def create_app(config_class='config.Config'):
     # 注册模板上下文处理器
     @app.context_processor
     def inject_template_functions():
+        from app.utils import format_local_dt
         return {
-            'now': datetime.now
+            'now': datetime.now,
+            'format_local_dt': format_local_dt
         }
+    
+    # 注册 Jinja2 过滤器
+    from app.utils import localize_dt
+    @app.template_filter('localize')
+    def localize_filter(dt):
+        return localize_dt(dt)
     
     return app

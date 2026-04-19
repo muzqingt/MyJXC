@@ -148,7 +148,7 @@
                             </tr>
                             <tr>
                                 <th>最后登录</th>
-                                <td>{{ current_user.last_login.strftime('%Y-%m-%d %H:%M:%S') if current_user.last_login else '从未登录' }}</td>
+                                <td>{{ format_local_dt(current_user.last_login) if current_user.last_login else '从未登录' }}</td>
                             </tr>
                         </tbody>
                     </table>

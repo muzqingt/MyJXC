@@ -103,7 +103,7 @@
                 
                 <div class="mb-3">
                     <strong>创建时间：</strong>
-                    <p class="text-muted">{{ receipt.created_at.strftime('%Y-%m-%d %H:%M:%S') if receipt.created_at else 'N/A' }}</p>
+                    <p class="text-muted">{{ format_local_dt(receipt.created_at) if receipt.created_at else 'N/A' }}</p>
                 </div>
             </div>
         </div>

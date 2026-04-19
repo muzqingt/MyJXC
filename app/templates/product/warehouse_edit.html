@@ -82,7 +82,7 @@
                 <table class="table table-sm">
                     <tr>
                         <th width="30%">创建时间：</th>
-                        <td>{{ warehouse.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td>{{ format_local_dt(warehouse.created_at) }}</td>
                     </tr>
                     <tr>
                         <th>入库记录数量：</th>

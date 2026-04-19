@@ -131,7 +131,7 @@
                     <tbody id="logsBody">
                         {% for log in logs %}
                         <tr>
-                            <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                            <td>{{ format_local_dt(log.created_at) }}</td>
                             <td>
                                 {% if log.reference_type == 'stock_in' %}
                                     {% if log.stock_in %}

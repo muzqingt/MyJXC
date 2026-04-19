@@ -103,7 +103,7 @@
                 
                 <div class="mb-3">
                     <strong>创建时间：</strong>
-                    <p class="text-muted">{{ payment.created_at.strftime('%Y-%m-%d %H:%M:%S') if payment.created_at else 'N/A' }}</p>
+                    <p class="text-muted">{{ format_local_dt(payment.created_at) if payment.created_at else 'N/A' }}</p>
                 </div>
             </div>
         </div>

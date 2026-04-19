@@ -229,5 +229,23 @@ def safe_commit():
         return False, str(e)
 
 
+def localize_dt(dt):
+    """将存储的UTC时间转换为本地时间（亚洲/上海）"""
+    from datetime import timezone, timedelta
+    if dt is None:
+        return ''
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone(timedelta(hours=8)))
+
+
+def format_local_dt(dt, fmt='%Y-%m-%d %H:%M:%S'):
+    """格式化本地时间，默认格式：2024-01-01 12:00:00"""
+    if dt is None:
+        return ''
+    local = localize_dt(dt)
+    return local.strftime(fmt)
+
+
 # 延迟导入避免循环引用
 from app.models import PurchaseOrder, SalesOrder, StockIn, StockOut

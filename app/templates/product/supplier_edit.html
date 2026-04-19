@@ -91,7 +91,7 @@
                 <table class="table table-sm">
                     <tr>
                         <th width="30%">创建时间：</th>
-                        <td>{{ supplier.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td>{{ format_local_dt(supplier.created_at) }}</td>
                     </tr>
                     <tr>
                         <th>采购订单数量：</th>
