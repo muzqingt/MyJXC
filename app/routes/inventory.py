@@ -566,7 +566,17 @@ def api_stock_check():
 def stock_adjust():
     """库存调整"""
     products = Product.query.all()
+    products_data = [{
+        'id': p.id,
+        'code': p.code,
+        'name': p.name,
+        'specification': p.specification or '',
+        'unit': p.unit,
+        'stock_quantity': float(p.stock_quantity) if p.stock_quantity else 0,
+        'purchase_price': float(p.purchase_price) if p.purchase_price else 0
+    } for p in products]
     warehouses = Warehouse.query.all()
+    warehouses_data = [{'id': w.id, 'code': w.code, 'name': w.name} for w in warehouses]
 
     form = StockAdjustForm()
     # 设置SelectField选项
@@ -588,8 +598,8 @@ def stock_adjust():
                     return render_template('inventory/stock_adjust.html',
                                          title='库存调整',
                                          form=form,
-                                         products=products,
-                                         warehouses=warehouses)
+                                         products=products_data,
+                                         warehouses=warehouses_data)
                 product.stock_quantity -= quantity
                 after_quantity = float(product.stock_quantity)
             else:
@@ -597,8 +607,8 @@ def stock_adjust():
                 return render_template('inventory/stock_adjust.html',
                                      title='库存调整',
                                      form=form,
-                                     products=products,
-                                     warehouses=warehouses)
+                                     products=products_data,
+                                     warehouses=warehouses_data)
 
             log = StockLog(
                 product_id=product.id,
@@ -623,5 +633,5 @@ def stock_adjust():
     return render_template('inventory/stock_adjust.html',
                          title='库存调整',
                          form=form,
-                         products=products,
-                         warehouses=warehouses)
+                         products=products_data,
+                         warehouses=warehouses_data)

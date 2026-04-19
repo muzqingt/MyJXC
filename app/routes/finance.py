@@ -280,7 +280,9 @@ def view_receipt(receipt_id):
     receipt = Receipt.query.get_or_404(receipt_id)
     return render_template('finance/receipt_view.html',
                          title='收款详情',
-                         receipt=receipt)
+                         receipt=receipt,
+                         db=db,
+                         SalesOrder=SalesOrder)
 
 @bp.route('/receipt/<int:receipt_id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -347,7 +349,9 @@ def view_payment(payment_id):
     payment = Payment.query.get_or_404(payment_id)
     return render_template('finance/payment_view.html',
                          title='付款详情',
-                         payment=payment)
+                         payment=payment,
+                         db=db,
+                         PurchaseOrder=PurchaseOrder)
 
 @bp.route('/payment/<int:payment_id>/edit', methods=['GET', 'POST'])
 @login_required
