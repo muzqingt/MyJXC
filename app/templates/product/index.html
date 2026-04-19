@@ -103,33 +103,13 @@
                                            class="btn btn-outline-primary" title="编辑">
                                             <i class="bi bi-pencil"></i>
                                         </a>
-                                        <button type="button" class="btn btn-outline-danger" 
-                                                data-bs-toggle="modal" data-bs-target="#deleteModal{{ product.id }}" title="删除">
+                                        <button type="button" class="btn btn-outline-danger delete-btn" 
+                                                data-id="{{ product.id }}" title="删除">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </div>
                                     
-                                    <!-- 删除确认模态框 -->
-                                    <div class="modal fade" id="deleteModal{{ product.id }}" tabindex="-1">
-                                        <div class="modal-dialog">
-                                            <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title">确认删除</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    确定要删除商品 "{{ product.name }}" 吗？此操作不可恢复。
-                                                </div>
-                                                <div class="modal-footer">
-                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                                                    <form method="post" action="{{ url_for('product.delete_product', id=product.id) }}">
-                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                        <button type="submit" class="btn btn-danger">确认删除</button>
-                                                    </form>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+
                                 </td>
                             </tr>
                             {% else %}
@@ -228,9 +208,20 @@ $(document).ready(function() {
     // 自动聚焦搜索框
     $('input[name="keyword"]').focus();
     
-    // 确认删除
-    $('.delete-btn').click(function() {
-        return confirm('确定要删除这个商品吗？此操作不可恢复。');
+    // 确认删除（使用 window.confirm 避免 Bootstrap 模态框在 WebView 中的兼容性问题）
+    $('.delete-btn').on('click', function() {
+        var productId = $(this).data('id');
+        if (!confirm('确定要删除此商品吗？此操作不可恢复。')) {
+            return false;
+        }
+        // 创建并提交表单
+        var csrf = '{{ csrf_token() }}';
+        var form = $('<form method="post"></form>');
+        form.attr('action', '/product/products/' + productId + '/delete');
+        form.append($('<input type="hidden" name="csrf_token">').val(csrf));
+        $('body').append(form);
+        form.submit();
+        return false;
     });
 });
 </script>
