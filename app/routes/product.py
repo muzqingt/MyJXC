@@ -191,7 +191,7 @@ def delete_product(id):
     product = Product.query.get_or_404(id)
     
     # 检查是否有相关记录
-    if product.purchase_order_items.count() > 0 or product.sales_order_items.count() > 0:
+    if len(product.purchase_order_items) > 0 or len(product.sales_order_items) > 0:
         flash('该商品已有采购或销售记录，无法删除！', 'danger')
         return redirect(url_for('product.index'))
     
@@ -285,12 +285,12 @@ def delete_category(id):
     category = Category.query.get_or_404(id)
     
     # 检查是否有子分类
-    if category.children.count() > 0:
+    if len(category.children) > 0:
         flash('该分类下有子分类，无法删除！', 'danger')
         return redirect(url_for('product.categories'))
     
     # 检查是否有商品
-    if category.products.count() > 0:
+    if len(category.products) > 0:
         flash('该分类下有商品，无法删除！', 'danger')
         return redirect(url_for('product.categories'))
     
@@ -376,7 +376,7 @@ def delete_supplier(id):
     supplier = Supplier.query.get_or_404(id)
     
     # 检查是否有采购记录
-    if supplier.purchase_orders.count() > 0:
+    if len(supplier.purchase_orders) > 0:
         flash('该供应商已有采购记录，无法删除！', 'danger')
         return redirect(url_for('product.suppliers'))
     
@@ -462,7 +462,7 @@ def delete_customer(id):
     customer = Customer.query.get_or_404(id)
     
     # 检查是否有销售记录
-    if customer.sales_orders.count() > 0:
+    if len(customer.sales_orders) > 0:
         flash('该客户已有销售记录，无法删除！', 'danger')
         return redirect(url_for('product.customers'))
     
@@ -546,7 +546,7 @@ def delete_warehouse(id):
     warehouse = Warehouse.query.get_or_404(id)
     
     # 检查是否有库存记录
-    if warehouse.stock_ins.count() > 0 or warehouse.stock_outs.count() > 0:
+    if len(warehouse.stock_ins) > 0 or len(warehouse.stock_outs) > 0:
         flash('该仓库已有库存记录，无法删除！', 'danger')
         return redirect(url_for('product.warehouses'))
     
