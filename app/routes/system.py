@@ -49,7 +49,14 @@ def create_backup():
     
     # 备份数据库文件
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../instance/store.db')
-    backup_filename = f'backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db'
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    description = request.form.get('description', '').strip()
+    # 清理描述用于文件名：只保留安全字符
+    safe_desc = ''.join(c for c in description if c.isalnum() or c in ' _-').strip()
+    if safe_desc:
+        backup_filename = f'backup_{timestamp}_{safe_desc}.db'
+    else:
+        backup_filename = f'backup_{timestamp}.db'
     backup_path = os.path.join(backup_dir, backup_filename)
     
     try:
@@ -65,7 +72,10 @@ def create_backup():
         db.session.add(log)
         db.session.commit()
         
-        flash(f'备份创建成功: {backup_filename}', 'success')
+        msg = f'备份创建成功: {backup_filename}'
+        if description:
+            msg += f'（{description}）'
+        flash(msg, 'success')
     except Exception as e:
         flash(f'备份创建失败: {str(e)}', 'danger')
     
