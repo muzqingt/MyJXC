@@ -74,33 +74,10 @@
     </div>
 </div>
 
-<!-- 恢复确认模态框 -->
-<div class="modal fade" id="restoreModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">确认恢复备份</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-danger">
-                    <i class="bi bi-exclamation-triangle"></i>
-                    <strong>警告：</strong>恢复备份将覆盖当前数据库，此操作不可逆！
-                </div>
-                <p>确定要从备份文件 <strong id="restoreFilename"></strong> 恢复数据吗？</p>
-                <p class="text-muted">恢复前系统会自动创建当前数据库的备份。</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <form method="post" action="{{ url_for('system.restore_backup') }}" id="restoreForm">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="filename" id="restoreFileInput">
-                    <button type="submit" class="btn btn-danger">确认恢复</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
+<form method="post" action="{{ url_for('system.restore_backup') }}" id="restoreForm" style="display:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="filename" id="restoreFileInput">
+</form>
 
 
 {% endblock %}
@@ -192,9 +169,8 @@ $(document).ready(function() {
                 // 绑定恢复按钮事件
                 $('.restore-btn').click(function() {
                     const filename = $(this).data('filename');
-                    $('#restoreFilename').text(filename);
                     $('#restoreFileInput').val(filename);
-                    $('#restoreModal').modal('show');
+                    if (confirm('警告：恢复备份将覆盖当前数据库，此操作不可逆！\n\n确定要从备份文件 ' + filename + ' 恢复数据吗？\n\n（恢复前系统会自动创建当前数据库的备份）')) { $('#restoreForm').submit(); }
                 });
                 
                 // 绑定删除按钮事件（使用 window.confirm 避免 Bootstrap 模态框在 WebView 中的兼容性问题）
@@ -239,18 +215,11 @@ $(document).ready(function() {
     // 每60秒刷新一次备份列表
     setInterval(loadBackupList, 60000);
     
-    // 恢复确认
+    // 恢复表单提交时显示加载状态
     $('#restoreForm').submit(function(e) {
-        if (!confirm('确定要恢复此备份吗？此操作将覆盖当前数据库！')) {
-            e.preventDefault();
-            return false;
-        }
-        
-        // 显示加载状态
-        $('#restoreModal .btn-danger').prop('disabled', true).html(`
-            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-            恢复中...
-        `);
+        // 确认已在点击按钮时完成，这里只是加loading状态
+        var btn = $('button[type="submit"]', this);
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> 恢复中...');
     });
 });
 </script>
