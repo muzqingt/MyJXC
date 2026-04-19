@@ -75,7 +75,7 @@
                             </tr>
                             <tr>
                                 <th>更新时间：</th>
-                                <td>{{ product.updated_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                <td>{{ format_local_dt(product.updated_at) }}</td>
                             </tr>
                         </table>
                     </div>
