@@ -166,15 +166,21 @@ $(document).ready(function() {
                 
                 $('#backupList').html(html);
                 
-                // 绑定恢复按钮事件
-                $('.restore-btn').click(function() {
-                    const filename = $(this).data('filename');
+                // 绑定恢复按钮事件（使用事件委托防止重复绑定）
+                $(document).off('click', '.restore-btn').on('click', '.restore-btn', function() {
+                    var btn = $(this);
+                    if (btn.prop('disabled')) return false;
+                    const filename = btn.data('filename');
                     $('#restoreFileInput').val(filename);
-                    if (confirm('警告：恢复备份将覆盖当前数据库，此操作不可逆！\n\n确定要从备份文件 ' + filename + ' 恢复数据吗？\n\n（恢复前系统会自动创建当前数据库的备份）')) { $('#restoreForm').submit(); }
+                    if (confirm('警告：恢复备份将覆盖当前数据库，此操作不可逆！\n\n确定要从备份文件 ' + filename + ' 恢复数据吗？\n\n（恢复前系统会自动创建当前数据库的备份）')) {
+                        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> 恢复中...');
+                        $('#restoreForm').submit();
+                    }
+                    return false;
                 });
                 
                 // 绑定删除按钮事件（使用 window.confirm 避免 Bootstrap 模态框在 WebView 中的兼容性问题）
-                $(document).on('click', '.delete-btn', function() {
+                $(document).off('click', '.delete-btn').on('click', '.delete-btn', function() {
                     const filename = $(this).data('filename');
                     if (!confirm('确定要删除备份文件 "' + filename + '" 吗？此操作不可恢复。')) {
                         return false;
