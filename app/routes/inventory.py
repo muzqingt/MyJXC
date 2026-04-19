@@ -526,6 +526,7 @@ def api_stock_check():
             product_id = item.get('product_id')
             actual_stock = item.get('actual_stock')
             remark = item.get('remark', '')
+            warehouse_id = item.get('warehouse_id') or 1
             
             if product_id and actual_stock is not None:
                 product = Product.query.get(product_id)
@@ -543,7 +544,7 @@ def api_stock_check():
                         
                         log = StockLog(
                             product_id=product.id,
-                            warehouse_id=1,  # 默认仓库
+                            warehouse_id=warehouse_id,
                             change_type=change_type,
                             quantity=abs(diff),
                             before_quantity=system_stock,

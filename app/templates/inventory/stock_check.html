@@ -287,6 +287,7 @@ function saveStockCheck() {
         if (actualStock !== systemStock) {
             stockCheckData.push({
                 product_id: productId,
+                warehouse_id: $(this).data('warehouse-id') || 1,
                 system_stock: systemStock,
                 actual_stock: actualStock,
                 difference: actualStock - systemStock,

@@ -721,6 +721,91 @@ def export_customer_ar(customer_id):
     response.headers['Content-Disposition'] = f'attachment; filename=customer_ar_{customer.code}_{datetime.now().strftime("%Y%m%d")}.xlsx'
     return response
 
+@bp.route('/export-receipts')
+@login_required
+def export_receipts():
+    """导出收款记录"""
+    from urllib.parse import quote
+
+    receipts_list = Receipt.query.order_by(Receipt.receipt_date.desc()).all()
+
+    # 创建工作簿
+    wb = Workbook()
+    ws = wb.active
+    ws.title = '收款记录'
+
+    # 设置表头样式
+    header_font = Font(bold=True, color='FFFFFF')
+    header_fill = PatternFill(start_color='4472C4', end_color='4472C4', fill_type='solid')
+    header_alignment = Alignment(horizontal='center', vertical='center')
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+
+    # 写入表头
+    headers = ['收款单号', '客户', '收款金额', '收款日期', '支付方式', '关联订单', '备注', '创建时间']
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = thin_border
+
+    # 支付方式映射
+    payment_method_map = {
+        'cash': '现金',
+        'bank_transfer': '银行转账',
+        'wechat': '微信支付',
+        'alipay': '支付宝'
+    }
+
+    # 写入数据
+    for row, receipt in enumerate(receipts_list, 2):
+        ws.cell(row=row, column=1, value=receipt.receipt_number).border = thin_border
+        ws.cell(row=row, column=2, value=receipt.customer.name if receipt.customer else '').border = thin_border
+        ws.cell(row=row, column=3, value=float(receipt.amount) if receipt.amount else 0).border = thin_border
+        ws.cell(row=row, column=3).number_format = '#,##0.02'
+        ws.cell(row=row, column=4, value=receipt.receipt_date.strftime('%Y-%m-%d') if receipt.receipt_date else '').border = thin_border
+        ws.cell(row=row, column=5, value=payment_method_map.get(receipt.payment_method, receipt.payment_method or '')).border = thin_border
+        # 解析reference_id(逗号分隔的订单ID)显示订单号
+        ref_orders = ''
+        if receipt.reference_type == 'sales_order' and receipt.reference_id:
+            try:
+                ids = [int(oid.strip()) for oid in receipt.reference_id.split(',') if oid.strip()]
+                orders = SalesOrder.query.filter(SalesOrder.id.in_(ids)).all()
+                ref_orders = ','.join([o.order_number for o in orders]) or receipt.reference_id
+            except (ValueError, TypeError):
+                ref_orders = receipt.reference_id or ''
+        ws.cell(row=row, column=6, value=ref_orders).border = thin_border
+        ws.cell(row=row, column=7, value=receipt.notes or '').border = thin_border
+        ws.cell(row=row, column=8, value=receipt.created_at.strftime('%Y-%m-%d %H:%M:%S') if receipt.created_at else '').border = thin_border
+
+    # 设置列宽
+    ws.column_dimensions['A'].width = 15
+    ws.column_dimensions['B'].width = 20
+    ws.column_dimensions['C'].width = 12
+    ws.column_dimensions['D'].width = 12
+    ws.column_dimensions['E'].width = 12
+    ws.column_dimensions['F'].width = 15
+    ws.column_dimensions['G'].width = 30
+    ws.column_dimensions['H'].width = 20
+
+    # 保存到BytesIO
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    filename = f'receipts_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8\'{quote(filename)}'
+    return response
+
+
 @bp.route('/export-payments')
 @login_required
 def export_payments():
