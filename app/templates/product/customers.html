@@ -49,39 +49,10 @@
                                            class="btn btn-outline-primary" title="编辑">
                                             <i class="bi bi-pencil"></i>
                                         </a>
-                                        <button type="button" class="btn btn-outline-danger" 
-                                                data-bs-toggle="modal" data-bs-target="#deleteModal{{ customer.id }}" title="删除">
+                                        <button type="button" class="btn btn-outline-danger delete-btn" 
+                                                data-id="{{ customer.id }}" title="删除">
                                             <i class="bi bi-trash"></i>
                                         </button>
-                                    </div>
-                                    
-                                    <!-- 删除确认模态框 -->
-                                    <div class="modal fade" id="deleteModal{{ customer.id }}" tabindex="-1">
-                                        <div class="modal-dialog">
-                                            <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title">确认删除</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    确定要删除客户 "{{ customer.name }}" 吗？
-                                                    {% if customer.sales_orders|length > 0 %}
-                                                    <div class="alert alert-warning mt-2">
-                                                        <i class="bi bi-exclamation-triangle"></i>
-                                                        该客户已有 {{ customer.sales_orders|length }} 条销售记录，删除后相关记录将无法查看客户信息。
-                                                    </div>
-                                                    {% endif %}
-                                                </div>
-                                                <div class="modal-footer">
-                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                                                    <form method="post" action="{{ url_for('product.delete_customer', id=customer.id) }}">
-                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                        <button type="submit" class="btn btn-danger">确认删除</button>
-                                                    </form>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -135,9 +106,19 @@
 {% block extra_js %}
 <script>
 $(document).ready(function() {
-    // 确认删除
-    $('.delete-btn').click(function() {
-        return confirm('确定要删除这个客户吗？此操作不可恢复。');
+    // 确认删除（使用 window.confirm 避免 Bootstrap 模态框在 WebView 中的兼容性问题）
+    $('.delete-btn').on('click', function() {
+        var id = $(this).data('id');
+        if (!confirm('确定要删除此客户吗？此操作不可恢复。')) {
+            return false;
+        }
+        var csrf = '{{ csrf_token() }}';
+        var form = $('<form method="post"></form>');
+        form.attr('action', '/product/customers/' + id + '/delete');
+        form.append($('<input type="hidden" name="csrf_token">').val(csrf));
+        $('body').append(form);
+        form.submit();
+        return false;
     });
 });
 </script>

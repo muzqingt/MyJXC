@@ -102,32 +102,7 @@
     </div>
 </div>
 
-<!-- 删除确认模态框 -->
-<div class="modal fade" id="deleteModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">确认删除备份</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-warning">
-                    <i class="bi bi-exclamation-triangle"></i>
-                    <strong>警告：</strong>删除备份文件后，数据将无法恢复！
-                </div>
-                <p>确定要删除备份文件 <strong id="deleteFilename"></strong> 吗？</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <form method="post" action="{{ url_for('system.delete_backup') }}" id="deleteForm">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="filename" id="deleteFileInput">
-                    <button type="submit" class="btn btn-danger">确认删除</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -222,12 +197,20 @@ $(document).ready(function() {
                     $('#restoreModal').modal('show');
                 });
                 
-                // 绑定删除按钮事件
-                $('.delete-btn').click(function() {
+                // 绑定删除按钮事件（使用 window.confirm 避免 Bootstrap 模态框在 WebView 中的兼容性问题）
+                $(document).on('click', '.delete-btn', function() {
                     const filename = $(this).data('filename');
-                    $('#deleteFilename').text(filename);
-                    $('#deleteFileInput').val(filename);
-                    $('#deleteModal').modal('show');
+                    if (!confirm('确定要删除备份文件 "' + filename + '" 吗？此操作不可恢复。')) {
+                        return false;
+                    }
+                    const csrf = '{{ csrf_token() }}';
+                    const form = $('<form method="post"></form>');
+                    form.attr('action', '/system/backup/delete');
+                    form.append($('<input type="hidden" name="csrf_token">').val(csrf));
+                    form.append($('<input type="hidden" name="filename">').val(filename));
+                    $('body').append(form);
+                    form.submit();
+                    return false;
                 });
             },
             error: function(xhr) {
