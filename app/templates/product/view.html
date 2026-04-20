@@ -162,7 +162,7 @@
                     <form method="post" action="{{ url_for('product.delete_product', id=product.id) }}" style="display:inline;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-outline-danger" 
-                                onclick="return confirm('确定要删除商品「{{ product.name|safe }}」吗？此操作不可恢复。');">
+                                onclick="return confirm('确定要删除商品「{{ product.name|e }}」吗？此操作不可恢复。');">
                             <i class="bi bi-trash"></i> 删除商品
                         </button>
                     </form>

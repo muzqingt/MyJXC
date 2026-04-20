@@ -233,8 +233,10 @@ def stock_transfer():
 
                         # 增加目标仓库库存
                         product.stock_quantity += quantity
-                        before_in = actual_stock + quantity  # same as before_out since global +=
-                        after_in = before_in + quantity
+                        # 计算目标仓库调拨前的实际库存
+                        actual_stock_to = get_product_stock_in_warehouse(product.id, to_warehouse_id)
+                        before_in = actual_stock_to
+                        after_in = actual_stock_to + quantity
                         log_in = StockLog(
                             product_id=product.id,
                             warehouse_id=to_warehouse_id,
@@ -546,7 +548,7 @@ def api_stock_check():
             product_id = item.get('product_id')
             actual_stock = item.get('actual_stock')
             remark = item.get('remark', '')
-            warehouse_id = item.get('warehouse_id') or 1
+            warehouse_id = item.get('warehouse_id') or 0
             
             if product_id and actual_stock is not None:
                 product = Product.query.get(product_id)
