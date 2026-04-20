@@ -1,6 +1,7 @@
 from flask import render_template, redirect, url_for, flash, request, jsonify, Blueprint
 from flask_login import login_required, current_user
 from app import db
+from sqlalchemy.orm import selectinload
 from app.models import SalesOrder, SystemSetting, SalesOrderItem, StockOut, StockOutItem, Customer, Warehouse, Product, StockLog, Log
 from app.utils import to_decimal, add_balance, sub_balance
 from app.forms import SalesOrderForm, SalesOrderItemForm, StockOutForm
