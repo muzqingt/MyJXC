@@ -315,7 +315,7 @@ def new_order():
 @bp.route('/orders/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_order(id):
-    order = SalesOrder.query.get_or_404(id)
+    order = SalesOrder.query.options(selectinload(SalesOrder.items).selectinload(SalesOrderItem.product)).get_or_404(id)
     
     if order.status == 'completed':
         flash('已完成的订单不能修改！', 'danger')
@@ -484,7 +484,7 @@ def delete_order(id):
 @login_required
 def quick_stock_out(id):
     """快捷出库：从销售订单直接出库（一次性完成）"""
-    order = SalesOrder.query.get_or_404(id)
+    order = SalesOrder.query.options(selectinload(SalesOrder.items).selectinload(SalesOrderItem.product)).get_or_404(id)
     
     if order.status == 'completed':
         flash('已完成的订单不能快捷出库！', 'danger')
@@ -598,7 +598,7 @@ def quick_stock_out(id):
 @bp.route('/orders/<int:id>')
 @login_required
 def view_order(id):
-    order = SalesOrder.query.get_or_404(id)
+    order = SalesOrder.query.options(selectinload(SalesOrder.items).selectinload(SalesOrderItem.product)).get_or_404(id)
     related_stock_outs = StockOut.query.filter_by(sales_order_id=id).order_by(StockOut.created_at.desc()).all()
     
     # 准备订单商品数据用于JavaScript确认框
@@ -622,7 +622,7 @@ def view_order(id):
 @bp.route('/orders/<int:id>/stock-out', methods=['GET', 'POST'])
 @login_required
 def new_stock_out_from_order(id):
-    order = SalesOrder.query.get_or_404(id)
+    order = SalesOrder.query.options(selectinload(SalesOrder.items).selectinload(SalesOrderItem.product)).get_or_404(id)
     
     if order.status not in ['confirmed', 'partial']:
         flash('只有已确认或部分出库的订单可以创建出库单！', 'danger')
@@ -836,7 +836,7 @@ def edit_stock_out_items(id):
 @bp.route('/stock-outs/<int:id>/complete', methods=['POST'])
 @login_required
 def complete_stock_out(id):
-    stock_out = StockOut.query.with_for_update().get_or_404(id)
+    stock_out = StockOut.query.options(selectinload(StockOut.items).selectinload(StockOutItem.product)).with_for_update().get_or_404(id)
     
     # 检查是否已经完成
     if stock_out.status == 'completed':

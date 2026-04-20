@@ -295,7 +295,7 @@ def new_order():
 @bp.route('/orders/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_order(id):
-    order = PurchaseOrder.query.get_or_404(id)
+    order = PurchaseOrder.query.options(selectinload(PurchaseOrder.items).selectinload(PurchaseOrderItem.product)).get_or_404(id)
     
     if order.status == 'completed':
         flash('已完成的订单不能修改！', 'danger')
@@ -495,7 +495,7 @@ def delete_order(id):
 @login_required
 def quick_stock_in(id):
     """快捷入库：从采购订单直接入库（一次性完成）"""
-    order = PurchaseOrder.query.get_or_404(id)
+    order = PurchaseOrder.query.options(selectinload(PurchaseOrder.items).selectinload(PurchaseOrderItem.product)).get_or_404(id)
     
     if order.status == 'completed':
         flash('此订单已入库完成！', 'danger')
@@ -631,7 +631,7 @@ def view_order(id):
 @bp.route('/orders/<int:id>/stock-in', methods=['GET', 'POST'])
 @login_required
 def new_stock_in_from_order(id):
-    order = PurchaseOrder.query.get_or_404(id)
+    order = PurchaseOrder.query.options(selectinload(PurchaseOrder.items).selectinload(PurchaseOrderItem.product)).get_or_404(id)
     
     if order.status not in ['confirmed', 'partial']:
         flash('只有已确认或部分入库的订单可以入库！', 'danger')
@@ -880,7 +880,7 @@ def edit_stock_in_items(id):
 @bp.route('/stock-ins/<int:id>/complete', methods=['POST'])
 @login_required
 def complete_stock_in(id):
-    stock_in = StockIn.query.with_for_update().get_or_404(id)
+    stock_in = StockIn.query.options(selectinload(StockIn.items).selectinload(StockInItem.product)).with_for_update().get_or_404(id)
     
     # 检查是否已经完成
     if stock_in.status == 'completed':
