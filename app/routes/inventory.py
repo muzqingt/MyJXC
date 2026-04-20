@@ -81,7 +81,7 @@ def stock_check():
             product_ids = request.form.getlist('product_id[]')
             actual_quantities = request.form.getlist('actual_quantity[]')
             notes = request.form.get('notes', '')
-            warehouse_id = int(request.form.get('warehouse_id', 1))
+            warehouse_id = int(request.form.get('warehouse_id') or 0)
             
             # 校验仓库是否存在
             warehouse = Warehouse.query.get(warehouse_id)

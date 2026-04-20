@@ -588,6 +588,10 @@ def quick_stock_in(id):
         
         if all_received:
             order.status = 'completed'
+            # 更新供应商应付余额
+            supplier = order.supplier
+            if supplier:
+                add_balance(supplier, "payable_balance", total_amount)
         else:
             order.status = 'partial'
         
@@ -943,7 +947,10 @@ def complete_stock_in(id):
             
             if all_received:
                 order.status = 'completed'
-                # 更新供应商应付余额（在new_order或quick_stock_in中已更新，此处不再重复更新）
+                # 更新供应商应付余额
+                supplier = order.supplier
+                if supplier:
+                    add_balance(supplier, "payable_balance", stock_in.total_amount)
             else:
                 order.status = 'partial'
         
