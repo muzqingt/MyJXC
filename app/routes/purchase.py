@@ -2,8 +2,9 @@ from flask import render_template, redirect, url_for, flash, request, jsonify, B
 from flask_login import login_required, current_user
 from app import db
 from app.models import PurchaseOrder, SystemSetting, PurchaseOrderItem, StockIn, StockInItem, Supplier, Warehouse, Product, StockLog, Log
+from app.utils import to_decimal, add_balance, sub_balance
 from app.forms import PurchaseOrderForm, PurchaseOrderItemForm, StockInForm
-from datetime import datetime
+from datetime import datetime, timezone
 import urllib.parse
 
 def get_redirect_tab():
@@ -274,7 +275,7 @@ def new_order():
             # 更新供应商应付余额
             supplier = order.supplier
             if supplier:
-                supplier.payable_balance = float(supplier.payable_balance) + float(total_amount)
+                add_balance(supplier, "payable_balance", total_amount)
             
             flash(f'采购订单创建并入库完成！入库单号: {receipt_number}', 'success')
         else:
@@ -405,13 +406,13 @@ def edit_order(id):
         if order.status in ['confirmed', 'partial', 'completed']:
             if old_supplier and old_supplier.id != supplier_id:
                 # 换了供应商：回滚旧供应商余额，增加新供应商余额
-                old_supplier.payable_balance -= original_total
+                sub_balance(old_supplier, "payable_balance", original_total)
                 new_supplier = Supplier.query.get(supplier_id)
                 if new_supplier:
-                    new_supplier.payable_balance += total_amount
+                    add_balance(new_supplier, "payable_balance", total_amount)
             elif order.supplier:
                 # 同供应商：调整差额
-                order.supplier.payable_balance += (total_amount - original_total)
+                add_balance(order.supplier, "payable_balance", total_amount - original_total)
         
         if action == 'confirm':
             if len(product_ids) == 0 or total_amount == 0:
@@ -482,7 +483,7 @@ def delete_order(id):
     # 回滚供应商应付余额（订单创建时已累加）
     supplier = order.supplier
     if supplier and order.status in ['confirmed', 'partial', 'completed']:
-        supplier.payable_balance -= float(order.total_amount)
+        sub_balance(supplier, "payable_balance", order.total_amount)
     
     db.session.delete(order)
     db.session.commit()
@@ -948,7 +949,7 @@ def complete_stock_in(id):
         
         # 更新入库单状态为已完成
         stock_in.status = 'completed'
-        stock_in.updated_at = datetime.utcnow()
+        stock_in.updated_at = datetime.now()
         
         db.session.commit()
         flash('入库单完成！库存已更新。', 'success')

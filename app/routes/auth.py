@@ -3,7 +3,7 @@ from flask_login import login_user, logout_user, current_user, login_required
 from app import db
 from app.models import User, Log
 from app.forms import LoginForm, RegistrationForm
-from datetime import datetime
+from datetime import datetime, timezone
 
 # 创建蓝图
 bp = Blueprint('auth', __name__, url_prefix='/auth')
@@ -25,7 +25,7 @@ def login():
             return redirect(url_for('auth.login'))
         
         login_user(user, remember=form.remember_me.data)
-        user.last_login = datetime.utcnow()
+        user.last_login = datetime.now()
         db.session.commit()
         
         # 记录登录日志
@@ -83,5 +83,5 @@ def logout():
 @bp.route('/profile')
 @login_required
 def profile():
-    from datetime import datetime
-    return render_template('auth/profile.html', title='个人资料', now=datetime.utcnow())
+    from datetime import datetime, timezone
+    return render_template('auth/profile.html', title='个人资料', now=datetime.now())

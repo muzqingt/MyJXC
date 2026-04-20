@@ -5,8 +5,10 @@ from app import db
 from app.models import Receipt, Payment, Expense, Customer, Supplier, SalesOrder, PurchaseOrder, SalesOrderItem, PurchaseOrderItem
 from app.forms import ReceiptForm, PaymentForm, ExpenseForm
 from sqlalchemy import or_
+from decimal import Decimal, ROUND_HALF_UP
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from app.utils import to_decimal, add_balance, sub_balance
 import io
 
 # 创建蓝图
@@ -32,7 +34,7 @@ def calc_order_paid_amount(order_id, order_type):
             Receipt.reference_id.isnot(None),
             ref_cond
         ).all()
-        return sum(float(r.amount) for r in rows)
+        return float(sum(to_decimal(r.amount) for r in rows))
     else:
         ref_cond = or_(
             Payment.reference_id == oid,
@@ -45,7 +47,7 @@ def calc_order_paid_amount(order_id, order_type):
             Payment.reference_id.isnot(None),
             ref_cond
         ).all()
-        return sum(float(p.amount) for p in rows)
+        return float(sum(to_decimal(p.amount) for p in rows))
 
 
 @bp.route('/')
@@ -148,7 +150,7 @@ def add_receipt():
             'order': order,
             'order_id': order.id,
             'paid_amount': paid_amount,
-            'balance': float(order.total_amount or 0) - paid_amount
+            'balance': float(to_decimal(order.total_amount or 0) - paid_amount)
         })
     return render_template('finance/receipt_edit.html',
                          title='添加收款',
@@ -220,7 +222,7 @@ def add_payment():
             'order': order,
             'order_id': order.id,
             'paid_amount': paid_amount,
-            'balance': float(order.total_amount or 0) - paid_amount
+            'balance': float(to_decimal(order.total_amount or 0) - paid_amount)
         })
     return render_template('finance/payment_edit.html',
                          title='添加付款',
@@ -327,15 +329,15 @@ def edit_receipt(receipt_id):
             # 换了客户：回滚旧客户的余额，增加新客户的应收
             old_customer = Customer.query.get(original_customer_id)
             if old_customer:
-                old_customer.receivable_balance += original_amount
+                add_balance(old_customer, "receivable_balance", original_amount)
             new_customer = Customer.query.get(receipt.customer_id)
             if new_customer:
-                new_customer.receivable_balance -= receipt.amount
+                sub_balance(new_customer, "receivable_balance", receipt.amount)
         elif original_amount != receipt.amount:
             # 金额变化：调整当前客户余额
             customer = Customer.query.get(receipt.customer_id)
             if customer:
-                customer.receivable_balance -= (receipt.amount - original_amount)
+                sub_balance(customer, "receivable_balance", receipt.amount - original_amount)
 
         db.session.commit()
         flash('收款记录已更新成功!', 'success')
@@ -352,7 +354,7 @@ def edit_receipt(receipt_id):
             'order': order,
             'order_id': order.id,
             'paid_amount': paid_amount,
-            'balance': float(order.total_amount or 0) - paid_amount
+            'balance': float(to_decimal(order.total_amount or 0) - paid_amount)
         })
     return render_template('finance/receipt_edit.html',
                          title='编辑收款',
@@ -396,15 +398,15 @@ def edit_payment(payment_id):
             # 换了供应商：回滚旧供应商的余额，增加新供应商的应付
             old_supplier = Supplier.query.get(original_supplier_id)
             if old_supplier:
-                old_supplier.payable_balance += original_amount
+                add_balance(old_supplier, "payable_balance", original_amount)
             new_supplier = Supplier.query.get(payment.supplier_id)
             if new_supplier:
-                new_supplier.payable_balance -= payment.amount
+                sub_balance(new_supplier, "payable_balance", payment.amount)
         elif original_amount != payment.amount:
             # 金额变化：调整当前供应商余额
             supplier = Supplier.query.get(payment.supplier_id)
             if supplier:
-                supplier.payable_balance -= (payment.amount - original_amount)
+                sub_balance(supplier, "payable_balance", payment.amount - original_amount)
 
         db.session.commit()
         flash('付款记录已更新成功!', 'success')
@@ -421,7 +423,7 @@ def edit_payment(payment_id):
             'order': order,
             'order_id': order.id,
             'paid_amount': paid_amount,
-            'balance': float(order.total_amount or 0) - paid_amount
+            'balance': float(to_decimal(order.total_amount or 0) - paid_amount)
         })
     return render_template('finance/payment_edit.html',
                          title='编辑付款',
@@ -506,11 +508,11 @@ def ar_ap_search():
             order.product_names = '、'.join(product_names) if product_names else None
 
         # 计算应收总额
-        customer_total_amount = sum(float(o.total_amount) for o in customer_orders)
+        customer_total_amount = sum(to_decimal(o.total_amount) for o in customer_orders)
         # 获取该客户的所有收款记录
         customer_receipts = Receipt.query.filter_by(customer_id=customer_id).order_by(Receipt.receipt_date.desc()).all()
         # 计算已收款总额
-        customer_received_amount = sum(float(r.amount) for r in customer_receipts)
+        customer_received_amount = sum(to_decimal(r.amount) for r in customer_receipts)
         # 计算应收余额
         customer_ar_balance = customer_total_amount - customer_received_amount
 
@@ -535,11 +537,11 @@ def ar_ap_search():
             order.product_names = '、'.join(product_names) if product_names else None
 
         # 计算应付总额
-        supplier_total_amount = sum(float(o.total_amount) for o in supplier_orders)
+        supplier_total_amount = sum(to_decimal(o.total_amount) for o in supplier_orders)
         # 获取该供应商的所有付款记录
         supplier_payments = Payment.query.filter_by(supplier_id=supplier_id).order_by(Payment.payment_date.desc()).all()
         # 计算已付款总额
-        supplier_paid_amount = sum(float(p.amount) for p in supplier_payments)
+        supplier_paid_amount = sum(to_decimal(p.amount) for p in supplier_payments)
         # 计算应付余额
         supplier_ap_balance = supplier_total_amount - supplier_paid_amount
 
@@ -651,8 +653,8 @@ def export_customer_ar(customer_id):
     receipts = Receipt.query.filter_by(customer_id=customer_id).order_by(Receipt.receipt_date.desc()).all()
 
     # 计算金额
-    total_amount = sum(float(o.total_amount) for o in orders)
-    received_amount = sum(float(r.amount) for r in receipts)
+    total_amount = sum(to_decimal(o.total_amount) for o in orders)
+    received_amount = sum(to_decimal(r.amount) for r in receipts)
     balance = total_amount - received_amount
 
     # 创建工作簿

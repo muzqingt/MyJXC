@@ -3,6 +3,59 @@
 """
 from flask import flash, redirect, url_for
 from datetime import datetime
+
+from decimal import Decimal, ROUND_HALF_UP
+
+
+def to_decimal(value, default=Decimal('0')):
+    """将任意值安全转换为 Decimal。保持便捷数据库切换（SQLAlchemy 会自动处理）。"""
+    if value is None:
+        return default
+    if isinstance(value, Decimal):
+        return value
+    if isinstance(value, (int, float)):
+        return Decimal(str(value))
+    if isinstance(value, str):
+        try:
+            return Decimal(value)
+        except Exception:
+            return default
+    try:
+        return Decimal(str(value))
+    except Exception:
+        return default
+
+
+def add_balance(customer_or_supplier, field_name, amount):
+    """原子增加余额（使用 SQL 表达式防止并发丢更新）。支持所有主流数据库。"""
+    from sqlalchemy import update
+    from app.models import Customer, Supplier
+    Model = Customer if hasattr(customer_or_supplier, 'receivable_balance') else Supplier
+    delta = to_decimal(amount)
+    # 构建 SET 表达式：column + delta（数据库层原子操作）
+    set_expr = getattr(Model, field_name) + delta
+    stmt = (
+        update(Model)
+        .where(Model.id == customer_or_supplier.id)
+        .values({field_name: set_expr})
+    )
+    db.session.execute(stmt)
+
+
+def sub_balance(customer_or_supplier, field_name, amount):
+    """原子减少余额（使用 SQL 表达式防止并发丢更新）。支持所有主流数据库。"""
+    from sqlalchemy import update
+    from app.models import Customer, Supplier
+    Model = Customer if hasattr(customer_or_supplier, 'receivable_balance') else Supplier
+    delta = to_decimal(amount)
+    set_expr = getattr(Model, field_name) - delta
+    stmt = (
+        update(Model)
+        .where(Model.id == customer_or_supplier.id)
+        .values({field_name: set_expr})
+    )
+    db.session.execute(stmt)
+
 from app import db
 
 

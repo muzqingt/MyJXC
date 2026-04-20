@@ -2,8 +2,9 @@ from flask import render_template, redirect, url_for, flash, request, jsonify, B
 from flask_login import login_required, current_user
 from app import db
 from app.models import SalesOrder, SystemSetting, SalesOrderItem, StockOut, StockOutItem, Customer, Warehouse, Product, StockLog, Log
+from app.utils import to_decimal, add_balance, sub_balance
 from app.forms import SalesOrderForm, SalesOrderItemForm, StockOutForm
-from datetime import datetime
+from datetime import datetime, timezone
 import urllib.parse
 
 def get_redirect_tab():
@@ -293,7 +294,7 @@ def new_order():
 
             customer = order.customer
             if customer:
-                customer.receivable_balance = float(customer.receivable_balance) + float(total_amount)
+                add_balance(customer, "receivable_balance", total_amount)
 
             flash(f'销售订单创建并出库完成！出库单号: {delivery_number}', 'success')
         else:
@@ -425,13 +426,13 @@ def edit_order(id):
         if order.status in ['confirmed', 'partial', 'completed']:
             if old_customer and old_customer.id != customer_id:
                 # 换了客户：回滚旧客户余额，增加新客户余额
-                old_customer.receivable_balance -= original_total
+                sub_balance(old_customer, "receivable_balance", original_total)
                 new_customer = Customer.query.get(customer_id)
                 if new_customer:
-                    new_customer.receivable_balance += total_amount
+                    add_balance(new_customer, "receivable_balance", total_amount)
             elif order.customer:
                 # 同客户：调整差额
-                order.customer.receivable_balance += (total_amount - original_total)
+                add_balance(order.customer, "receivable_balance", total_amount - original_total)
         
         db.session.commit()
         flash('销售订单修改成功！', 'success')
@@ -471,7 +472,7 @@ def delete_order(id):
     # 回滚客户应收余额（订单创建时已累加）
     customer = order.customer
     if customer and order.status in ['confirmed', 'partial', 'completed']:
-        customer.receivable_balance -= float(order.total_amount)
+        sub_balance(customer, "receivable_balance", order.total_amount)
     
     db.session.delete(order)
     db.session.commit()
@@ -913,7 +914,7 @@ def complete_stock_out(id):
         
         # 更新出库单状态为已完成
         stock_out.status = 'completed'
-        stock_out.updated_at = datetime.utcnow()
+        stock_out.updated_at = datetime.now()
         
         db.session.commit()
         flash('出库单完成！库存已更新。', 'success')

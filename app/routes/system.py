@@ -2,7 +2,7 @@ from flask import render_template, redirect, url_for, flash, request, jsonify, B
 from flask_login import login_required, current_user
 import os
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from app import db
 from app.models import Log, User
 
@@ -393,7 +393,7 @@ def clean_logs():
     
     try:
         from datetime import timedelta
-        cutoff_date = datetime.utcnow() - timedelta(days=90)
+        cutoff_date = datetime.now() - timedelta(days=90)
         deleted = Log.query.filter(Log.created_at < cutoff_date).delete()
         db.session.commit()
         return jsonify({'success': True, 'deleted_count': deleted})

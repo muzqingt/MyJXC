@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from app import db, csrf
 from app.models import Product, Category, Supplier, Customer, Warehouse, Log
 from app.forms import ProductForm, CategoryForm, SupplierForm, CustomerForm, WarehouseForm, SearchForm
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 from werkzeug.utils import secure_filename
 from flask import Blueprint
@@ -135,7 +135,7 @@ def edit_product(id):
         product.sale_price = form.sale_price.data or 0
         product.safety_stock = form.safety_stock.data or 0
         product.description = form.description.data
-        product.updated_at = datetime.utcnow()
+        product.updated_at = datetime.now()
         
         # 处理图片上传
         if form.image.data:

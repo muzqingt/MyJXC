@@ -1,6 +1,6 @@
 from flask import render_template, redirect, url_for, flash, request, jsonify, Blueprint, make_response
 from flask_login import login_required, current_user
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from app import db
 from app.models import Product, SalesOrder, PurchaseOrder, Customer, Supplier, StockIn, StockOut, Category, Receipt, PurchaseOrderItem, SalesOrderItem
 from openpyxl import Workbook
@@ -49,7 +49,7 @@ def inventory_report():
     
     # 如果没有提供日期，默认最近30天
     if not start_date or not end_date:
-        end_date = datetime.utcnow().date()
+        end_date = datetime.now().date()
         start_date = end_date - timedelta(days=30)
     else:
         start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
@@ -117,7 +117,7 @@ def sales_ranking():
     
     # 如果没有提供日期，默认最近30天
     if not start_date or not end_date:
-        end_date = datetime.utcnow().date()
+        end_date = datetime.now().date()
         start_date = end_date - timedelta(days=30)
     else:
         start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
@@ -190,7 +190,7 @@ def supplier_statistics():
 @login_required
 def daily_report():
     """经营日报"""
-    report_date = request.args.get('date', datetime.utcnow().date())
+    report_date = request.args.get('date', datetime.now().date())
     if isinstance(report_date, str):
         report_date = datetime.strptime(report_date, '%Y-%m-%d').date()
     
@@ -225,7 +225,7 @@ def daily_report():
 def sales_trend_api():
     """销售趋势API"""
     # 获取最近12个月的销售数据
-    end_date = datetime.utcnow().date()
+    end_date = datetime.now().date()
     start_date = end_date - timedelta(days=365)
     
     sales_trend = db.session.query(
@@ -249,7 +249,7 @@ def export_inventory():
     end_date = request.args.get('end_date')
     
     if not start_date or not end_date:
-        end_date = datetime.utcnow().date()
+        end_date = datetime.now().date()
         start_date = end_date - timedelta(days=30)
     else:
         start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
@@ -346,7 +346,7 @@ def export_sales_ranking():
     end_date = request.args.get('end_date')
     
     if not start_date or not end_date:
-        end_date = datetime.utcnow().date()
+        end_date = datetime.now().date()
         start_date = end_date - timedelta(days=30)
     else:
         start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
@@ -511,7 +511,7 @@ def export_supplier():
 @login_required
 def export_daily():
     """导出的日报"""
-    report_date = request.args.get('date', datetime.utcnow().date())
+    report_date = request.args.get('date', datetime.now().date())
     if isinstance(report_date, str):
         report_date = datetime.strptime(report_date, '%Y-%m-%d').date()
     
