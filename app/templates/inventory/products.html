@@ -15,8 +15,9 @@
         <li><a class="dropdown-item" href="#">零库存商品</a></li>
         <li><hr class="dropdown-divider"></li>
         <li><a class="dropdown-item" href="#">按分类筛选</a></li>
+        <li><a class="dropdown-item" href="#">按分类筛选</a></li>
     </ul>
-    <button type="button" class="btn btn-outline-primary" onclick="alert('商品导出功能开发中')">
+    <button type="button" class="btn btn-outline-primary" onclick="exportProducts()">
         <i class="bi bi-download"></i> 导出
     </button>
 </div>
@@ -232,6 +233,10 @@
 
 {% block extra_js %}
 <script>
+function exportProducts() {
+    window.location.href = '{{ url_for("report.export_products") }}';
+}
+
 $(document).ready(function() {
     console.log('商品库存页面加载完成');
 });

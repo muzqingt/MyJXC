@@ -85,3 +85,73 @@ def logout():
 def profile():
     from datetime import datetime, timezone
     return render_template('auth/profile.html', title='个人资料', now=datetime.now())
+
+@bp.route('/change-password', methods=['POST'])
+@login_required
+def change_password():
+    old_password = request.form.get('old_password', '')
+    new_password = request.form.get('new_password', '')
+    confirm_password = request.form.get('confirm_password', '')
+    
+    if not current_user.check_password(old_password):
+        flash('当前密码错误', 'danger')
+        return redirect(url_for('auth.profile'))
+    
+    if len(new_password) < 6:
+        flash('新密码长度至少6位', 'danger')
+        return redirect(url_for('auth.profile'))
+    
+    if new_password != confirm_password:
+        flash('两次输入的密码不一致', 'danger')
+        return redirect(url_for('auth.profile'))
+    
+    current_user.set_password(new_password)
+    db.session.commit()
+    
+    # 记录日志
+    log = Log(
+        user_id=current_user.id,
+        action='修改密码',
+        details=f'用户 {current_user.username} 修改了密码',
+        ip_address=request.remote_addr
+    )
+    db.session.add(log)
+    db.session.commit()
+    
+    flash('密码修改成功', 'success')
+    return redirect(url_for('auth.profile'))
+
+@bp.route('/change-email', methods=['POST'])
+@login_required
+def change_email():
+    new_email = request.form.get('new_email', '').strip()
+    
+    if not new_email:
+        flash('邮箱地址不能为空', 'danger')
+        return redirect(url_for('auth.profile'))
+    
+    if '@' not in new_email:
+        flash('请输入有效的邮箱地址', 'danger')
+        return redirect(url_for('auth.profile'))
+    
+    # 检查邮箱是否已被使用
+    existing = User.query.filter(User.email == new_email, User.id != current_user.id).first()
+    if existing:
+        flash('该邮箱已被其他用户使用', 'danger')
+        return redirect(url_for('auth.profile'))
+    
+    current_user.email = new_email
+    db.session.commit()
+    
+    # 记录日志
+    log = Log(
+        user_id=current_user.id,
+        action='修改邮箱',
+        details=f'用户 {current_user.username} 修改邮箱为 {new_email}',
+        ip_address=request.remote_addr
+    )
+    db.session.add(log)
+    db.session.commit()
+    
+    flash('邮箱修改成功', 'success')
+    return redirect(url_for('auth.profile'))

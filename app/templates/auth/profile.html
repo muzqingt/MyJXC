@@ -89,9 +89,24 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p class="text-muted">密码修改功能正在开发中...</p>
+                <form id="changePasswordForm" method="POST" action="{{ url_for('auth.change_password') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label class="form-label">当前密码</label>
+                        <input type="password" name="old_password" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">新密码</label>
+                        <input type="password" name="new_password" class="form-control" required minlength="6">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">确认新密码</label>
+                        <input type="password" name="confirm_password" class="form-control" required>
+                    </div>
+                </form>
             </div>
             <div class="modal-footer">
+                <button type="submit" form="changePasswordForm" class="btn btn-primary">修改密码</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
             </div>
         </div>
@@ -107,9 +122,16 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p class="text-muted">邮箱修改功能正在开发中...</p>
+                <form id="changeEmailForm" method="POST" action="{{ url_for('auth.change_email') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label class="form-label">新邮箱地址</label>
+                        <input type="email" name="new_email" class="form-control" required>
+                    </div>
+                </form>
             </div>
             <div class="modal-footer">
+                <button type="submit" form="changeEmailForm" class="btn btn-primary">修改邮箱</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
             </div>
         </div>

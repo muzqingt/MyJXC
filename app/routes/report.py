@@ -508,6 +508,56 @@ def export_supplier():
     return response
 
 @bp.route('/export/daily')
+
+@bp.route('/export-products')
+@login_required
+def export_products():
+    from openpyxl import Workbook
+    
+    products = Product.query.order_by(Product.code).all()
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = '商品数据'
+    
+    headers = ['商品编码', '商品名称', '规格', '单位', '分类', '进价', '售价', '库存', '安全库存', '状态']
+    ws.append(headers)
+    
+    for product in products:
+        ws.append([
+            product.code or '',
+            product.name or '',
+            product.specification or '',
+            product.unit or '',
+            product.category.name if product.category else '',
+            str(product.purchase_price or ''),
+            str(product.sale_price or ''),
+            float(product.stock_quantity or 0),
+            float(product.safety_stock or 0) if product.safety_stock else '',
+            '启用' if product.is_active else '停用'
+        ])
+    
+    ws.column_dimensions['A'].width = 15
+    ws.column_dimensions['B'].width = 20
+    ws.column_dimensions['C'].width = 15
+    ws.column_dimensions['D'].width = 8
+    ws.column_dimensions['E'].width = 12
+    ws.column_dimensions['F'].width = 10
+    ws.column_dimensions['G'].width = 10
+    ws.column_dimensions['H'].width = 10
+    ws.column_dimensions['I'].width = 10
+    ws.column_dimensions['J'].width = 8
+    
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    filename = f'products_{datetime.now().strftime("%Y%m%d")}.xlsx'
+    response.headers['Content-Disposition'] = f"attachment; filename*=UTF-8''{quote(filename)}"
+    return response
+
 @login_required
 def export_daily():
     """导出的日报"""

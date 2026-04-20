@@ -62,10 +62,16 @@
                             </td>
                             <td class="system-stock" data-global-stock="{{ product.stock_quantity|float }}">{{ product.stock_quantity|float }}</td>
                             <td>
-                                <input type="number" class="form-control form-control-sm actual-stock" 
-                                       value="{{ product.stock_quantity|float }}" 
-                                       step="0.01" min="0" 
-                                       onchange="calculateDifference(this)">
+                                <div class="input-group input-group-sm">
+                                    <button type="button" class="btn btn-outline-secondary" onclick="adjustQuantity(this, -1)">−</button>
+                                    <input type="number" class="form-control form-control-sm actual-stock text-center" 
+                                           value="{{ product.stock_quantity|float }}" 
+                                           step="1" min="0" 
+                                           style="max-width: 80px;"
+                                           oninput="handleQuantityInput(this)"
+                                           onchange="calculateDifference(this)">
+                                    <button type="button" class="btn btn-outline-secondary" onclick="adjustQuantity(this, 1)">+</button>
+                                </div>
                             </td>
                             <td class="difference-qty">0.00</td>
                             <td class="difference-amount">0.00</td>
@@ -233,12 +239,37 @@ function filterByWarehouse() {
     calculateTotals();
 }
 
+// 允许输入框为空，blur时自动填0
+function handleQuantityInput(input) {
+    var val = $(input).val();
+    if (val === '' || val === '-') {
+        // 允许空状态，不做处理
+        return;
+    }
+    // 允许输入负号开头的情况
+}
+
+// +/- 按钮调整数量，每次 +-1
+function adjustQuantity(btn, delta) {
+    var input = $(btn).siblings('.actual-stock');
+    var val = parseFloat(input.val()) || 0;
+    val += delta;
+    if (val < 0) val = 0;
+    input.val(val);
+    calculateDifference(input[0]);
+}
+
 function calculateDifference(input) {
     var row = $(input).closest('tr');
     var systemStock = parseFloat(row.find('.system-stock').text()) || 0;
-    var actualStock = parseFloat($(input).val()) || 0;
-    var price = parseFloat(row.data('price')) || 0;
+    var actualStock = parseFloat($(input).val());
     
+    // 允许空输入，视为0
+    if (actualStock === null || isNaN(actualStock) || $(input).val() === '') {
+        actualStock = 0;
+    }
+    
+    var price = parseFloat(row.data('price')) || 0;
     var differenceQty = actualStock - systemStock;
     var differenceAmount = differenceQty * price;
     
