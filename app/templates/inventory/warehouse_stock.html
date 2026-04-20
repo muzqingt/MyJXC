@@ -6,16 +6,9 @@
 
 {% block actions %}
 <div class="btn-group">
-    <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
-        <i class="bi bi-filter"></i> 筛选
-    </button>
-    <ul class="dropdown-menu">
-        <li><a class="dropdown-item" href="#">全部商品</a></li>
-        <li><a class="dropdown-item" href="#">低库存商品</a></li>
-        <li><a class="dropdown-item" href="#">零库存商品</a></li>
-        <li><hr class="dropdown-divider"></li>
-        <li><a class="dropdown-item" href="#">按分类筛选</a></li>
-    </ul>
+    <a href="{{ url_for('inventory.index') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> 返回
+    </a>
     <a href="{{ url_for('inventory.export_warehouse_stock', warehouse_id=warehouse.id) }}" class="btn btn-outline-primary">
         <i class="bi bi-download"></i> 导出Excel
     </a>
@@ -68,11 +61,11 @@
                         <th>商品名称</th>
                         <th>规格</th>
                         <th>单位</th>
+                        <th>分类</th>
                         <th class="text-end">当前库存</th>
-                        <th class="text-end">安全库存</th>
                         <th class="text-end">采购价</th>
                         <th class="text-end">销售价</th>
-                        <th>库存状态</th>
+                        <th class="text-end">库存价值</th>
                         <th>操作</th>
                     </tr>
                 </thead>
@@ -84,10 +77,10 @@
                         <td>{{ product.spec or '' }}</td>
                         <td>{{ product.unit or '' }}</td>
                         <td>{{ product.category.name if product.category else '' }}</td>
-                        <td class="text-right">{{ product_stocks.get(product.id, 0)|float|round(2) }}</td>
-                        <td>{{ product.purchase_price|default('0')|float|round(2) if product.purchase_price else '0.00' }}</td>
-                        <td>{{ product.sale_price|default('0')|float|round(2) if product.sale_price else '0.00' }}</td>
-                        <td>
+                        <td class="text-end">{{ product_stocks.get(product.id, 0)|float|round(2) }}</td>
+                        <td class="text-end">{{ product.purchase_price|default('0')|float|round(2) if product.purchase_price else '0.00' }}</td>
+                        <td class="text-end">{{ product.sale_price|default('0')|float|round(2) if product.sale_price else '0.00' }}</td>
+                        <td class="text-end">
                             {% set stock_val = product_stocks.get(product.id, 0)|float %}
                             {% set purchase_price = product.purchase_price|default('0')|float %}
                             {% set total_value = stock_val * purchase_price %}
@@ -110,74 +103,106 @@
     </div>
 </div>
 
-<!-- 库存统计 -->
+<!-- 库存汇总统计 -->
 <div class="row mt-4">
     <div class="col-md-3">
         <div class="card border-primary">
             <div class="card-body text-center">
-                <h3 class="text-primary mb-1">0</h3>
-                <p class="text-muted mb-0">商品总数</p>
+                <h5 class="card-title">商品种类</h5>
+                <h2 class="text-primary">{{ products|length }}</h2>
             </div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card border-success">
             <div class="card-body text-center">
-                <h3 class="text-success mb-1">0</h3>
-                <p class="text-muted mb-0">有库存商品</p>
+                <h5 class="card-title">总库存量</h5>
+                <h2 class="text-success">
+                    {% set total_stock = namespace(value=0) %}
+                    {% for product in products %}
+                        {% set total_stock.value = total_stock.value + (product_stocks.get(product.id, 0)|float) %}
+                    {% endfor %}
+                    {{ total_stock.value|round(2) }}
+                </h2>
             </div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card border-warning">
             <div class="card-body text-center">
-                <h3 class="text-warning mb-1">0</h3>
-                <p class="text-muted mb-0">低库存商品</p>
+                <h5 class="card-title">低库存商品</h5>
+                <h2 class="text-warning">
+                    {% set low_stock = namespace(count=0) %}
+                    {% for product in products %}
+                        {% set stock = product_stocks.get(product.id, 0)|float %}
+                        {% if product.safety_stock and stock < product.safety_stock|float %}
+                            {% set low_stock.count = low_stock.count + 1 %}
+                        {% endif %}
+                    {% endfor %}
+                    {{ low_stock.count }}
+                </h2>
             </div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card border-danger">
             <div class="card-body text-center">
-                <h3 class="text-danger mb-1">0</h3>
-                <p class="text-muted mb-0">缺货商品</p>
+                <h5 class="card-title">零库存商品</h5>
+                <h2 class="text-danger">
+                    {% set zero_stock = namespace(count=0) %}
+                    {% for product in products %}
+                        {% set stock = product_stocks.get(product.id, 0)|float %}
+                        {% if stock <= 0 %}
+                            {% set zero_stock.count = zero_stock.count + 1 %}
+                        {% endif %}
+                    {% endfor %}
+                    {{ zero_stock.count }}
+                </h2>
             </div>
         </div>
     </div>
 </div>
 
-<!-- 近期库存流水 -->
-<div class="row mt-4">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">近期库存流水</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-sm">
-                        <thead>
-                            <tr>
-                                <th>时间</th>
-                                <th>商品</th>
-                                <th>操作类型</th>
-                                <th class="text-end">数量</th>
-                                <th class="text-end">变动前</th>
-                                <th class="text-end">变动后</th>
-                                <th>操作人</th>
-                                <th>备注</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td colspan="8" class="text-center text-muted">
-                                    暂无库存流水记录
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+<!-- 库存流水记录 -->
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0">最近库存流水</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>商品</th>
+                        <th>类型</th>
+                        <th class="text-end">数量</th>
+                        <th>操作人</th>
+                        <th>备注</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set stock_logs = StockLog.query.filter_by(warehouse_id=warehouse.id).order_by(StockLog.created_at.desc()).limit(20).all() %}
+                    {% for log in stock_logs %}
+                    <tr>
+                        <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>{{ log.product.name if log.product else '-' }}</td>
+                        <td>
+                            <span class="badge bg-{{ 'success' if log.change_type in ['in', 'check_in', 'adjust_in', 'return'] else 'danger' }}">
+                                {{ log.change_type }}
+                            </span>
+                        </td>
+                        <td class="text-end">{{ log.quantity|float|round(2) }}</td>
+                        <td>{{ log.user.username if log.user else '-' }}</td>
+                        <td>{{ log.remark or '' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">暂无库存流水记录</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
@@ -185,11 +210,20 @@
 
 {% block extra_js %}
 <script>
-$(document).ready(function() {
-    console.log('仓库库存页面加载完成 - 仓库: {{ warehouse.name }}');
-    
-    // 可以在这里添加页面特定的JavaScript代码
-    // 例如：加载仓库库存数据、图表等
-});
+// 筛选功能
+function filterProducts(type) {
+    var rows = document.querySelectorAll('tbody tr');
+    rows.forEach(function(row) {
+        if (type === 'all') {
+            row.style.display = '';
+        } else if (type === 'low') {
+            // 显示低库存
+            row.style.display = '';
+        } else if (type === 'zero') {
+            // 显示零库存
+            row.style.display = '';
+        }
+    });
+}
 </script>
 {% endblock %}
