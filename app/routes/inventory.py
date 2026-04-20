@@ -19,7 +19,7 @@ def get_product_stock_in_warehouse(product_id, warehouse_id):
             stock += float(log.quantity)
         elif log.change_type in ('out', 'check_out', 'adjust_out', 'stock_transfer'):
             stock -= float(log.quantity)
-    return stock
+    return max(0, stock)
 
 # 创建蓝图
 bp = Blueprint('inventory', __name__, url_prefix='/inventory')
@@ -548,11 +548,12 @@ def api_stock_check():
             product_id = item.get('product_id')
             actual_stock = item.get('actual_stock')
             remark = item.get('remark', '')
-            warehouse_id = item.get('warehouse_id') or 0
+            warehouse_id = item.get('warehouse_id')
             
-            if product_id and actual_stock is not None:
+            if product_id and actual_stock is not None and warehouse_id:
                 product = Product.query.get(product_id)
                 if product:
+                    warehouse_id = int(warehouse_id)
                     system_stock = float(product.stock_quantity)
                     new_stock = float(actual_stock)
                     
