@@ -133,7 +133,7 @@ def add_receipt():
         # 更新客户应收余额(收款减少应收)
         customer = Customer.query.get(form.customer_id.data)
         if customer:
-            customer.receivable_balance -= form.amount.data
+            sub_balance(customer, "receivable_balance", form.amount.data)
 
         db.session.commit()
         flash('收款记录已添加成功!', 'success')
@@ -205,7 +205,7 @@ def add_payment():
         # 更新供应商应付余额(付款减少应付)
         supplier = Supplier.query.get(form.supplier_id.data)
         if supplier:
-            supplier.payable_balance -= form.amount.data
+            sub_balance(supplier, "payable_balance", form.amount.data)
 
         db.session.commit()
         flash('付款记录已添加成功!', 'success')
