@@ -836,11 +836,15 @@ def edit_stock_out_items(id):
 @bp.route('/stock-outs/<int:id>/complete', methods=['POST'])
 @login_required
 def complete_stock_out(id):
-    stock_out = StockOut.query.get_or_404(id)
+    stock_out = StockOut.query.with_for_update().get_or_404(id)
     
     # 检查是否已经完成
     if stock_out.status == 'completed':
         flash('此出库单已经完成，不能重复确认！', 'danger')
+        return redirect(url_for('sales.index', tab='stockouts'))
+    
+    if stock_out.status != 'pending':
+        flash('此出库单状态异常，无法确认！', 'danger')
         return redirect(url_for('sales.index', tab='stockouts'))
     
     if len(stock_out.items) == 0:

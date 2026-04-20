@@ -880,7 +880,7 @@ def edit_stock_in_items(id):
 @bp.route('/stock-ins/<int:id>/complete', methods=['POST'])
 @login_required
 def complete_stock_in(id):
-    stock_in = StockIn.query.get_or_404(id)
+    stock_in = StockIn.query.with_for_update().get_or_404(id)
     
     # 检查是否已经完成
     if stock_in.status == 'completed':
