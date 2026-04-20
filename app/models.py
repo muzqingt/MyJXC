@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db, login_manager
@@ -11,7 +11,7 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(256), nullable=False)
     role = db.Column(db.String(20), default='user')  # admin, user
     is_active = db.Column(db.Boolean, default=True)  # 用户是否激活
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     last_login = db.Column(db.DateTime)
     
     @property
@@ -37,7 +37,7 @@ class Category(db.Model):
     name = db.Column(db.String(100), nullable=False)
     parent_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=True)
     description = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     
     # 自关联关系
     parent = db.relationship('Category', remote_side=[id], backref='children')
@@ -59,8 +59,8 @@ class Product(db.Model):
     safety_stock = db.Column(db.Numeric(10, 2), default=0)  # 安全库存
     image_path = db.Column(db.String(500))
     description = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     
     category = db.relationship('Category', backref='products')
     
@@ -77,7 +77,7 @@ class Supplier(db.Model):
     address = db.Column(db.Text)
     email = db.Column(db.String(120))
     payable_balance = db.Column(db.Numeric(12, 2), default=0)  # 应付余额
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     
     def __repr__(self):
         return f'<Supplier {self.code} - {self.name}>'
@@ -92,7 +92,7 @@ class Customer(db.Model):
     address = db.Column(db.Text)
     email = db.Column(db.String(120))
     receivable_balance = db.Column(db.Numeric(12, 2), default=0)  # 应收余额
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     
     def __repr__(self):
         return f'<Customer {self.code} - {self.name}>'
@@ -105,7 +105,7 @@ class Warehouse(db.Model):
     address = db.Column(db.Text)
     manager = db.Column(db.String(100))
     phone = db.Column(db.String(50))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     
     def __repr__(self):
         return f'<Warehouse {self.code} - {self.name}>'
@@ -116,14 +116,14 @@ class PurchaseOrder(db.Model):
     order_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
     supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'), nullable=False)
     warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouses.id'), nullable=False)
-    order_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    order_date = db.Column(db.Date, nullable=False, default=datetime.now)
     expected_date = db.Column(db.Date)
     total_amount = db.Column(db.Numeric(12, 2), default=0)
     status = db.Column(db.String(20), default='confirmed')  # confirmed, partial, completed
     notes = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     
     supplier = db.relationship('Supplier', backref='purchase_orders')
     warehouse = db.relationship('Warehouse', backref='purchase_orders')
@@ -154,14 +154,14 @@ class StockIn(db.Model):
     receipt_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
     purchase_order_id = db.Column(db.Integer, db.ForeignKey('purchase_orders.id'), nullable=True)
     warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouses.id'), nullable=False)
-    receipt_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    receipt_date = db.Column(db.Date, nullable=False, default=datetime.now)
     total_amount = db.Column(db.Numeric(12, 2), default=0)
     status = db.Column(db.String(20), default='pending')  # pending, completed
     handler = db.Column(db.String(100))
     notes = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     
     purchase_order = db.relationship('PurchaseOrder', backref='stock_ins')
     warehouse = db.relationship('Warehouse', backref='stock_ins')
@@ -191,14 +191,14 @@ class SalesOrder(db.Model):
     order_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
     warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouses.id'), nullable=False)
-    order_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    order_date = db.Column(db.Date, nullable=False, default=datetime.now)
     delivery_date = db.Column(db.Date)
     total_amount = db.Column(db.Numeric(12, 2), default=0)
     status = db.Column(db.String(20), default='confirmed')  # confirmed, partial, completed
     notes = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     
     customer = db.relationship('Customer', backref='sales_orders')
     warehouse = db.relationship('Warehouse', backref='sales_orders')
@@ -229,14 +229,14 @@ class StockOut(db.Model):
     delivery_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
     sales_order_id = db.Column(db.Integer, db.ForeignKey('sales_orders.id'), nullable=True)
     warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouses.id'), nullable=False)
-    delivery_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    delivery_date = db.Column(db.Date, nullable=False, default=datetime.now)
     total_amount = db.Column(db.Numeric(12, 2), default=0)
     status = db.Column(db.String(20), default='pending')  # pending, completed
     handler = db.Column(db.String(100))
     notes = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     
     sales_order = db.relationship('SalesOrder', backref='stock_outs')
     warehouse = db.relationship('Warehouse', backref='stock_outs')
@@ -273,7 +273,7 @@ class StockLog(db.Model):
     reference_type = db.Column(db.String(50))  # 单据类型
     notes = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.now, index=True)
     
     product = db.relationship('Product', backref='stock_logs')
     warehouse = db.relationship('Warehouse', backref='stock_logs')
@@ -323,13 +323,13 @@ class Receipt(db.Model):
     receipt_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
     amount = db.Column(db.Numeric(12, 2), nullable=False)
-    receipt_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    receipt_date = db.Column(db.Date, nullable=False, default=datetime.now)
     payment_method = db.Column(db.String(50), default='cash')  # cash, bank_transfer, wechat, alipay
     reference_type = db.Column(db.String(50))  # sales_order, other
-    reference_id = db.Column(db.String(500), nullable=True)  # 改为String支持多订单，以逗号分隔存储
+    reference_id = db.Column(db.String(500), nullable=True, index=True)  # 改为String支持多订单，以逗号分隔存储
     notes = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
 
     customer = db.relationship('Customer', backref='receipts')
     creator = db.relationship('User', backref='created_receipts')
@@ -343,13 +343,13 @@ class Payment(db.Model):
     payment_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
     supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'), nullable=False)
     amount = db.Column(db.Numeric(12, 2), nullable=False)
-    payment_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    payment_date = db.Column(db.Date, nullable=False, default=datetime.now)
     payment_method = db.Column(db.String(50), default='cash')  # cash, bank_transfer, wechat, alipay
     reference_type = db.Column(db.String(50))  # purchase_order, other
-    reference_id = db.Column(db.String(500), nullable=True)  # 改为String支持多订单，以逗号分隔存储
+    reference_id = db.Column(db.String(500), nullable=True, index=True)  # 改为String支持多订单，以逗号分隔存储
     notes = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
 
     supplier = db.relationship('Supplier', backref='payments')
     creator = db.relationship('User', backref='created_payments')
@@ -363,12 +363,12 @@ class Expense(db.Model):
     expense_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
     category = db.Column(db.String(100), nullable=False)  # 费用类别
     amount = db.Column(db.Numeric(12, 2), nullable=False)
-    expense_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    expense_date = db.Column(db.Date, nullable=False, default=datetime.now)
     payee = db.Column(db.String(200))  # 收款方
     payment_method = db.Column(db.String(50), default='cash')
     notes = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     
     creator = db.relationship('User', backref='created_expenses')
     
@@ -382,7 +382,7 @@ class Log(db.Model):
     action = db.Column(db.String(200), nullable=False)
     details = db.Column(db.Text)
     ip_address = db.Column(db.String(50))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.now, index=True)
     
     user = db.relationship('User', backref='logs')
     
@@ -396,7 +396,7 @@ class SystemSetting(db.Model):
     setting_key = db.Column('key', db.String(100), unique=True, nullable=False, index=True)
     value = db.Column(db.Text)
     description = db.Column(db.String(200))
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     
     @classmethod
     def get_value(cls, key, default=None):

@@ -6,6 +6,21 @@ from app import db
 from app.models import Product, Warehouse, StockLog, StockIn, StockOut, Category, PurchaseOrder, SalesOrder
 from app.forms import StockAdjustForm, StockTransferForm
 
+
+def get_product_stock_in_warehouse(product_id, warehouse_id):
+    """根据 StockLog 计算某商品在指定仓库的实际库存"""
+    logs = db.session.query(StockLog).filter(
+        StockLog.product_id == product_id,
+        StockLog.warehouse_id == warehouse_id
+    ).all()
+    stock = 0
+    for log in logs:
+        if log.change_type in ('in', 'check_in', 'adjust_in', 'return'):
+            stock += float(log.quantity)
+        elif log.change_type in ('out', 'check_out', 'adjust_out', 'stock_transfer'):
+            stock -= float(log.quantity)
+    return stock
+
 # 创建蓝图
 bp = Blueprint('inventory', __name__, url_prefix='/inventory')
 
@@ -180,8 +195,9 @@ def stock_transfer():
                     if product:
                         quantity = float(item['quantity'])
 
-                        # TODO: 当前使用全局库存检查，多仓库时应该查询对应仓库的库存记录
-                        if product.stock_quantity < quantity:
+                        # 从 StockLog 按仓库聚合计算实际库存（而不是全局库存）
+                        actual_stock = get_product_stock_in_warehouse(product.id, from_warehouse_id)
+                        if actual_stock < quantity:
                             flash(f'{product.name} 库存不足！', 'danger')
                             items_data = [
                                 {'product_id': i['product_id'], 'quantity': i['quantity']}
@@ -200,13 +216,15 @@ def stock_transfer():
 
                         # 减少源仓库库存
                         product.stock_quantity -= quantity
+                        before_out = actual_stock
+                        after_out = actual_stock - quantity
                         log_out = StockLog(
                             product_id=product.id,
                             warehouse_id=from_warehouse_id,
                             change_type='out',
                             quantity=quantity,
-                            before_quantity=product.stock_quantity + quantity,
-                            after_quantity=product.stock_quantity,
+                            before_quantity=before_out,
+                            after_quantity=after_out,
                             reference_type='stock_transfer',
                             notes=f'调拨出库至{warehouse_name}: {notes}',
                             created_by=current_user.id
@@ -215,13 +233,15 @@ def stock_transfer():
 
                         # 增加目标仓库库存
                         product.stock_quantity += quantity
+                        before_in = actual_stock + quantity  # same as before_out since global +=
+                        after_in = before_in + quantity
                         log_in = StockLog(
                             product_id=product.id,
                             warehouse_id=to_warehouse_id,
                             change_type='in',
                             quantity=quantity,
-                            before_quantity=product.stock_quantity - quantity,
-                            after_quantity=product.stock_quantity,
+                            before_quantity=before_in,
+                            after_quantity=after_in,
                             reference_type='stock_transfer',
                             notes=f'调拨入库自{warehouse_name}: {notes}',
                             created_by=current_user.id

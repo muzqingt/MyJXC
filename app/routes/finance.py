@@ -1,9 +1,10 @@
 from flask import render_template, redirect, url_for, flash, request, jsonify, Blueprint, make_response
 from flask_login import login_required, current_user
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from app import db
 from app.models import Receipt, Payment, Expense, Customer, Supplier, SalesOrder, PurchaseOrder, SalesOrderItem, PurchaseOrderItem
 from app.forms import ReceiptForm, PaymentForm, ExpenseForm
+from sqlalchemy import or_
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 import io
@@ -13,20 +14,38 @@ bp = Blueprint('finance', __name__, url_prefix='/finance')
 
 
 def calc_order_paid_amount(order_id, order_type):
-    """计算订单已收/已付金额，支持逗号分隔的多订单ID"""
-    def parse_ids(ref_id):
-        # 兼容旧数据：reference_id 可能是 int 或 str
-        s = str(ref_id) if ref_id is not None else ''
-        return [int(x.strip()) for x in s.split(',') if x.strip()]
-
+    """计算订单已收/已付金额，支持逗号分隔的多订单ID。
+    使用数据库层模糊匹配避免加载全表。
+    reference_id 格式: "1" / "1,2,3" / "12,13"
+    """
+    oid = str(order_id)
     if order_type == 'sales_order':
-        receipts = Receipt.query.filter_by(reference_type='sales_order').all()
-        return sum(float(r.amount) for r in receipts
-                   if r.reference_id and order_id in parse_ids(r.reference_id))
+        # 构造 4 种可能的位置匹配（首／尾／中／独）
+        ref_cond = or_(
+            Receipt.reference_id == oid,
+            Receipt.reference_id.like(f'{oid},%'),
+            Receipt.reference_id.like(f'%,{oid},%'),
+            Receipt.reference_id.like(f'%,{oid}'),
+        )
+        rows = db.session.query(Receipt).filter(
+            Receipt.reference_type == 'sales_order',
+            Receipt.reference_id.isnot(None),
+            ref_cond
+        ).all()
+        return sum(float(r.amount) for r in rows)
     else:
-        payments = Payment.query.filter_by(reference_type='purchase_order').all()
-        return sum(float(p.amount) for p in payments
-                   if p.reference_id and order_id in parse_ids(p.reference_id))
+        ref_cond = or_(
+            Payment.reference_id == oid,
+            Payment.reference_id.like(f'{oid},%'),
+            Payment.reference_id.like(f'%,{oid},%'),
+            Payment.reference_id.like(f'%,{oid}'),
+        )
+        rows = db.session.query(Payment).filter(
+            Payment.reference_type == 'purchase_order',
+            Payment.reference_id.isnot(None),
+            ref_cond
+        ).all()
+        return sum(float(p.amount) for p in rows)
 
 
 @bp.route('/')
@@ -34,7 +53,7 @@ def calc_order_paid_amount(order_id, order_type):
 def index():
     """财务管理首页"""
     # 获取最近30天的财务数据
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    thirty_days_ago = datetime.now() - timedelta(days=30)
 
     # 统计收款
     total_receipts = db.session.query(db.func.sum(Receipt.amount)).filter(
