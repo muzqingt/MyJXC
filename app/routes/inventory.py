@@ -64,13 +64,20 @@ def product_list():
 @bp.route('/warehouse/<int:warehouse_id>')
 @login_required
 def warehouse_stock(warehouse_id):
-    """仓库库存明细 - 显示所有产品的库存（当前为全局库存）"""
+    """仓库库存明细 - 显示指定仓库中所有产品的库存"""
     warehouse = Warehouse.query.get_or_404(warehouse_id)
     products = Product.query.all()
+    
+    # Calculate per-product stock in this specific warehouse
+    product_stocks = {}
+    for product in products:
+        product_stocks[product.id] = get_product_stock_in_warehouse(product.id, warehouse_id)
+    
     return render_template('inventory/warehouse_stock.html',
                          title=f'{warehouse.name}库存',
                          warehouse=warehouse,
-                         products=products)
+                         products=products,
+                         product_stocks=product_stocks)
 
 @bp.route('/stock-check', methods=['GET', 'POST'])
 @login_required

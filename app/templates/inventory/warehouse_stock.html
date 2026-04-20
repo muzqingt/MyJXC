@@ -77,13 +77,33 @@
                     </tr>
                 </thead>
                 <tbody>
+                    {% for product in products %}
                     <tr>
-                        <td colspan="10" class="text-center text-muted">
-                            <i class="bi bi-info-circle"></i> 仓库库存明细功能正在开发中...
-                            <br>
-                            <small>需要实现按仓库查询库存的逻辑</small>
+                        <td>{{ product.code }}</td>
+                        <td>{{ product.name }}</td>
+                        <td>{{ product.spec or '' }}</td>
+                        <td>{{ product.unit or '' }}</td>
+                        <td>{{ product.category.name if product.category else '' }}</td>
+                        <td class="text-right">{{ product_stocks.get(product.id, 0)|float|round(2) }}</td>
+                        <td>{{ product.purchase_price|default('0')|float|round(2) if product.purchase_price else '0.00' }}</td>
+                        <td>{{ product.sale_price|default('0')|float|round(2) if product.sale_price else '0.00' }}</td>
+                        <td>
+                            {% set stock_val = product_stocks.get(product.id, 0)|float %}
+                            {% set purchase_price = product.purchase_price|default('0')|float %}
+                            {% set total_value = stock_val * purchase_price %}
+                            {{ total_value|round(2) }}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('inventory.stock_transfer', product_id=product.id) }}" class="btn btn-sm btn-outline-primary">
+                                调拨
+                            </a>
                         </td>
                     </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="10" class="text-center text-muted">暂无商品数据</td>
+                    </tr>
+                    {% endfor %}
                 </tbody>
             </table>
         </div>
