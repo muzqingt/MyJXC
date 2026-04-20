@@ -124,10 +124,24 @@ def stock_check():
     
     products = Product.query.all()
     warehouses = Warehouse.query.all()
+    
+    # Pre-calculate per-warehouse stock for each product
+    # Build a dict: {(product_id, warehouse_id): stock}
+    warehouse_stocks = {}
+    all_warehouses = {w.id: w for w in warehouses}
+    for product in products:
+        product_wh_stocks = {}
+        for wh_id in all_warehouses:
+            stock = get_product_stock_in_warehouse(product.id, wh_id)
+            warehouse_stocks[(product.id, wh_id)] = stock
+            product_wh_stocks[wh_id] = stock
+        warehouse_stocks[product.id] = product_wh_stocks  # Store per-product lookup
+    
     return render_template('inventory/stock_check.html',
                          title='库存盘点',
                          products=products,
-                         warehouses=warehouses)
+                         warehouses=warehouses,
+                         warehouse_stocks=warehouse_stocks)
 
 @bp.route('/stock-transfer', methods=['GET', 'POST'])
 @login_required

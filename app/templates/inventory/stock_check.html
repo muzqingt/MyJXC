@@ -48,7 +48,7 @@
                     </thead>
                     <tbody id="stockCheckBody">
                         {% for product in products %}
-                        <tr data-product-id="{{ product.id }}" data-warehouse-id="{{ product.warehouse_id or '' }}">
+                        <tr data-product-id="{{ product.id }}" data-warehouse-id="{{ product.warehouse_id or '' }}" data-price="{{ product.purchase_price or 0 }}" data-warehouse-stocks="{{ warehouse_stocks.get(product.id, {})|tojson }}">
                             <td>{{ product.code }}</td>
                             <td>{{ product.name }}</td>
                             <td>{{ product.specification or '' }}</td>
@@ -60,7 +60,7 @@
                                 未指定
                                 {% endif %}
                             </td>
-                            <td class="system-stock">{{ product.stock_quantity|float }}</td>
+                            <td class="system-stock" data-global-stock="{{ product.stock_quantity|float }}">{{ product.stock_quantity|float }}</td>
                             <td>
                                 <input type="number" class="form-control form-control-sm actual-stock" 
                                        value="{{ product.stock_quantity|float }}" 
@@ -205,17 +205,39 @@ function filterByWarehouse() {
         var rowWarehouseId = $(this).data('warehouse-id');
         if (!warehouseId || rowWarehouseId == warehouseId) {
             $(this).show();
+            // Update system stock to show warehouse-specific stock
+            if (warehouseId) {
+                var globalStock = parseFloat($(this).find('.system-stock').data('global-stock')) || 0;
+                var warehouseStocks = $(this).data('warehouse-stocks');
+                if (warehouseStocks) {
+                    try {
+                        var stocks = JSON.parse(warehouseStocks);
+                        var whStock = stocks[warehouseId] || 0;
+                        $(this).find('.system-stock').text(whStock.toFixed(2));
+                    } catch(e) {
+                        $(this).find('.system-stock').text(globalStock.toFixed(2));
+                    }
+                } else {
+                    $(this).find('.system-stock').text(globalStock.toFixed(2));
+                }
+            } else {
+                // No filter - show global stock
+                var globalStock = parseFloat($(this).find('.system-stock').data('global-stock')) || 0;
+                $(this).find('.system-stock').text(globalStock.toFixed(2));
+            }
         } else {
             $(this).hide();
         }
     });
+    updateStatistics();
+    calculateTotals();
 }
 
 function calculateDifference(input) {
     var row = $(input).closest('tr');
     var systemStock = parseFloat(row.find('.system-stock').text()) || 0;
     var actualStock = parseFloat($(input).val()) || 0;
-    var price = parseFloat(row.find('td:eq(5)').text()) || 0; // 假设价格在第6列
+    var price = parseFloat(row.data('price')) || 0;
     
     var differenceQty = actualStock - systemStock;
     var differenceAmount = differenceQty * price;
