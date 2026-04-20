@@ -48,7 +48,7 @@
                     </thead>
                     <tbody id="stockCheckBody">
                         {% for product in products %}
-                        <tr data-product-id="{{ product.id }}" data-warehouse-id="{{ product.warehouse_id or '' }}" data-price="{{ product.purchase_price or 0 }}" data-warehouse-stocks="{{ warehouse_stocks.get(product.id, {})|tojson }}">
+                        <tr data-product-id="{{ product.id }}" data-warehouse-id="{{ product.warehouse_id or '' }}" data-price="{{ product.purchase_price or 0 }}" data-warehouse-stocks="{{ warehouse_stocks.get(product.id, {}) | tojson | safe }}">
                             <td>{{ product.code }}</td>
                             <td>{{ product.name }}</td>
                             <td>{{ product.specification or '' }}</td>
