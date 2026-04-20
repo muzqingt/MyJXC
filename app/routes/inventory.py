@@ -212,7 +212,7 @@ def stock_transfer():
 
             for item in items:
                 if item['product_id'] and item['quantity']:
-                    product = Product.query.get(item['product_id'])
+                    product = Product.query.with_for_update().get(item['product_id'])
                     if product:
                         quantity = float(item['quantity'])
 
