@@ -150,7 +150,7 @@ def add_receipt():
             'order': order,
             'order_id': order.id,
             'paid_amount': paid_amount,
-            'balance': float(to_decimal(order.total_amount or 0) - paid_amount)
+            'balance': to_decimal(order.total_amount or 0) - to_decimal(paid_amount)
         })
     return render_template('finance/receipt_edit.html',
                          title='添加收款',
@@ -222,7 +222,7 @@ def add_payment():
             'order': order,
             'order_id': order.id,
             'paid_amount': paid_amount,
-            'balance': float(to_decimal(order.total_amount or 0) - paid_amount)
+            'balance': to_decimal(order.total_amount or 0) - to_decimal(paid_amount)
         })
     return render_template('finance/payment_edit.html',
                          title='添加付款',
@@ -354,7 +354,7 @@ def edit_receipt(receipt_id):
             'order': order,
             'order_id': order.id,
             'paid_amount': paid_amount,
-            'balance': float(to_decimal(order.total_amount or 0) - paid_amount)
+            'balance': to_decimal(order.total_amount or 0) - to_decimal(paid_amount)
         })
     return render_template('finance/receipt_edit.html',
                          title='编辑收款',
@@ -423,7 +423,7 @@ def edit_payment(payment_id):
             'order': order,
             'order_id': order.id,
             'paid_amount': paid_amount,
-            'balance': float(to_decimal(order.total_amount or 0) - paid_amount)
+            'balance': to_decimal(order.total_amount or 0) - to_decimal(paid_amount)
         })
     return render_template('finance/payment_edit.html',
                          title='编辑付款',

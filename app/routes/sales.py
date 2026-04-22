@@ -423,8 +423,10 @@ def edit_order(id):
         
         order.total_amount = total_amount
         
-        # 调整客户应收余额（差额）
-        if order.status in ['confirmed', 'partial', 'completed']:
+        # 调整客户应收余额（差额）- 仅对已完成的订单
+        # 注意：confirmed/partial 状态的订单尚未实际出库，不调整余额
+        # 余额仅在订单 status=completed（已全部出库）时才记录
+        if order.status == 'completed':
             if old_customer and old_customer.id != customer_id:
                 # 换了客户：回滚旧客户余额，增加新客户余额
                 sub_balance(old_customer, "receivable_balance", original_total)
@@ -472,7 +474,8 @@ def delete_order(id):
     
     # 回滚客户应收余额（订单创建时已累加）
     customer = order.customer
-    if customer and order.status in ['confirmed', 'partial', 'completed']:
+    # 只有已完成的订单才需要回滚应收余额（confirmed/partial 未实际出库，无余额记录）
+    if customer and order.status == 'completed':
         sub_balance(customer, "receivable_balance", order.total_amount)
     
     db.session.delete(order)
@@ -485,7 +488,9 @@ def delete_order(id):
 @login_required
 def quick_stock_out(id):
     """快捷出库：从销售订单直接出库（一次性完成）"""
-    order = SalesOrder.query.options(selectinload(SalesOrder.items).selectinload(SalesOrderItem.product)).get_or_404(id)
+    order = SalesOrder.query.options(
+        selectinload(SalesOrder.items).selectinload(SalesOrderItem.product)
+    ).with_for_update().get_or_404(id)
     
     if order.status == 'completed':
         flash('已完成的订单不能快捷出库！', 'danger')

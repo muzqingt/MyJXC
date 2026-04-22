@@ -8,7 +8,11 @@ from app.forms import StockAdjustForm, StockTransferForm
 
 
 def get_product_stock_in_warehouse(product_id, warehouse_id):
-    """根据 StockLog 计算某商品在指定仓库的实际库存"""
+    """根据 StockLog 计算某商品在指定仓库的实际库存
+    
+    注意：返回实际库存（可为负数），调用方需自行判断库存异常。
+    使用 max(0, ...) 会掩盖调拨/出库计算错误，不利于排查问题。
+    """
     logs = db.session.query(StockLog).filter(
         StockLog.product_id == product_id,
         StockLog.warehouse_id == warehouse_id
@@ -19,7 +23,7 @@ def get_product_stock_in_warehouse(product_id, warehouse_id):
             stock += float(log.quantity)
         elif log.change_type in ('out', 'check_out', 'adjust_out', 'stock_transfer'):
             stock -= float(log.quantity)
-    return max(0, stock)
+    return stock
 
 # 创建蓝图
 bp = Blueprint('inventory', __name__, url_prefix='/inventory')
@@ -77,7 +81,8 @@ def warehouse_stock(warehouse_id):
                          title=f'{warehouse.name}库存',
                          warehouse=warehouse,
                          products=products,
-                         product_stocks=product_stocks)
+                         product_stocks=product_stocks,
+                         StockLog=StockLog)
 
 @bp.route('/stock-check', methods=['GET', 'POST'])
 @login_required
