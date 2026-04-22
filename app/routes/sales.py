@@ -612,6 +612,9 @@ def quick_stock_out(id):
         )
         
         if all_delivered:
+            # confirmed → completed：补记应收余额（confirmed时尚未记应收）
+            if order.status == 'confirmed' and order.customer:
+                add_balance(order.customer, "receivable_balance", order.total_amount)
             order.status = 'completed'
         else:
             order.status = 'partial'
