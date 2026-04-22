@@ -605,8 +605,25 @@ def quick_stock_in(id):
 
             stock_in_details.append(f"{product.name} 库存增加 {remaining_qty} {product.unit}")
 
-        if not has_partial:
-            flash('此订单所有商品都已入库!', 'warning')
+        # 无需入库时：检查是否所有商品已入库但订单未完成（需更新状态+加余额）
+        if total_amount == 0:
+            # 检查是否所有商品都已入库
+            all_received = all(
+                float(oi.received_quantity) >= float(oi.quantity)
+                for oi in order.items
+            )
+            if all_received and order.status != 'completed':
+                # 所有商品已入库但订单状态未更新，补记状态和余额
+                order.status = 'completed'
+                supplier = order.supplier
+                if supplier:
+                    add_balance(supplier, 'payable_balance', float(order.total_amount))
+                db.session.commit()
+            elif order.status == 'completed':
+                db.session.commit()  # 已完成，无需操作
+            else:
+                db.session.rollback()
+            flash('此订单所有商品都已入库！', 'warning')
             return redirect(url_for('purchase.index', tab=get_redirect_tab()))
 
         stock_in.total_amount = total_amount
