@@ -538,16 +538,20 @@ def quick_stock_out(id):
         
         total_amount = 0
         for item in order.items:
-            product = item.product
-            unit_price = float(item.unit_price)
-            product.sale_price = unit_price
             remaining_qty = float(item.quantity) - float(item.delivered_quantity)
             if remaining_qty <= 0:
                 continue
-            
+
+            # 锁定商品行，防止并发出库导致库存计算错误
+            product = Product.query.with_for_update().get(item.product_id)
+            if not product:
+                continue
+            unit_price = float(item.unit_price)
+            product.sale_price = unit_price
+
             amount = remaining_qty * unit_price
             total_amount += amount
-            
+
             stock_out_item = StockOutItem(
                 stock_out_id=stock_out.id,
                 product_id=product.id,
@@ -556,7 +560,7 @@ def quick_stock_out(id):
                 amount=amount
             )
             db.session.add(stock_out_item)
-            
+
             before_quantity = float(product.stock_quantity)
             after_quantity = before_quantity - remaining_qty
             product.stock_quantity = after_quantity
@@ -859,25 +863,33 @@ def complete_stock_out(id):
     
     # 开始事务
     try:
-        # 检查库存是否充足
+        # 锁定并检查所有商品库存（单个循环，避免重复迭代）
+        locked_products = {}
         insufficient_stock = []
-        
+        warehouse = stock_out.warehouse
+
         for item in stock_out.items:
-            product = item.product
-            warehouse = stock_out.warehouse
-            
+            # 锁定商品行，防止并发出库导致库存计算错误
+            product = Product.query.with_for_update().get(item.product_id)
+            if not product:
+                continue
+            locked_products[item.id] = product
             if product.stock_quantity < item.quantity:
-                insufficient_stock.append(f"{product.code} - {product.name} (库存: {product.stock_quantity}, 需求: {item.quantity})")
-        
+                insufficient_stock.append(
+                    f"{product.code} - {product.name} (库存: {product.stock_quantity}, 需求: {item.quantity})"
+                )
+
         if insufficient_stock:
             flash(f'库存不足: {", ".join(insufficient_stock)}', 'danger')
+            db.session.rollback()
             return redirect(url_for('sales.index', tab='stockouts'))
-        
+
         # 更新库存和记录流水
         for item in stock_out.items:
-            product = item.product
-            warehouse = stock_out.warehouse
-            
+            product = locked_products.get(item.id)
+            if not product:
+                continue
+
             before_quantity = float(product.stock_quantity)
             after_quantity = before_quantity - float(item.quantity)
             product.stock_quantity = after_quantity

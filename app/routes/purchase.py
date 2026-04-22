@@ -555,7 +555,10 @@ def quick_stock_in(id):
             db.session.add(item)
             total_amount += amount
 
-            product = order_item.product
+            # 锁定商品行，防止并发入库导致库存计算错误
+            product = Product.query.with_for_update().get(order_item.product_id)
+            if not product:
+                continue
             product.purchase_price = unit_price
             before_quantity = float(product.stock_quantity)
             after_quantity = before_quantity + remaining_qty
@@ -905,14 +908,16 @@ def complete_stock_in(id):
     try:
         # 更新库存和记录流水
         for item in stock_in.items:
-            product = item.product
             warehouse = stock_in.warehouse
+            # 锁定商品行，防止并发入库导致库存计算错误
+            product = Product.query.with_for_update().get(item.product_id)
+            if not product:
+                continue
 
             # 记录当前库存(更新前)
-            before_quantity = product.stock_quantity
+            before_quantity = float(product.stock_quantity)
 
             # 更新商品库存
-            before_quantity = float(product.stock_quantity)
             after_quantity = before_quantity + float(item.quantity)
             product.stock_quantity = after_quantity
 
