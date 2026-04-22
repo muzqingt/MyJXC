@@ -40,6 +40,8 @@ def add_balance(customer_or_supplier, field_name, amount):
         .values({field_name: set_expr})
     )
     db.session.execute(stmt)
+    # 刷新 ORM 对象，防止后续 commit() 用脏数据覆盖刚写入的数据库值
+    db.session.refresh(customer_or_supplier)
 
 
 def sub_balance(customer_or_supplier, field_name, amount):
@@ -55,6 +57,8 @@ def sub_balance(customer_or_supplier, field_name, amount):
         .values({field_name: set_expr})
     )
     db.session.execute(stmt)
+    # 刷新 ORM 对象，防止后续 commit() 用脏数据覆盖刚写入的数据库值
+    db.session.refresh(customer_or_supplier)
 
 from app import db
 from sqlalchemy.exc import IntegrityError
