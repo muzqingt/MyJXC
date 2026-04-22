@@ -251,7 +251,6 @@ def stock_transfer():
 
                         # 源仓库当前追踪库存（含本次调拨前序迭代的变动）
                         actual_stock = product_warehouse_stock[pid][from_warehouse_id]
-                        if actual_stock < quantity:stock_in_warehouse(product.id, from_warehouse_id)
                         if actual_stock < quantity:
                             flash(f'{product.name} 库存不足！', 'danger')
                             items_data = [
