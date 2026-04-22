@@ -507,8 +507,6 @@ def export_supplier():
     response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8\'\'{quote(filename)}'
     return response
 
-@bp.route('/export/daily')
-
 @bp.route('/export-products')
 @login_required
 def export_products():
@@ -558,6 +556,7 @@ def export_products():
     response.headers['Content-Disposition'] = f"attachment; filename*=UTF-8''{quote(filename)}"
     return response
 
+@bp.route('/export/daily')
 @login_required
 def export_daily():
     """导出的日报"""

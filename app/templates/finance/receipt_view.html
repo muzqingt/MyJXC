@@ -14,6 +14,12 @@
                     <a href="{{ url_for('finance.edit_receipt', receipt_id=receipt.id) }}" class="btn btn-sm btn-warning mr-2">
                         <i class="fas fa-edit"></i> 编辑
                     </a>
+                    <form method="post" action="{{ url_for('finance.delete_receipt', receipt_id=receipt.id) }}" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('确定删除此收款记录？删除后将回滚客户应收余额。')">
+                            <i class="fas fa-trash"></i> 删除
+                        </button>
+                    </form>
                     <a href="{{ url_for('finance.receipts') }}" class="btn btn-sm btn-secondary">
                         <i class="fas fa-arrow-left"></i> 返回列表
                     </a>

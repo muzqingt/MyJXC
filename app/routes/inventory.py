@@ -215,14 +215,43 @@ def stock_transfer():
             warehouse = Warehouse.query.get(to_warehouse_id)
             warehouse_name = warehouse.name if warehouse else '未知仓库'
 
+            # 预计算初始仓库库存（用于追踪同一商品多次调拨的正确 before_quantity）
+            # product.stock_quantity 是全局库存，需结合 StockLog 计算出各仓库基准库存
+            product_warehouse_stock = {}
+            for item in items:
+                if item['product_id'] and item['quantity']:
+                    pid = item['product_id']
+                    if pid not in product_warehouse_stock:
+                        product = Product.query.get(pid)
+                        if product:
+                            # 全局库存减去各仓库的 StockLog 合计，得到"未记录"的起点
+                            # 再加上源仓库的 StockLog，得到源仓库初始库存
+                            global_stock = float(product.stock_quantity) if product.stock_quantity else 0
+                            from_log = get_product_stock_in_warehouse(pid, from_warehouse_id)
+                            to_log = get_product_stock_in_warehouse(pid, to_warehouse_id)
+                            # 各仓库 StockLog 总和
+                            all_log = db.session.query(db.func.sum(
+                                db.case(
+                                    (StockLog.change_type.in_(['in', 'check_in', 'adjust_in', 'return']), StockLog.quantity),
+                                    else_=0 - StockLog.quantity
+                                )
+                            )).filter(StockLog.product_id == pid).scalar() or 0
+                            # 仓库粒度的初始库存
+                            product_warehouse_stock[pid] = {
+                                from_warehouse_id: global_stock - all_log + from_log,
+                                to_warehouse_id: global_stock - all_log + to_log
+                            }
+
             for item in items:
                 if item['product_id'] and item['quantity']:
                     product = Product.query.with_for_update().get(item['product_id'])
                     if product:
                         quantity = float(item['quantity'])
+                        pid = product.id
 
-                        # 从 StockLog 按仓库聚合计算实际库存（而不是全局库存）
-                        actual_stock = get_product_stock_in_warehouse(product.id, from_warehouse_id)
+                        # 源仓库当前追踪库存（含本次调拨前序迭代的变动）
+                        actual_stock = product_warehouse_stock[pid][from_warehouse_id]
+                        if actual_stock < quantity:stock_in_warehouse(product.id, from_warehouse_id)
                         if actual_stock < quantity:
                             flash(f'{product.name} 库存不足！', 'danger')
                             items_data = [
@@ -240,7 +269,7 @@ def stock_transfer():
                                                  today=today,
                                                  items_data=items_data)
 
-                        # 减少源仓库库存
+                        # 减少源仓库库存（使用运行追踪值）
                         product.stock_quantity -= quantity
                         before_out = actual_stock
                         after_out = actual_stock - quantity
@@ -255,12 +284,12 @@ def stock_transfer():
                             notes=f'调拨出库至{warehouse_name}: {notes}',
                             created_by=current_user.id
                         )
+                        product_warehouse_stock[pid][from_warehouse_id] = after_out
                         db.session.add(log_out)
 
-                        # 增加目标仓库库存
+                        # 增加目标仓库库存（使用运行追踪值）
                         product.stock_quantity += quantity
-                        # 计算目标仓库调拨前的实际库存
-                        actual_stock_to = get_product_stock_in_warehouse(product.id, to_warehouse_id)
+                        actual_stock_to = product_warehouse_stock[pid][to_warehouse_id]
                         before_in = actual_stock_to
                         after_in = actual_stock_to + quantity
                         log_in = StockLog(
@@ -274,6 +303,7 @@ def stock_transfer():
                             notes=f'调拨入库自{warehouse_name}: {notes}',
                             created_by=current_user.id
                         )
+                        product_warehouse_stock[pid][to_warehouse_id] = after_in
                         db.session.add(log_in)
 
             db.session.commit()

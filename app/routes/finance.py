@@ -273,6 +273,20 @@ def add_expense():
 
     return render_template('finance/expense_edit.html', title='添加费用', form=form)
 
+@bp.route('/expense/<int:expense_id>/delete', methods=['POST'])
+@login_required
+def delete_expense(expense_id):
+    """删除费用记录"""
+    expense = Expense.query.get_or_404(expense_id)
+    try:
+        db.session.delete(expense)
+        db.session.commit()
+        flash('费用记录已删除！', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'删除失败: {str(e)}', 'danger')
+    return redirect(url_for('finance.expenses'))
+
 @bp.route('/profit-analysis')
 @login_required
 def profit_analysis():
@@ -363,6 +377,24 @@ def edit_receipt(receipt_id):
                          sales_orders=sales_orders_data,
                          form=form)
 
+@bp.route('/receipt/<int:receipt_id>/delete', methods=['POST'])
+@login_required
+def delete_receipt(receipt_id):
+    """删除收款记录，同时回滚客户应收余额"""
+    receipt = Receipt.query.get_or_404(receipt_id)
+    try:
+        # 回滚客户应收余额
+        customer = receipt.customer
+        if customer:
+            sub_balance(customer, 'receivable_balance', receipt.amount)
+        db.session.delete(receipt)
+        db.session.commit()
+        flash('收款记录已删除！', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'删除失败: {str(e)}', 'danger')
+    return redirect(url_for('finance.receipts'))
+
 @bp.route('/payment/<int:payment_id>')
 @login_required
 def view_payment(payment_id):
@@ -431,6 +463,24 @@ def edit_payment(payment_id):
                          suppliers=suppliers_data,
                          purchase_orders=purchase_orders_data,
                          form=form)
+
+@bp.route('/payment/<int:payment_id>/delete', methods=['POST'])
+@login_required
+def delete_payment(payment_id):
+    """删除付款记录，同时回滚供应商应付余额"""
+    payment = Payment.query.get_or_404(payment_id)
+    try:
+        # 回滚供应商应付余额（付款减少应付，删除时加回）
+        supplier = payment.supplier
+        if supplier:
+            add_balance(supplier, 'payable_balance', payment.amount)
+        db.session.delete(payment)
+        db.session.commit()
+        flash('付款记录已删除！', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'删除失败: {str(e)}', 'danger')
+    return redirect(url_for('finance.payments'))
 
 @bp.route('/api/financial-summary')
 @login_required
