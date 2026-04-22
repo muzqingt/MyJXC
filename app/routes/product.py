@@ -189,10 +189,12 @@ def edit_product(id):
 @login_required
 def delete_product(id):
     product = Product.query.get_or_404(id)
-    
+
     # 检查是否有相关记录
-    if len(product.purchase_order_items) > 0 or len(product.sales_order_items) > 0:
-        flash('该商品已有采购或销售记录，无法删除！', 'danger')
+    if (len(product.purchase_order_items) > 0 or len(product.sales_order_items) > 0
+            or len(product.stock_in_items) > 0 or len(product.stock_out_items) > 0
+            or len(product.stock_logs) > 0):
+        flash('该商品已有库存或订单记录，无法删除！', 'danger')
         return redirect(url_for('product.index'))
     
     # 删除图片
@@ -375,9 +377,9 @@ def edit_supplier(id):
 def delete_supplier(id):
     supplier = Supplier.query.get_or_404(id)
     
-    # 检查是否有采购记录
-    if len(supplier.purchase_orders) > 0:
-        flash('该供应商已有采购记录，无法删除！', 'danger')
+    # 检查是否有采购记录或付款记录
+    if len(supplier.purchase_orders) > 0 or len(supplier.payments) > 0:
+        flash('该供应商已有采购或付款记录，无法删除！', 'danger')
         return redirect(url_for('product.suppliers'))
     
     db.session.delete(supplier)
@@ -461,9 +463,9 @@ def edit_customer(id):
 def delete_customer(id):
     customer = Customer.query.get_or_404(id)
     
-    # 检查是否有销售记录
-    if len(customer.sales_orders) > 0:
-        flash('该客户已有销售记录，无法删除！', 'danger')
+    # 检查是否有销售记录或收款记录
+    if len(customer.sales_orders) > 0 or len(customer.receipts) > 0:
+        flash('该客户已有销售或收款记录，无法删除！', 'danger')
         return redirect(url_for('product.customers'))
     
     db.session.delete(customer)
@@ -546,7 +548,8 @@ def delete_warehouse(id):
     warehouse = Warehouse.query.get_or_404(id)
     
     # 检查是否有库存记录
-    if len(warehouse.stock_ins) > 0 or len(warehouse.stock_outs) > 0:
+    if (len(warehouse.stock_ins) > 0 or len(warehouse.stock_outs) > 0
+            or len(warehouse.stock_logs) > 0):
         flash('该仓库已有库存记录，无法删除！', 'danger')
         return redirect(url_for('product.warehouses'))
     
