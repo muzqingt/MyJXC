@@ -399,28 +399,45 @@ def edit_order(id):
         order.delivery_date = datetime.strptime(delivery_date, '%Y-%m-%d').date() if delivery_date else None
         order.notes = notes
         
-        # 更新商品明细
-        SalesOrderItem.query.filter_by(order_id=order.id).delete()
-        
+        # 更新商品明细（保留已出库数量，只删除本次移除的商品）
         original_total = float(order.total_amount)
+        existing_items = {item.product_id: item for item in order.items}
+        remaining_product_ids = set()
         total_amount = 0
+
         for i in range(len(product_ids)):
             if product_ids[i] and quantities[i] and unit_prices[i]:
-                product = Product.query.get(int(product_ids[i]))
+                product_id = int(product_ids[i])
+                remaining_product_ids.add(product_id)
+                product = Product.query.get(product_id)
                 if product:
                     quantity = float(quantities[i])
                     unit_price = float(unit_prices[i])
                     amount = quantity * unit_price
-                    item = SalesOrderItem(
-                        order_id=order.id,
-                        product_id=product.id,
-                        quantity=quantity,
-                        unit_price=unit_price,
-                        amount=amount
-                    )
-                    db.session.add(item)
                     total_amount += amount
-        
+
+                    if product_id in existing_items:
+                        # 保留已有的 delivered_quantity，只更新数量和单价
+                        item = existing_items[product_id]
+                        item.quantity = quantity
+                        item.unit_price = unit_price
+                        item.amount = amount
+                    else:
+                        # 新增商品，delivered_quantity 从 0 开始
+                        item = SalesOrderItem(
+                            order_id=order.id,
+                            product_id=product_id,
+                            quantity=quantity,
+                            unit_price=unit_price,
+                            amount=amount
+                        )
+                        db.session.add(item)
+
+        # 删除本次编辑中移除的商品明细（保护已出库的数量记录）
+        items_to_delete = [item for item in order.items if item.product_id not in remaining_product_ids]
+        for item in items_to_delete:
+            db.session.delete(item)
+
         order.total_amount = total_amount
         
         # 调整客户应收余额（差额）- 仅对已完成的订单
