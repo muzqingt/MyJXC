@@ -103,7 +103,7 @@ def stock_check():
             
             for i in range(len(product_ids)):
                 if product_ids[i] and actual_quantities[i]:
-                    product = Product.query.get(int(product_ids[i]))
+                    product = Product.query.with_for_update().get(int(product_ids[i]))
                     if product:
                         book_quantity = float(product.stock_quantity)
                         actual_quantity = float(actual_quantities[i])
@@ -606,7 +606,7 @@ def api_stock_check():
             warehouse_id = item.get('warehouse_id')
             
             if product_id and actual_stock is not None and warehouse_id:
-                product = Product.query.get(product_id)
+                product = Product.query.with_for_update().get(product_id)
                 if product:
                     warehouse_id = int(warehouse_id)
                     system_stock = float(product.stock_quantity)
@@ -663,7 +663,7 @@ def stock_adjust():
 
     if form.validate_on_submit():
         try:
-            product = Product.query.get_or_404(form.product_id.data)
+            product = Product.query.with_for_update().get_or_404(form.product_id.data)
             before_quantity = float(product.stock_quantity)
             quantity = float(form.quantity.data)
 
