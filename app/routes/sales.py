@@ -817,6 +817,8 @@ def edit_stock_out_items(id):
                     )
                     db.session.add(item)
                     total_amount += amount
+                    # 同步更新商品销价（与 quick_stock_out 保持一致）
+                    product.sale_price = unit_price
         
         stock_out.total_amount = total_amount
         db.session.commit()

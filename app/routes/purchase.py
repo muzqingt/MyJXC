@@ -824,6 +824,8 @@ def edit_stock_in_items(id):
                     )
                     db.session.add(item)
                     total_amount += amount
+                    # 同步更新商品进价（与 quick_stock_in 保持一致）
+                    product.purchase_price = unit_price
 
         stock_in.total_amount = total_amount
         db.session.commit()
