@@ -484,8 +484,9 @@ def delete_order(id):
         flash('此订单有关联的发货单，无法删除！', 'danger')
         return redirect(url_for('sales.index'))
 
-    # 检查是否有收款记录
-    if order.receipts:
+    # 检查是否有收款记录（通过 reference_type=order.id 关联）
+    from app.models import Receipt
+    if Receipt.query.filter_by(reference_type='sales_order', reference_id=order.id).first():
         flash('此订单已有收款记录，无法删除！', 'danger')
         return redirect(url_for('sales.index'))
 

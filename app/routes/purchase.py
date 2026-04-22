@@ -494,8 +494,9 @@ def delete_order(id):
         flash('此订单有关联的入库单,无法删除!', 'danger')
         return redirect(url_for('purchase.index', tab=get_redirect_tab()))
 
-    # 检查是否有付款记录
-    if order.payments:
+    # 检查是否有付款记录（通过 reference_type=order.id 关联）
+    from app.models import Payment
+    if Payment.query.filter_by(reference_type='purchase_order', reference_id=order.id).first():
         flash('此订单已有付款记录，无法删除！', 'danger')
         return redirect(url_for('purchase.index', tab=get_redirect_tab()))
 
