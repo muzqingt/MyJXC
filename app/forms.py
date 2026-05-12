@@ -191,3 +191,19 @@ class SearchForm(FlaskForm):
     keyword = StringField('关键词', validators=[Optional()])
     start_date = DateField('开始日期', validators=[Optional()])
     end_date = DateField('结束日期', validators=[Optional()])
+
+class PurchaseReturnForm(FlaskForm):
+    purchase_order_id = SelectField('采购订单', coerce=int, validators=[Optional()])
+    warehouse_id = SelectField('仓库', coerce=int, validators=[DataRequired()])
+    return_date = DateField('退货日期', validators=[DataRequired()])
+    handler = StringField('经办人', validators=[Length(max=100)])
+    notes = TextAreaField('备注')
+    submit = SubmitField('保存退货单')
+
+class SalesReturnForm(FlaskForm):
+    sales_order_id = SelectField('销售订单', coerce=int, validators=[Optional()])
+    warehouse_id = SelectField('仓库', coerce=int, validators=[DataRequired()])
+    return_date = DateField('退货日期', validators=[DataRequired()])
+    handler = StringField('经办人', validators=[Length(max=100)])
+    notes = TextAreaField('备注')
+    submit = SubmitField('保存退货单')

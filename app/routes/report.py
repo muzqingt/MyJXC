@@ -532,7 +532,7 @@ def export_products():
             str(product.sale_price or ''),
             float(product.stock_quantity or 0),
             float(product.safety_stock or 0) if product.safety_stock else '',
-            '启用' if product.is_active else '停用'
+            '正常' if float(product.stock_quantity or 0) > 0 else '零库存'
         ])
     
     ws.column_dimensions['A'].width = 15

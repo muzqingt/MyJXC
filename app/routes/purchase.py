@@ -2,7 +2,7 @@ from flask import render_template, redirect, url_for, flash, request, jsonify, B
 from flask_login import login_required, current_user
 from app import db
 from sqlalchemy.orm import selectinload
-from app.models import PurchaseOrder, SystemSetting, PurchaseOrderItem, StockIn, StockInItem, Supplier, Warehouse, Product, StockLog, Log
+from app.models import PurchaseOrder, SystemSetting, PurchaseOrderItem, StockIn, StockInItem, Supplier, Warehouse, Product, StockLog, Log, PurchaseReturn, PurchaseReturnItem
 from app.utils import to_decimal, add_balance, sub_balance
 from app.forms import PurchaseOrderForm, PurchaseOrderItemForm, StockInForm
 from datetime import datetime, timezone
@@ -51,7 +51,7 @@ def index():
     if end_date:
         order_query = order_query.filter(PurchaseOrder.order_date <= end_date)
 
-    orders = order_query.order_by(PurchaseOrder.created_at.desc()).paginate(page=page, per_page=per_page)
+    orders = order_query.order_by(PurchaseOrder.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
 
     # 获取入库单
     stock_in_query = StockIn.query
@@ -65,15 +65,33 @@ def index():
     if end_date:
         stock_in_query = stock_in_query.filter(StockIn.receipt_date <= end_date)
 
-    stock_ins = stock_in_query.order_by(StockIn.created_at.desc()).paginate(page=page, per_page=per_page)
+    stock_ins = stock_in_query.order_by(StockIn.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
+
+    # 获取退货单
+    return_query = PurchaseReturn.query
+    if start_date:
+        return_query = return_query.filter(PurchaseReturn.return_date >= start_date)
+    if end_date:
+        return_query = return_query.filter(PurchaseReturn.return_date <= end_date)
+    returns_list = return_query.order_by(PurchaseReturn.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
 
     suppliers = Supplier.query.all()
     warehouses = Warehouse.query.all()
+
+    # 预计算已退货的订单ID集合（用于模板显示"已退货"状态）
+    returned_order_ids = set(
+        r.purchase_order_id for r in PurchaseReturn.query.filter(
+            PurchaseReturn.status == 'completed',
+            PurchaseReturn.purchase_order_id.isnot(None)
+        ).all()
+    )
 
     return render_template('purchase/index.html',
                          title='采购管理',
                          orders=orders,
                          stock_ins=stock_ins,
+                         returns=returns_list,
+                         returned_order_ids=returned_order_ids,
                          suppliers=suppliers,
                          warehouses=warehouses,
                          status=status,
@@ -205,80 +223,91 @@ def new_order():
 
         # 如果选择直接入库,完成入库流程
         if order_status == 'completed':
-            # 生成入库单号
-            last_stock_in = StockIn.query.filter(StockIn.receipt_number.like(f'SI{today}%')).order_by(StockIn.id.desc()).first()
-            if last_stock_in:
-                last_num = int(last_stock_in.receipt_number[10:]) if len(last_stock_in.receipt_number) > 10 else 0
-                receipt_number = f'SI{today}{last_num + 1:03d}'
-            else:
-                receipt_number = f'SI{today}001'
+            try:
+                # 生成入库单号
+                last_stock_in = StockIn.query.filter(StockIn.receipt_number.like(f'SI{today}%')).order_by(StockIn.id.desc()).first()
+                if last_stock_in:
+                    last_num = int(last_stock_in.receipt_number[10:]) if len(last_stock_in.receipt_number) > 10 else 0
+                    receipt_number = f'SI{today}{last_num + 1:03d}'
+                else:
+                    receipt_number = f'SI{today}001'
 
-            stock_in = StockIn(
-                receipt_number=receipt_number,
-                purchase_order_id=order.id,
-                warehouse_id=warehouse_id,
-                receipt_date=datetime.now().date(),
-                handler=current_user.username,
-                notes='创建订单时直接入库',
-                created_by=current_user.id,
-                status='completed',
-                total_amount=total_amount
-            )
-            db.session.add(stock_in)
-            db.session.flush()
-
-            # 创建入库明细并更新库存
-            for item_data in order_items_list:
-                product = item_data['product']
-                quantity = item_data['quantity']
-                unit_price = item_data['unit_price']
-                amount = item_data['amount']
-
-                # 创建入库明细
-                stock_in_item = StockInItem(
-                    stock_in_id=stock_in.id,
-                    product_id=product.id,
-                    quantity=quantity,
-                    unit_price=unit_price,
-                    amount=amount
-                )
-                db.session.add(stock_in_item)
-
-                # 更新库存
-                before_quantity = float(product.stock_quantity)
-                after_quantity = before_quantity + quantity
-                product.stock_quantity = after_quantity
-                # 同步更新商品进价
-                product.purchase_price = unit_price
-
-                # 记录库存流水
-                log = StockLog(
-                    product_id=product.id,
+                stock_in = StockIn(
+                    receipt_number=receipt_number,
+                    purchase_order_id=order.id,
                     warehouse_id=warehouse_id,
-                    change_type='in',
-                    quantity=quantity,
-                    before_quantity=before_quantity,
-                    after_quantity=after_quantity,
-                    reference_id=stock_in.id,
-                    reference_type='stock_in',
-                    notes=f'创建订单时直接入库: {receipt_number}',
-                    created_by=current_user.id
+                    receipt_date=datetime.now().date(),
+                    handler=current_user.username,
+                    notes='创建订单时直接入库',
+                    created_by=current_user.id,
+                    status='completed',
+                    total_amount=total_amount
                 )
-                db.session.add(log)
+                db.session.add(stock_in)
+                db.session.flush()
 
-                # 更新订单明细已入库数量
-                for order_item in order.items:
-                    if order_item.product_id == product.id:
-                        order_item.received_quantity = quantity
+                # 创建入库明细并更新库存
+                for item_data in order_items_list:
+                    product = item_data['product']
+                    quantity = item_data['quantity']
+                    unit_price = item_data['unit_price']
+                    amount = item_data['amount']
 
-            order.status = 'completed'
+                    stock_in_item = StockInItem(
+                        stock_in_id=stock_in.id,
+                        product_id=product.id,
+                        quantity=quantity,
+                        unit_price=unit_price,
+                        amount=amount
+                    )
+                    db.session.add(stock_in_item)
 
-            # 更新供应商应付余额
-            supplier = order.supplier
-            if supplier:
-                add_balance(supplier, "payable_balance", total_amount)
+                    before_quantity = float(product.stock_quantity)
+                    after_quantity = before_quantity + quantity
+                    product.stock_quantity = after_quantity
+                    product.purchase_price = unit_price
 
-            flash(f'采购订单创建并入库完成!入库单号: {receipt_number}', 'success')
+                    log = StockLog(
+                        product_id=product.id,
+                        warehouse_id=warehouse_id,
+                        change_type='in',
+                        quantity=quantity,
+                        before_quantity=before_quantity,
+                        after_quantity=after_quantity,
+                        reference_id=stock_in.id,
+                        reference_type='stock_in',
+                        notes=f'创建订单时直接入库: {receipt_number}',
+                        created_by=current_user.id
+                    )
+                    db.session.add(log)
+
+                    for order_item in order.items:
+                        if order_item.product_id == product.id:
+                            order_item.received_quantity = quantity
+
+                order.status = 'completed'
+
+                supplier = order.supplier
+                if supplier:
+                    add_balance(supplier, "payable_balance", total_amount)
+
+                flash(f'采购订单创建并入库完成!入库单号: {receipt_number}', 'success')
+            except Exception as e:
+                db.session.rollback()
+                flash(f'直接入库失败: {str(e)}', 'danger')
+                return render_template('purchase/order_items.html',
+                                     title='新建采购订单',
+                                     suppliers=suppliers_data,
+                                     warehouses=warehouses,
+                                     products=products_data,
+                                     action='new',
+                                     submitted_supplier_id=supplier_id,
+                                     submitted_warehouse_id=warehouse_id,
+                                     submitted_order_date=order_date,
+                                     submitted_expected_date=expected_date,
+                                     submitted_notes=notes,
+                                     order_items=order_items_list,
+                                     default_warehouse_id=default_warehouse_id)
         else:
             flash('采购订单创建成功!', 'success')
 
@@ -1042,6 +1071,162 @@ def view_stock_in(id):
     return render_template('purchase/stock_in_view.html',
                          title='入库单详情',
                          stock_in=stock_in)
+
+
+# ==================== 采购退货管理 ====================
+
+@bp.route('/orders/<int:id>/quick-return', methods=['POST'])
+@login_required
+def quick_return(id):
+    """快捷退货: 从采购订单直接退货(一次性完成)"""
+    order = PurchaseOrder.query.options(
+        selectinload(PurchaseOrder.items).selectinload(PurchaseOrderItem.product)
+    ).get_or_404(id)
+
+    if order.status != 'completed':
+        flash('只有已完成的采购订单可以退货！', 'danger')
+        return redirect(url_for('purchase.index', tab='orders'))
+
+    if len(order.items) == 0:
+        flash('此订单没有商品明细，无法退货！', 'danger')
+        return redirect(url_for('purchase.index', tab='orders'))
+
+    if PurchaseReturn.query.filter_by(purchase_order_id=id, status='completed').first():
+        flash('此订单已经退货，不能重复退货！', 'danger')
+        return redirect(url_for('purchase.index', tab='orders'))
+
+    try:
+        today = datetime.now().strftime('%Y%m%d')
+        last_return = PurchaseReturn.query.filter(PurchaseReturn.return_number.like(f'PR{today}%')).order_by(PurchaseReturn.id.desc()).first()
+        if last_return:
+            last_num = int(last_return.return_number[10:]) if len(last_return.return_number) > 10 else 0
+            return_number = f'PR{today}{last_num + 1:03d}'
+        else:
+            return_number = f'PR{today}001'
+
+        purchase_return = PurchaseReturn(
+            return_number=return_number,
+            purchase_order_id=order.id,
+            warehouse_id=order.warehouse_id,
+            return_date=datetime.now().date(),
+            handler=current_user.username,
+            notes='快捷退货',
+            created_by=current_user.id,
+            status='completed',
+            total_amount=0
+        )
+        db.session.add(purchase_return)
+        db.session.flush()
+
+        total_amount = 0
+        has_items = False
+        for order_item in order.items:
+            product = Product.query.with_for_update().get(order_item.product_id)
+            if not product or float(product.stock_quantity) <= 0:
+                continue
+
+            return_qty = min(float(order_item.quantity), float(product.stock_quantity))
+            if return_qty <= 0:
+                continue
+
+            has_items = True
+            unit_price = float(order_item.unit_price)
+            amount = return_qty * unit_price
+
+            item = PurchaseReturnItem(
+                return_id=purchase_return.id,
+                product_id=product.id,
+                quantity=return_qty,
+                unit_price=unit_price,
+                amount=amount
+            )
+            db.session.add(item)
+            total_amount += amount
+
+            before_quantity = float(product.stock_quantity)
+            after_quantity = before_quantity - return_qty
+            product.stock_quantity = after_quantity
+
+            log = StockLog(
+                product_id=product.id,
+                warehouse_id=order.warehouse_id,
+                change_type='return_out',
+                quantity=return_qty,
+                before_quantity=before_quantity,
+                after_quantity=after_quantity,
+                reference_id=purchase_return.id,
+                reference_type='purchase_return',
+                notes=f'采购退货: {return_number}',
+                created_by=current_user.id
+            )
+            db.session.add(log)
+
+        if not has_items:
+            db.session.rollback()
+            flash('没有可退货的商品（库存不足或已全部退货）！', 'warning')
+            return redirect(url_for('purchase.index', tab='orders'))
+
+        purchase_return.total_amount = total_amount
+
+        # 减少供应商应付余额（退货=减少应付）
+        supplier = order.supplier
+        if supplier:
+            sub_balance(supplier, 'payable_balance', total_amount)
+
+        db.session.commit()
+        flash(f'退货单 {return_number} 创建成功，库存已更新！', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'退货失败: {str(e)}', 'danger')
+
+    return redirect(url_for('purchase.index', tab='returns'))
+
+
+@bp.route('/returns')
+@login_required
+def returns():
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    query = PurchaseReturn.query
+    if start_date:
+        query = query.filter(PurchaseReturn.return_date >= start_date)
+    if end_date:
+        query = query.filter(PurchaseReturn.return_date <= end_date)
+
+    returns_list = query.order_by(PurchaseReturn.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
+    return render_template('purchase/returns.html',
+                         title='采购退货管理',
+                         returns=returns_list,
+                         start_date=start_date or '',
+                         end_date=end_date or '')
+
+
+@bp.route('/returns/<int:id>')
+@login_required
+def view_return(id):
+    purchase_return = PurchaseReturn.query.get_or_404(id)
+    return render_template('purchase/return_view.html',
+                         title='退货单详情',
+                         purchase_return=purchase_return)
+
+
+@bp.route('/returns/<int:id>/delete', methods=['POST'])
+@login_required
+def delete_return(id):
+    purchase_return = PurchaseReturn.query.get_or_404(id)
+
+    if purchase_return.status != 'pending':
+        flash('只有未完成的退货单可以删除！', 'danger')
+        return redirect(url_for('purchase.returns'))
+
+    db.session.delete(purchase_return)
+    db.session.commit()
+    flash('退货单删除成功！', 'success')
+    return redirect(url_for('purchase.returns'))
+
 
 # API接口
 @bp.route('/api/purchase-orders/<int:order_id>/items')

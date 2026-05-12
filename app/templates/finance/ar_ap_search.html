@@ -198,6 +198,41 @@
                 </table>
             </div>
         </div>
+
+        <!-- 退货记录列表 -->
+        {% if customer_returns %}
+        <div class="card-body border-top">
+            <h6 class="text-danger mb-3"><i class="bi bi-arrow-return-left"></i> 退货记录</h6>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>退货单号</th>
+                            <th>退货日期</th>
+                            <th>退货金额</th>
+                            <th>关联订单</th>
+                            <th>备注</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ret in customer_returns %}
+                        <tr>
+                            <td>{{ ret.return_number }}</td>
+                            <td>{{ ret.return_date.strftime('%Y-%m-%d') }}</td>
+                            <td class="text-danger fw-bold">¥{{ "%.2f"|format(ret.total_amount) }}</td>
+                            <td>
+                                {% if ret.sales_order %}
+                                {{ ret.sales_order.order_number }}
+                                {% else %}-{% endif %}
+                            </td>
+                            <td>{{ ret.notes|truncate(20) if ret.notes else '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 
@@ -352,6 +387,41 @@
                 </table>
             </div>
         </div>
+
+        <!-- 退货记录列表 -->
+        {% if supplier_returns %}
+        <div class="card-body border-top">
+            <h6 class="text-danger mb-3"><i class="bi bi-arrow-return-left"></i> 退货记录</h6>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>退货单号</th>
+                            <th>退货日期</th>
+                            <th>退货金额</th>
+                            <th>关联订单</th>
+                            <th>备注</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ret in supplier_returns %}
+                        <tr>
+                            <td>{{ ret.return_number }}</td>
+                            <td>{{ ret.return_date.strftime('%Y-%m-%d') }}</td>
+                            <td class="text-danger fw-bold">¥{{ "%.2f"|format(ret.total_amount) }}</td>
+                            <td>
+                                {% if ret.purchase_order %}
+                                {{ ret.purchase_order.order_number }}
+                                {% else %}-{% endif %}
+                            </td>
+                            <td>{{ ret.notes|truncate(20) if ret.notes else '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 

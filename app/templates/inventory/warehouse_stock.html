@@ -74,7 +74,7 @@
                     <tr>
                         <td>{{ product.code }}</td>
                         <td>{{ product.name }}</td>
-                        <td>{{ product.spec or '' }}</td>
+                        <td>{{ product.specification or '' }}</td>
                         <td>{{ product.unit or '' }}</td>
                         <td>{{ product.category.name if product.category else '' }}</td>
                         <td class="text-end">{{ product_stocks.get(product.id, 0)|float|round(2) }}</td>
@@ -188,13 +188,15 @@
                         <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                         <td>{{ log.product.name if log.product else '-' }}</td>
                         <td>
-                            <span class="badge bg-{{ 'success' if log.change_type in ['in', 'check_in', 'adjust_in', 'return'] else 'danger' }}">
-                                {{ log.change_type }}
+                            {% set type_map = {'in': '入库', 'out': '出库', 'check_in': '盘盈', 'check_out': '盘亏', 'adjust_in': '调增', 'adjust_out': '调减', 'return_in': '退货入库', 'return_out': '退货出库'} %}
+                            {% set badge_class = 'success' if log.change_type in ['in', 'check_in', 'adjust_in', 'return_in'] else 'danger' %}
+                            <span class="badge bg-{{ badge_class }}">
+                                {{ type_map.get(log.change_type, log.change_type) }}
                             </span>
                         </td>
                         <td class="text-end">{{ log.quantity|float|round(2) }}</td>
-                        <td>{{ log.user.username if log.user else '-' }}</td>
-                        <td>{{ log.remark or '' }}</td>
+                        <td>{{ log.creator.username if log.creator else '-' }}</td>
+                        <td>{{ log.notes or '' }}</td>
                     </tr>
                     {% else %}
                     <tr>

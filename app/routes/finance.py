@@ -2,7 +2,7 @@ from flask import render_template, redirect, url_for, flash, request, jsonify, B
 from flask_login import login_required, current_user
 from datetime import datetime, timezone, timedelta
 from app import db
-from app.models import Receipt, Payment, Expense, Customer, Supplier, SalesOrder, PurchaseOrder, SalesOrderItem, PurchaseOrderItem
+from app.models import Receipt, Payment, Expense, Customer, Supplier, SalesOrder, PurchaseOrder, SalesOrderItem, PurchaseOrderItem, SalesReturn, PurchaseReturn
 from app.forms import ReceiptForm, PaymentForm, ExpenseForm
 from sqlalchemy import or_
 from decimal import Decimal, ROUND_HALF_UP
@@ -383,10 +383,10 @@ def delete_receipt(receipt_id):
     """删除收款记录，同时回滚客户应收余额"""
     receipt = Receipt.query.get_or_404(receipt_id)
     try:
-        # 回滚客户应收余额
+        # 回滚客户应收余额（收款时减应收，删除时加回应收）
         customer = receipt.customer
         if customer:
-            sub_balance(customer, 'receivable_balance', receipt.amount)
+            add_balance(customer, 'receivable_balance', receipt.amount)
         db.session.delete(receipt)
         db.session.commit()
         flash('收款记录已删除！', 'success')
@@ -563,8 +563,14 @@ def ar_ap_search():
         customer_receipts = Receipt.query.filter_by(customer_id=customer_id).order_by(Receipt.receipt_date.desc()).all()
         # 计算已收款总额
         customer_received_amount = sum(to_decimal(r.amount) for r in customer_receipts)
-        # 计算应收余额
-        customer_ar_balance = customer_total_amount - customer_received_amount
+        # 计算退货金额（需从应收中扣除）
+        customer_returns = SalesReturn.query.filter(
+            SalesReturn.sales_order_id.in_(customer_order_ids),
+            SalesReturn.status == 'completed'
+        ).order_by(SalesReturn.return_date.desc()).all() if customer_order_ids else []
+        customer_return_amount = sum(to_decimal(r.total_amount) for r in customer_returns)
+        # 计算应收余额 = 订单总额 - 已收款 - 退货金额
+        customer_ar_balance = customer_total_amount - customer_received_amount - customer_return_amount
 
     # 按供应商检索应付
     if supplier_id:
@@ -592,8 +598,14 @@ def ar_ap_search():
         supplier_payments = Payment.query.filter_by(supplier_id=supplier_id).order_by(Payment.payment_date.desc()).all()
         # 计算已付款总额
         supplier_paid_amount = sum(to_decimal(p.amount) for p in supplier_payments)
-        # 计算应付余额
-        supplier_ap_balance = supplier_total_amount - supplier_paid_amount
+        # 计算退货金额（需从应付中扣除）
+        supplier_returns = PurchaseReturn.query.filter(
+            PurchaseReturn.purchase_order_id.in_(supplier_order_ids),
+            PurchaseReturn.status == 'completed'
+        ).order_by(PurchaseReturn.return_date.desc()).all() if supplier_order_ids else []
+        supplier_return_amount = sum(to_decimal(r.total_amount) for r in supplier_returns)
+        # 计算应付余额 = 订单总额 - 已付款 - 退货金额
+        supplier_ap_balance = supplier_total_amount - supplier_paid_amount - supplier_return_amount
 
     return render_template('finance/ar_ap_search.html',
                          title='应收应付检索',
@@ -605,10 +617,14 @@ def ar_ap_search():
                          customer_ar_balance=customer_ar_balance,
                          customer_receipts=customer_receipts,
                          customer_orders=customer_orders,
+                         customer_return_amount=customer_return_amount if customer_id else 0,
+                         customer_returns=customer_returns if customer_id else [],
                          supplier_info=supplier_info,
                          supplier_total_amount=supplier_total_amount,
                          supplier_paid_amount=supplier_paid_amount,
                          supplier_ap_balance=supplier_ap_balance,
+                         supplier_return_amount=supplier_return_amount if supplier_id else 0,
+                         supplier_returns=supplier_returns if supplier_id else [],
                          supplier_payments=supplier_payments,
                          supplier_orders=supplier_orders)
 

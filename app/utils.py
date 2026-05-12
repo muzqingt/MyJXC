@@ -61,58 +61,6 @@ def sub_balance(customer_or_supplier, field_name, amount):
     db.session.refresh(customer_or_supplier)
 
 from app import db
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy import func
-
-
-def generate_unique_order_number(prefix, model_class, number_field='order_number', max_retries=3):
-    """生成唯一订单编号（带重试机制，防止并发冲突）
-    
-    使用数据库唯一约束 + INSERT 重试解决并发重复问题。
-    适用于 SQLite / PostgreSQL 等所有支持 INSERT ... ON CONFLICT 的数据库。
-    """
-    from datetime import datetime
-    for attempt in range(max_retries):
-        today = datetime.now().strftime('%Y%m%d')
-        like_pattern = f'{prefix}{today}%'
-        number_col = getattr(model_class, number_field)
-        last_order = model_class.query.filter(
-            number_col.like(like_pattern)
-        ).order_by(model_class.id.desc()).first()
-        if last_order:
-            order_str = str(getattr(last_order, number_field))
-            prefix_len = len(prefix) + len(today)
-            if len(order_str) > prefix_len:
-                try:
-                    last_num = int(order_str[prefix_len:])
-                    order_number = f'{prefix}{today}{last_num + 1:03d}'
-                except (ValueError, IndexError):
-                    order_number = f'{prefix}{today}001'
-            else:
-                order_number = f'{prefix}{today}001'
-        else:
-            order_number = f'{prefix}{today}001'
-        
-        # 尝试插入，如果唯一约束冲突则重试
-        try:
-            return order_number
-        except Exception:
-            if attempt == max_retries - 1:
-                raise
-    return order_number  # fallback
-    """从referer获取当前tab，默认返回指定值"""
-    from flask import request
-    referer = request.referrer
-    if referer:
-        try:
-            from urllib.parse import urlparse, parse_qs
-            parsed = urlparse(referer)
-            query_params = parse_qs(parsed.query)
-            if 'tab' in query_params:
-                return query_params['tab'][0]
-        except Exception:
-            pass
-    return default
 
 
 def generate_order_number(prefix, model_class, date_field_name='created_at'):

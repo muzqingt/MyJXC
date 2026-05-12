@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}采购退货单详情{% endblock %}
+
+{% block header %}采购退货单详情{% endblock %}
+
+{% block actions %}
+<div class="btn-group">
+    <a href="{{ url_for('purchase.returns') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> 返回退货列表
+    </a>
+    {% if purchase_return.status == 'completed' %}
+    <span class="badge bg-success fs-6 py-2 px-3">
+        <i class="bi bi-check-circle"></i> 已完成退货
+    </span>
+    {% else %}
+    <form method="post" action="{{ url_for('purchase.delete_return', id=purchase_return.id) }}" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-danger" onclick="return confirm('确定删除此退货单？')">
+            <i class="bi bi-trash"></i> 删除退货单
+        </button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">退货单信息</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-sm">
+                            <tr>
+                                <th width="120">退货单号：</th>
+                                <td>{{ purchase_return.return_number }}</td>
+                            </tr>
+                            <tr>
+                                <th>仓库：</th>
+                                <td>{{ purchase_return.warehouse.code }} - {{ purchase_return.warehouse.name }}</td>
+                            </tr>
+                            <tr>
+                                <th>退货日期：</th>
+                                <td>{{ purchase_return.return_date.strftime('%Y-%m-%d') }}</td>
+                            </tr>
+                            <tr>
+                                <th>经办人：</th>
+                                <td>{{ purchase_return.handler or '-' }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-sm">
+                            <tr>
+                                <th width="120">采购订单：</th>
+                                <td>
+                                    {% if purchase_return.purchase_order %}
+                                    <a href="{{ url_for('purchase.view_order', id=purchase_return.purchase_order.id) }}">
+                                        {{ purchase_return.purchase_order.order_number }}
+                                    </a>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>供应商：</th>
+                                <td>
+                                    {% if purchase_return.purchase_order %}
+                                    {{ purchase_return.purchase_order.supplier.name }}
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>总金额：</th>
+                                <td class="fw-bold text-danger">¥{{ "%.2f"|format(purchase_return.total_amount) }}</td>
+                            </tr>
+                            <tr>
+                                <th>创建时间：</th>
+                                <td>{{ format_local_dt(purchase_return.created_at) }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                {% if purchase_return.notes %}
+                <div class="mt-3">
+                    <h6>备注：</h6>
+                    <p class="text-muted">{{ purchase_return.notes }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">退货商品明细</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>商品编码</th>
+                                <th>商品名称</th>
+                                <th>规格</th>
+                                <th>单位</th>
+                                <th class="text-end">数量</th>
+                                <th class="text-end">单价</th>
+                                <th class="text-end">金额</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in purchase_return.items %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td>{{ item.product.code }}</td>
+                                <td>{{ item.product.name }}</td>
+                                <td>{{ item.product.specification or '-' }}</td>
+                                <td>{{ item.product.unit }}</td>
+                                <td class="text-end">{{ "%.2f"|format(item.quantity) }}</td>
+                                <td class="text-end">¥{{ "%.2f"|format(item.unit_price) }}</td>
+                                <td class="text-end">¥{{ "%.2f"|format(item.amount) }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-4">暂无退货明细</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="7" class="text-end fw-bold">总计：</td>
+                                <td class="text-end fw-bold text-danger">¥{{ "%.2f"|format(purchase_return.total_amount) }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">操作记录</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>创建时间</span>
+                        <span class="text-muted">{{ format_local_dt(purchase_return.created_at) }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>创建人</span>
+                        <span class="text-muted">{{ purchase_return.creator.username if purchase_return.creator else '系统' }}</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">库存影响</h5>
+            </div>
+            <div class="card-body">
+                {% if purchase_return.status == 'completed' %}
+                <div class="alert alert-warning">
+                    <i class="bi bi-arrow-down-circle"></i> 退货完成，库存已减少，供应商应付已减少
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> 等待确认退货
+                </div>
+                {% endif %}
+                {% if purchase_return.items %}
+                <div class="list-group">
+                    {% for item in purchase_return.items %}
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ item.product.code }} - {{ item.product.name }}</h6>
+                            <small>{{ item.quantity }}{{ item.product.unit }}</small>
+                        </div>
+                        <p class="mb-1">
+                            当前库存: {{ item.product.stock_quantity }}{{ item.product.unit }}
+                            <span class="badge bg-warning ms-2">退货出库</span>
+                        </p>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

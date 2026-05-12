@@ -175,6 +175,10 @@
                                 <span class="badge bg-info">盘点</span>
                                 {% elif log.change_type == 'adjust_in' or log.change_type == 'adjust_out' %}
                                 <span class="badge bg-secondary">调整</span>
+                                {% elif log.change_type == 'return_in' %}
+                                <span class="badge bg-info">退货入库</span>
+                                {% elif log.change_type == 'return_out' %}
+                                <span class="badge bg-warning">退货出库</span>
                                 {% else %}
                                 <span class="badge bg-dark">{{ log.change_type }}</span>
                                 {% endif %}

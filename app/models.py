@@ -312,6 +312,12 @@ class StockLog(db.Model):
         elif self.reference_type == 'sales_order':
             so = SalesOrder.query.get(self.reference_id)
             return so.order_number if so else ''
+        elif self.reference_type == 'purchase_return':
+            pr = PurchaseReturn.query.get(self.reference_id)
+            return pr.return_number if pr else ''
+        elif self.reference_type == 'sales_return':
+            sr = SalesReturn.query.get(self.reference_id)
+            return sr.return_number if sr else ''
         return ''
     
     def __repr__(self):
@@ -397,13 +403,13 @@ class SystemSetting(db.Model):
     value = db.Column(db.Text)
     description = db.Column(db.String(200))
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
-    
+
     @classmethod
     def get_value(cls, key, default=None):
         """获取设置值"""
         setting = cls.query.filter_by(setting_key=key).first()
         return setting.value if setting else default
-    
+
     @classmethod
     def set_value(cls, key, value):
         """设置值"""
@@ -414,6 +420,74 @@ class SystemSetting(db.Model):
             setting = cls(setting_key=key, value=value if value else '')
             db.session.add(setting)
         db.session.commit()
-    
+
     def __repr__(self):
         return f'<SystemSetting {self.setting_key}>'
+
+
+class PurchaseReturn(db.Model):
+    """采购退货单 - 退货给供应商"""
+    __tablename__ = 'purchase_returns'
+    id = db.Column(db.Integer, primary_key=True)
+    return_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    purchase_order_id = db.Column(db.Integer, db.ForeignKey('purchase_orders.id'), nullable=True)
+    warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouses.id'), nullable=False)
+    return_date = db.Column(db.Date, nullable=False, default=datetime.now)
+    total_amount = db.Column(db.Numeric(12, 2), default=0)
+    status = db.Column(db.String(20), default='pending')  # pending, completed
+    handler = db.Column(db.String(100))
+    notes = db.Column(db.Text)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+    purchase_order = db.relationship('PurchaseOrder', backref='purchase_returns')
+    warehouse = db.relationship('Warehouse', backref='purchase_returns')
+    creator = db.relationship('User', backref='created_purchase_returns')
+    items = db.relationship('PurchaseReturnItem', backref='purchase_return', cascade='all, delete-orphan')
+
+
+class PurchaseReturnItem(db.Model):
+    __tablename__ = 'purchase_return_items'
+    id = db.Column(db.Integer, primary_key=True)
+    return_id = db.Column(db.Integer, db.ForeignKey('purchase_returns.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    quantity = db.Column(db.Numeric(10, 2), nullable=False)
+    unit_price = db.Column(db.Numeric(10, 2), nullable=False)
+    amount = db.Column(db.Numeric(12, 2), nullable=False)
+
+    product = db.relationship('Product', backref='purchase_return_items')
+
+
+class SalesReturn(db.Model):
+    """销售退货单 - 客户退货"""
+    __tablename__ = 'sales_returns'
+    id = db.Column(db.Integer, primary_key=True)
+    return_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    sales_order_id = db.Column(db.Integer, db.ForeignKey('sales_orders.id'), nullable=True)
+    warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouses.id'), nullable=False)
+    return_date = db.Column(db.Date, nullable=False, default=datetime.now)
+    total_amount = db.Column(db.Numeric(12, 2), default=0)
+    status = db.Column(db.String(20), default='pending')  # pending, completed
+    handler = db.Column(db.String(100))
+    notes = db.Column(db.Text)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+    sales_order = db.relationship('SalesOrder', backref='sales_returns')
+    warehouse = db.relationship('Warehouse', backref='sales_returns')
+    creator = db.relationship('User', backref='created_sales_returns')
+    items = db.relationship('SalesReturnItem', backref='sales_return', cascade='all, delete-orphan')
+
+
+class SalesReturnItem(db.Model):
+    __tablename__ = 'sales_return_items'
+    id = db.Column(db.Integer, primary_key=True)
+    return_id = db.Column(db.Integer, db.ForeignKey('sales_returns.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    quantity = db.Column(db.Numeric(10, 2), nullable=False)
+    unit_price = db.Column(db.Numeric(10, 2), nullable=False)
+    amount = db.Column(db.Numeric(12, 2), nullable=False)
+
+    product = db.relationship('Product', backref='sales_return_items')

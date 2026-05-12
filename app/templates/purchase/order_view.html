@@ -22,7 +22,8 @@ function confirmQuickStockIn(btn) {
     <a href="{{ url_for('purchase.index') }}" class="btn btn-secondary">
         <i class="bi bi-arrow-left"></i> 返回列表
     </a>
-    {% if order.status != 'completed' %}
+    {% set is_returned = order.purchase_returns|selectattr('status', 'equalto', 'completed')|list|length > 0 %}
+    {% if not is_returned and order.status != 'completed' %}
     <a href="{{ url_for('purchase.edit_order', id=order.id) }}" class="btn btn-primary">
         <i class="bi bi-pencil"></i> 编辑订单
     </a>
@@ -36,6 +37,14 @@ function confirmQuickStockIn(btn) {
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-danger" onclick="return confirm('确定删除此采购订单？')">
             <i class="bi bi-trash"></i> 删除订单
+        </button>
+    </form>
+    {% endif %}
+    {% if not is_returned and order.status == 'completed' %}
+    <form method="post" action="{{ url_for('purchase.quick_return', id=order.id) }}" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-warning" onclick="return confirm('确认退货给供应商？将退回所有商品，减少库存和应付余额。')">
+            <i class="bi bi-arrow-return-left"></i> 退货
         </button>
     </form>
     {% endif %}
@@ -88,7 +97,9 @@ function confirmQuickStockIn(btn) {
                             <tr>
                                 <th>订单状态：</th>
                                 <td>
-                                    {% if order.status == 'confirmed' %}
+                                    {% if order.purchase_returns|selectattr('status', 'equalto', 'completed')|list|length > 0 %}
+                                    <span class="badge bg-danger">已退货</span>
+                                    {% elif order.status == 'confirmed' %}
                                     <span class="badge bg-secondary">待入库</span>
                                     {% elif order.status == 'partial' %}
                                     <span class="badge bg-warning">部分入库</span>

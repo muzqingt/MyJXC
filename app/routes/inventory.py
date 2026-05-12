@@ -1,9 +1,10 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, make_response
 from flask_login import login_required, current_user
 from datetime import datetime, timedelta
 import json
 from app import db
 from app.models import Product, Warehouse, StockLog, StockIn, StockOut, Category, PurchaseOrder, SalesOrder
+import io
 from app.forms import StockAdjustForm, StockTransferForm
 
 
@@ -19,9 +20,9 @@ def get_product_stock_in_warehouse(product_id, warehouse_id):
     ).all()
     stock = 0
     for log in logs:
-        if log.change_type in ('in', 'check_in', 'adjust_in', 'return'):
+        if log.change_type in ('in', 'check_in', 'adjust_in', 'return_in'):
             stock += float(log.quantity)
-        elif log.change_type in ('out', 'check_out', 'adjust_out', 'stock_transfer'):
+        elif log.change_type in ('out', 'check_out', 'adjust_out', 'stock_transfer', 'return_out'):
             stock -= float(log.quantity)
     return stock
 
@@ -212,8 +213,10 @@ def stock_transfer():
                                      today=today,
                                      items_data=items_data)
 
-            warehouse = Warehouse.query.get(to_warehouse_id)
-            warehouse_name = warehouse.name if warehouse else '未知仓库'
+            to_warehouse = Warehouse.query.get(to_warehouse_id)
+            from_warehouse_obj = Warehouse.query.get(from_warehouse_id)
+            to_warehouse_name = to_warehouse.name if to_warehouse else '未知仓库'
+            from_warehouse_name = from_warehouse_obj.name if from_warehouse_obj else '未知仓库'
 
             # 预计算初始仓库库存（用于追踪同一商品多次调拨的正确 before_quantity）
             # product.stock_quantity 是全局库存，需结合 StockLog 计算出各仓库基准库存
@@ -232,7 +235,7 @@ def stock_transfer():
                             # 各仓库 StockLog 总和
                             all_log = db.session.query(db.func.sum(
                                 db.case(
-                                    (StockLog.change_type.in_(['in', 'check_in', 'adjust_in', 'return']), StockLog.quantity),
+                                    (StockLog.change_type.in_(['in', 'check_in', 'adjust_in', 'return_in']), StockLog.quantity),
                                     else_=0 - StockLog.quantity
                                 )
                             )).filter(StockLog.product_id == pid).scalar() or 0
@@ -280,7 +283,7 @@ def stock_transfer():
                             before_quantity=before_out,
                             after_quantity=after_out,
                             reference_type='stock_transfer',
-                            notes=f'调拨出库至{warehouse_name}: {notes}',
+                            notes=f'调拨出库至{to_warehouse_name}: {notes}',
                             created_by=current_user.id
                         )
                         product_warehouse_stock[pid][from_warehouse_id] = after_out
@@ -299,7 +302,7 @@ def stock_transfer():
                             before_quantity=before_in,
                             after_quantity=after_in,
                             reference_type='stock_transfer',
-                            notes=f'调拨入库自{warehouse_name}: {notes}',
+                            notes=f'调拨入库自{from_warehouse_name}: {notes}',
                             created_by=current_user.id
                         )
                         product_warehouse_stock[pid][to_warehouse_id] = after_in
@@ -525,7 +528,9 @@ def export_logs():
         'check_in': '盘点',
         'check_out': '盘点',
         'adjust_in': '调整',
-        'adjust_out': '调整'
+        'adjust_out': '调整',
+        'return_in': '退货入库',
+        'return_out': '退货出库',
     }
     
     # 写入数据

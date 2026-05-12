@@ -1,0 +1,42 @@
+# Python virtual environment
+venv/
+.venv/
+
+# Python bytecode cache
+__pycache__/
+*.pyc
+*.pyo
+
+# PyInstaller build artifacts
+build/
+dist/
+release/
+
+# Flask instance (runtime secrets + database)
+instance/
+
+# Database backups
+backups/
+
+# Cookie / session files
+cookies*.txt
+fresh_cookies.txt
+c.txt
+sess.txt
+
+# Log files
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local

@@ -102,6 +102,14 @@
             {% endif %}
         </button>
     </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="returns-tab" data-bs-toggle="tab" data-bs-target="#returns" type="button" role="tab">
+            <i class="bi bi-arrow-return-left"></i> 采购退货
+            {% if returns.total > 0 %}
+            <span class="badge bg-warning">{{ returns.total }}</span>
+            {% endif %}
+        </button>
+    </li>
 </ul>
 
 <!-- 标签页内容 -->
@@ -157,7 +165,9 @@
                                     <strong class="text-primary">¥{{ "%.2f"|format(order.total_amount) }}</strong>
                                 </td>
                                 <td>
-                                    {% if order.status == 'completed' %}
+                                    {% if order.id in returned_order_ids %}
+                                    <span class="badge bg-danger">已退货</span>
+                                    {% elif order.status == 'completed' %}
                                     <span class="badge bg-success">已入库</span>
                                     {% elif order.status == 'partial' %}
                                     <span class="badge bg-info">部分入库</span>
@@ -192,6 +202,12 @@
                                             <i class="bi bi-trash"></i>
                                         </a>
                                         {% endif %}
+                                        {% if order.status == 'completed' %}
+                                        <a href="#" onclick="if(confirm('确认退货给供应商？库存和应付将减少。')) {document.getElementById('qr-{{ order.id }}').submit();} return false;"
+                                           class="btn btn-sm btn-outline-warning" title="退货">
+                                            <i class="bi bi-arrow-return-left"></i>
+                                        </a>
+                                        {% endif %}
                                     </div>
                                     <form id="qi-{{ order.id }}" method="post" action="{{ url_for('purchase.quick_stock_in', id=order.id) }}" hidden>
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -199,6 +215,11 @@
                                     <form id="do-{{ order.id }}" method="post" action="{{ url_for('purchase.delete_order', id=order.id) }}" hidden>
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     </form>
+                                    {% if order.status == 'completed' %}
+                                    <form id="qr-{{ order.id }}" method="post" action="{{ url_for('purchase.quick_return', id=order.id) }}" hidden>
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    </form>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
@@ -419,6 +440,79 @@
             </div>
         </div>
     </div>
+
+    <!-- 退货单标签页 -->
+    <div class="tab-pane fade" id="returns" role="tabpanel">
+        <div class="card">
+            <div class="card-body">
+                {% if returns.items %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>退货单号</th>
+                                <th>关联订单</th>
+                                <th>供应商</th>
+                                <th>仓库</th>
+                                <th>退货日期</th>
+                                <th>总金额</th>
+                                <th>状态</th>
+                                <th>经办人</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in returns.items %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('purchase.view_return', id=r.id) }}" class="text-decoration-none">
+                                        <strong>{{ r.return_number }}</strong>
+                                    </a>
+                                </td>
+                                <td>
+                                    {% if r.purchase_order %}
+                                    <a href="{{ url_for('purchase.view_order', id=r.purchase_order.id) }}" class="badge bg-info text-decoration-none">
+                                        {{ r.purchase_order.order_number }}
+                                    </a>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if r.purchase_order %}{{ r.purchase_order.supplier.name }}{% else %}-{% endif %}
+                                </td>
+                                <td>{{ r.warehouse.name }}</td>
+                                <td>{{ r.return_date.strftime('%Y-%m-%d') }}</td>
+                                <td><strong class="text-danger">¥{{ "%.2f"|format(r.total_amount) }}</strong></td>
+                                <td>
+                                    {% if r.status == 'completed' %}
+                                    <span class="badge bg-success">已完成</span>
+                                    {% else %}
+                                    <span class="badge bg-warning">待处理</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ r.handler or '-' }}</td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <a href="{{ url_for('purchase.view_return', id=r.id) }}" class="btn btn-sm btn-outline-primary" title="查看">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-arrow-return-left" style="font-size: 3rem;"></i>
+                    <p class="mt-2">暂无退货记录</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- 统计卡片 -->
@@ -503,8 +597,11 @@ $(document).ready(function() {
     if (activeTab === 'stockins') {
         const stockInsTab = new bootstrap.Tab(document.querySelector('#stockins-tab'));
         stockInsTab.show();
+    } else if (activeTab === 'returns') {
+        const returnsTab = new bootstrap.Tab(document.querySelector('#returns-tab'));
+        returnsTab.show();
     }
-    
+
     // 监听标签页切换，保存到localStorage并清理URL参数
     document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(tabEl => {
         tabEl.addEventListener('shown.bs.tab', function (e) {
@@ -513,6 +610,8 @@ $(document).ready(function() {
                 localStorage.setItem('purchaseActiveTab', 'orders');
             } else if (targetId === '#stockins') {
                 localStorage.setItem('purchaseActiveTab', 'stockins');
+            } else if (targetId === '#returns') {
+                localStorage.setItem('purchaseActiveTab', 'returns');
             }
             
             // 清理URL中的tab参数，保持URL干净
