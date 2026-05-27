@@ -5,7 +5,9 @@ import json
 from app import db
 from app.models import Product, Warehouse, StockLog, StockIn, StockOut, Category, PurchaseOrder, SalesOrder
 import io
+from decimal import Decimal
 from app.forms import StockAdjustForm, StockTransferForm
+from app.utils import to_decimal
 
 
 def get_product_stock_in_warehouse(product_id, warehouse_id):
@@ -54,11 +56,11 @@ def product_list():
     total_stock_value = 0
     total_potential_value = 0
     for product in products:
-        stock_qty = float(product.stock_quantity or 0)
-        purchase_price = float(product.purchase_price or 0)
-        sale_price = float(product.sale_price or 0)
-        total_stock_value += stock_qty * purchase_price
-        total_potential_value += stock_qty * sale_price
+        stock_qty = Decimal(str(product.stock_quantity or 0))
+        purchase_price = Decimal(str(product.purchase_price or 0))
+        sale_price = Decimal(str(product.sale_price or 0))
+        total_stock_value += float(stock_qty * purchase_price)
+        total_potential_value += float(stock_qty * sale_price)
     
     return render_template('inventory/products.html', 
                          title='商品库存',
@@ -106,8 +108,8 @@ def stock_check():
                 if product_ids[i] and actual_quantities[i]:
                     product = Product.query.with_for_update().get(int(product_ids[i]))
                     if product:
-                        book_quantity = float(product.stock_quantity)
-                        actual_quantity = float(actual_quantities[i])
+                        book_quantity = to_decimal(product.stock_quantity)
+                        actual_quantity = to_decimal(actual_quantities[i])
                         
                         if book_quantity != actual_quantity:
                             diff = actual_quantity - book_quantity
@@ -249,7 +251,7 @@ def stock_transfer():
                 if item['product_id'] and item['quantity']:
                     product = Product.query.with_for_update().get(item['product_id'])
                     if product:
-                        quantity = float(item['quantity'])
+                        quantity = to_decimal(item['quantity'])
                         pid = product.id
 
                         # 源仓库当前追踪库存（含本次调拨前序迭代的变动）
@@ -383,9 +385,9 @@ def export_warehouse_stock(warehouse_id):
         ws.cell(row=row_idx, column=6, value=safety).border = thin_border
         ws.cell(row=row_idx, column=6).number_format = '#,##0.00'
         ws.cell(row=row_idx, column=7, value=float(product.purchase_price or 0)).border = thin_border
-        ws.cell(row=row_idx, column=7).number_format = '#,##0.02'
+        ws.cell(row=row_idx, column=7).number_format = '#,##0.00'
         ws.cell(row=row_idx, column=8, value=float(product.sale_price or 0)).border = thin_border
-        ws.cell(row=row_idx, column=8).number_format = '#,##0.02'
+        ws.cell(row=row_idx, column=8).number_format = '#,##0.00'
         ws.cell(row=row_idx, column=9, value=status).border = thin_border
 
     ws.column_dimensions['A'].width = 12
@@ -614,8 +616,8 @@ def api_stock_check():
                 product = Product.query.with_for_update().get(product_id)
                 if product:
                     warehouse_id = int(warehouse_id)
-                    system_stock = float(product.stock_quantity)
-                    new_stock = float(actual_stock)
+                    system_stock = to_decimal(product.stock_quantity)
+                    new_stock = to_decimal(actual_stock)
                     
                     if system_stock != new_stock:
                         # 更新产品库存
@@ -669,12 +671,12 @@ def stock_adjust():
     if form.validate_on_submit():
         try:
             product = Product.query.with_for_update().get_or_404(form.product_id.data)
-            before_quantity = float(product.stock_quantity)
-            quantity = float(form.quantity.data)
+            before_quantity = to_decimal(product.stock_quantity)
+            quantity = to_decimal(form.quantity.data)
 
             if form.adjust_type.data == 'adjust_in':
                 product.stock_quantity += quantity
-                after_quantity = float(product.stock_quantity)
+                after_quantity = to_decimal(product.stock_quantity)
             elif form.adjust_type.data == 'adjust_out':
                 if product.stock_quantity < quantity:
                     flash('库存不足，无法调整！', 'danger')
@@ -684,7 +686,7 @@ def stock_adjust():
                                          products=products_data,
                                          warehouses=warehouses_data)
                 product.stock_quantity -= quantity
-                after_quantity = float(product.stock_quantity)
+                after_quantity = to_decimal(product.stock_quantity)
             else:
                 flash('无效的调整类型！', 'danger')
                 return render_template('inventory/stock_adjust.html',

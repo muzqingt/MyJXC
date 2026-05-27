@@ -200,8 +200,8 @@ def new_order():
             if product_ids[i] and quantities[i] and unit_prices[i]:
                 product = Product.query.get(int(product_ids[i]))
                 if product:
-                    quantity = float(quantities[i])
-                    unit_price = float(unit_prices[i])
+                    quantity = to_decimal(quantities[i])
+                    unit_price = to_decimal(unit_prices[i])
                     amount = quantity * unit_price
                     item = PurchaseOrderItem(
                         order_id=order.id,
@@ -262,7 +262,7 @@ def new_order():
                     )
                     db.session.add(stock_in_item)
 
-                    before_quantity = float(product.stock_quantity)
+                    before_quantity = to_decimal(product.stock_quantity)
                     after_quantity = before_quantity + quantity
                     product.stock_quantity = after_quantity
                     product.purchase_price = unit_price
@@ -420,8 +420,8 @@ def edit_order(id):
                 remaining_product_ids.add(product_id)
                 product = Product.query.get(product_id)
                 if product:
-                    quantity = float(quantities[i])
-                    unit_price = float(unit_prices[i])
+                    quantity = to_decimal(quantities[i])
+                    unit_price = to_decimal(unit_prices[i])
                     amount = quantity * unit_price
                     total_amount += amount
 
@@ -454,14 +454,18 @@ def edit_order(id):
         # 余额仅在订单 status=completed(已全部入库)时才记录
         if order.status == 'completed':
             if old_supplier and old_supplier.id != supplier_id:
-                # 换了供应商:回滚旧供应商余额,增加新供应商余额
-                sub_balance(old_supplier, "payable_balance", original_total)
+                # 换了供应商:先验证新供应商存在,再执行余额调整
                 new_supplier = Supplier.query.get(supplier_id)
-                if new_supplier:
-                    add_balance(new_supplier, "payable_balance", total_amount)
-            elif order.supplier:
+                if not new_supplier:
+                    flash('供应商不存在', 'danger')
+                    return redirect(url_for('purchase.edit_order', id=id))
+                sub_balance(old_supplier, "payable_balance", original_total)
+                add_balance(new_supplier, "payable_balance", total_amount)
+            elif old_supplier and old_supplier.id == supplier_id:
                 # 同供应商:调整差额
-                add_balance(order.supplier, "payable_balance", total_amount - original_total)
+                if original_total != total_amount:
+                    diff = total_amount - original_total
+                    add_balance(old_supplier, "payable_balance", diff)
 
         if action == 'confirm':
             if len(product_ids) == 0 or total_amount == 0:
@@ -605,12 +609,12 @@ def quick_stock_in(id):
         has_partial = False
         stock_in_details = []
         for order_item in order.items:
-            remaining_qty = float(order_item.quantity) - float(order_item.received_quantity)
+            remaining_qty = to_decimal(order_item.quantity) - to_decimal(order_item.received_quantity)
             if remaining_qty <= 0:
                 continue
 
             has_partial = True
-            unit_price = float(order_item.unit_price)
+            unit_price = to_decimal(order_item.unit_price)
             amount = remaining_qty * unit_price
 
             item = StockInItem(
@@ -628,7 +632,7 @@ def quick_stock_in(id):
             if not product:
                 continue
             product.purchase_price = unit_price
-            before_quantity = float(product.stock_quantity)
+            before_quantity = to_decimal(product.stock_quantity)
             after_quantity = before_quantity + remaining_qty
             product.stock_quantity = after_quantity
 
@@ -756,9 +760,9 @@ def new_stock_in_from_order(id):
     # 添加订单中未入库的商品明细
     total_amount = 0
     for order_item in order.items:
-        remaining_qty = float(order_item.quantity) - float(order_item.received_quantity)
+        remaining_qty = to_decimal(order_item.quantity) - to_decimal(order_item.received_quantity)
         if remaining_qty > 0:
-            unit_price = float(order_item.unit_price)
+            unit_price = to_decimal(order_item.unit_price)
             amount = remaining_qty * unit_price
             stock_in_item = StockInItem(
                 stock_in_id=stock_in.id,
@@ -896,8 +900,8 @@ def edit_stock_in_items(id):
             if product_ids[i] and quantities[i] and unit_prices[i]:
                 product = Product.query.get(int(product_ids[i]))
                 if product:
-                    quantity = float(quantities[i])
-                    unit_price = float(unit_prices[i])
+                    quantity = to_decimal(quantities[i])
+                    unit_price = to_decimal(unit_prices[i])
                     amount = quantity * unit_price
 
                     item = StockInItem(
@@ -1002,10 +1006,10 @@ def complete_stock_in(id):
                 continue
 
             # 记录当前库存(更新前)
-            before_quantity = float(product.stock_quantity)
+            before_quantity = to_decimal(product.stock_quantity)
 
             # 更新商品库存
-            after_quantity = before_quantity + float(item.quantity)
+            after_quantity = before_quantity + to_decimal(item.quantity)
             product.stock_quantity = after_quantity
 
             # 记录库存流水
@@ -1138,15 +1142,15 @@ def quick_return(id):
         has_items = False
         for order_item in order.items:
             product = Product.query.with_for_update().get(order_item.product_id)
-            if not product or float(product.stock_quantity) <= 0:
+            if not product or to_decimal(product.stock_quantity) <= 0:
                 continue
 
-            return_qty = min(float(order_item.quantity), float(product.stock_quantity))
+            return_qty = min(to_decimal(order_item.received_quantity or 0), to_decimal(product.stock_quantity))
             if return_qty <= 0:
                 continue
 
             has_items = True
-            unit_price = float(order_item.unit_price)
+            unit_price = to_decimal(order_item.unit_price)
             amount = return_qty * unit_price
 
             item = PurchaseReturnItem(
@@ -1159,7 +1163,7 @@ def quick_return(id):
             db.session.add(item)
             total_amount += amount
 
-            before_quantity = float(product.stock_quantity)
+            before_quantity = to_decimal(product.stock_quantity)
             after_quantity = before_quantity - return_qty
             product.stock_quantity = after_quantity
 

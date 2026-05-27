@@ -200,8 +200,8 @@ def new_order():
             if product_ids[i] and quantities[i] and unit_prices[i]:
                 product = Product.query.get(int(product_ids[i]))
                 if product:
-                    quantity = float(quantities[i])
-                    unit_price = float(unit_prices[i])
+                    quantity = to_decimal(quantities[i])
+                    unit_price = to_decimal(unit_prices[i])
                     amount = quantity * unit_price
                     item = SalesOrderItem(
                         order_id=order.id,
@@ -285,8 +285,8 @@ def new_order():
                     )
                     db.session.add(stock_out_item)
 
-                    before_quantity = float(product.stock_quantity)
-                    after_quantity = before_quantity - quantity
+                    before_quantity = to_decimal(product.stock_quantity)
+                    after_quantity = before_quantity - to_decimal(quantity)
                     product.stock_quantity = after_quantity
                     product.sale_price = unit_price
 
@@ -433,7 +433,7 @@ def edit_order(id):
         order.notes = notes
         
         # 更新商品明细（保留已出库数量，只删除本次移除的商品）
-        original_total = float(order.total_amount)
+        original_total = to_decimal(order.total_amount)
         existing_items = {item.product_id: item for item in order.items}
         remaining_product_ids = set()
         total_amount = 0
@@ -444,8 +444,8 @@ def edit_order(id):
                 remaining_product_ids.add(product_id)
                 product = Product.query.get(product_id)
                 if product:
-                    quantity = float(quantities[i])
-                    unit_price = float(unit_prices[i])
+                    quantity = to_decimal(quantities[i])
+                    unit_price = to_decimal(unit_prices[i])
                     amount = quantity * unit_price
                     total_amount += amount
 
@@ -572,18 +572,6 @@ def quick_stock_out(id):
         flash('此订单没有商品明细！', 'danger')
         return redirect(url_for('sales.index'))
     
-    # 检查库存是否充足
-    insufficient_stock = []
-    for item in order.items:
-        product = item.product
-        remaining_qty = float(item.quantity) - float(item.delivered_quantity)
-        if remaining_qty > 0 and product.stock_quantity < remaining_qty:
-            insufficient_stock.append(f"{product.code} - {product.name} (库存: {product.stock_quantity}, 需求: {remaining_qty})")
-    
-    if insufficient_stock:
-        flash(f'库存不足: {", ".join(insufficient_stock)}', 'danger')
-        return redirect(url_for('sales.index'))
-    
     try:
         today = datetime.now().strftime('%Y%m%d')
         
@@ -610,7 +598,7 @@ def quick_stock_out(id):
         
         total_amount = 0
         for item in order.items:
-            remaining_qty = float(item.quantity) - float(item.delivered_quantity)
+            remaining_qty = to_decimal(item.quantity) - to_decimal(item.delivered_quantity)
             if remaining_qty <= 0:
                 continue
 
@@ -618,7 +606,11 @@ def quick_stock_out(id):
             product = Product.query.with_for_update().get(item.product_id)
             if not product:
                 continue
-            unit_price = float(item.unit_price)
+            if to_decimal(product.stock_quantity) < remaining_qty:
+                db.session.rollback()
+                flash(f'商品 {product.name} 库存不足，当前库存: {to_decimal(product.stock_quantity)}，需要: {remaining_qty}', 'danger')
+                return redirect(url_for('sales.order_view', id=order.id))
+            unit_price = to_decimal(item.unit_price)
             product.sale_price = unit_price
 
             amount = remaining_qty * unit_price
@@ -633,10 +625,10 @@ def quick_stock_out(id):
             )
             db.session.add(stock_out_item)
 
-            before_quantity = float(product.stock_quantity)
+            before_quantity = to_decimal(product.stock_quantity)
             after_quantity = before_quantity - remaining_qty
             product.stock_quantity = after_quantity
-            
+
             log = StockLog(
                 product_id=product.id,
                 warehouse_id=order.warehouse_id,
@@ -651,21 +643,21 @@ def quick_stock_out(id):
             )
             db.session.add(log)
             
-            item.delivered_quantity = float(item.delivered_quantity) + remaining_qty
+            item.delivered_quantity = to_decimal(item.delivered_quantity) + remaining_qty
         
         stock_out.total_amount = total_amount
 
         # 无需出库时：检查是否所有商品已出库但订单未完成（需更新状态+加余额）
         if total_amount == 0:
             all_delivered = all(
-                float(oi.delivered_quantity) >= float(oi.quantity)
+                to_decimal(oi.delivered_quantity) >= to_decimal(oi.quantity)
                 for oi in order.items
             )
             if all_delivered and order.status != 'completed':
                 order.status = 'completed'
                 customer = order.customer
                 if customer:
-                    add_balance(customer, 'receivable_balance', float(order.total_amount))
+                    add_balance(customer, 'receivable_balance', order.total_amount)
                 db.session.commit()
             elif order.status == 'completed':
                 db.session.commit()
@@ -683,7 +675,7 @@ def quick_stock_out(id):
         if all_delivered:
             # 订单首次完成时补记应收余额（非completed→completed不重复记）
             if order.customer:
-                add_balance(order.customer, "receivable_balance", float(order.total_amount))
+                add_balance(order.customer, "receivable_balance", order.total_amount)
             order.status = 'completed'
         else:
             order.status = 'partial'
@@ -708,7 +700,7 @@ def view_order(id):
     # 准备订单商品数据用于JavaScript确认框
     order_items_data = []
     for item in order.items:
-        remaining = float(item.quantity) - float(item.delivered_quantity)
+        remaining = to_decimal(item.quantity) - to_decimal(item.delivered_quantity)
         if remaining > 0:
             order_items_data.append({
                 'name': item.product.name,
@@ -758,9 +750,9 @@ def new_stock_out_from_order(id):
     # 添加订单中未出库的商品明细
     total_amount = 0
     for order_item in order.items:
-        remaining_qty = float(order_item.quantity) - float(order_item.delivered_quantity)
+        remaining_qty = to_decimal(order_item.quantity) - to_decimal(order_item.delivered_quantity)
         if remaining_qty > 0:
-            unit_price = float(order_item.unit_price)
+            unit_price = to_decimal(order_item.unit_price)
             amount = remaining_qty * unit_price
             stock_out_item = StockOutItem(
                 stock_out_id=stock_out.id,
@@ -898,8 +890,8 @@ def edit_stock_out_items(id):
             if product_ids[i] and quantities[i] and unit_prices[i]:
                 product = Product.query.get(int(product_ids[i]))
                 if product:
-                    quantity = float(quantities[i])
-                    unit_price = float(unit_prices[i])
+                    quantity = to_decimal(quantities[i])
+                    unit_price = to_decimal(unit_prices[i])
                     amount = quantity * unit_price
                     
                     item = StockOutItem(
@@ -986,10 +978,10 @@ def complete_stock_out(id):
             if not product:
                 continue
 
-            before_quantity = float(product.stock_quantity)
-            after_quantity = before_quantity - float(item.quantity)
+            before_quantity = to_decimal(product.stock_quantity)
+            after_quantity = before_quantity - to_decimal(item.quantity)
             product.stock_quantity = after_quantity
-            
+
             # 记录库存流水
             log = StockLog(
                 product_id=product.id,
@@ -1033,7 +1025,7 @@ def complete_stock_out(id):
                 # 更新客户应收余额（使用订单总额，而非仅本次出库金额）
                 customer = order.customer
                 if customer:
-                    add_balance(customer, "receivable_balance", float(order.total_amount))
+                    add_balance(customer, "receivable_balance", order.total_amount)
             else:
                 order.status = 'partial'
 
@@ -1126,12 +1118,12 @@ def quick_return(id):
             if not product:
                 continue
 
-            return_qty = float(order_item.quantity)
+            return_qty = to_decimal(order_item.delivered_quantity or 0)
             if return_qty <= 0:
                 continue
 
             has_items = True
-            unit_price = float(order_item.unit_price)
+            unit_price = to_decimal(order_item.unit_price)
             amount = return_qty * unit_price
 
             item = SalesReturnItem(
@@ -1144,7 +1136,7 @@ def quick_return(id):
             db.session.add(item)
             total_amount += amount
 
-            before_quantity = float(product.stock_quantity)
+            before_quantity = to_decimal(product.stock_quantity)
             after_quantity = before_quantity + return_qty
             product.stock_quantity = after_quantity
 

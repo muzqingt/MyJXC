@@ -6,6 +6,7 @@ from app.models import Product, SalesOrder, PurchaseOrder, Customer, Supplier, S
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from io import BytesIO
+from decimal import Decimal
 from urllib.parse import quote
 
 # 创建蓝图
@@ -93,7 +94,7 @@ def inventory_report():
             'name': product.name,
             'unit': product.unit,
             # 注：期初 = 当前库存 - 本期入库 + 本月出库，假设当前库存为期末库存
-            'beginning_stock': float(product.stock_quantity or 0) - float(purchase.purchase_quantity if purchase else 0) + float(sales.sales_quantity if sales else 0),
+            'beginning_stock': float(Decimal(str(product.stock_quantity or 0)) - Decimal(str(purchase.purchase_quantity if purchase else 0)) + Decimal(str(sales.sales_quantity if sales else 0))),
             'purchase_quantity': purchase.purchase_quantity if purchase else 0,
             'purchase_amount': float(purchase.purchase_amount) if purchase else 0,
             'sales_quantity': sales.sales_quantity if sales else 0,

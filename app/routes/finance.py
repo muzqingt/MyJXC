@@ -871,7 +871,7 @@ def export_receipts():
         ws.cell(row=row, column=1, value=receipt.receipt_number).border = thin_border
         ws.cell(row=row, column=2, value=receipt.customer.name if receipt.customer else '').border = thin_border
         ws.cell(row=row, column=3, value=float(receipt.amount) if receipt.amount else 0).border = thin_border
-        ws.cell(row=row, column=3).number_format = '#,##0.02'
+        ws.cell(row=row, column=3).number_format = '#,##0.00'
         ws.cell(row=row, column=4, value=receipt.receipt_date.strftime('%Y-%m-%d') if receipt.receipt_date else '').border = thin_border
         ws.cell(row=row, column=5, value=payment_method_map.get(receipt.payment_method, receipt.payment_method or '')).border = thin_border
         # 解析reference_id(逗号分隔的订单ID)显示订单号
@@ -956,7 +956,7 @@ def export_payments():
         ws.cell(row=row, column=1, value=payment.payment_number).border = thin_border
         ws.cell(row=row, column=2, value=payment.supplier.name if payment.supplier else '').border = thin_border
         ws.cell(row=row, column=3, value=float(payment.amount) if payment.amount else 0).border = thin_border
-        ws.cell(row=row, column=3).number_format = '#,##0.02'
+        ws.cell(row=row, column=3).number_format = '#,##0.00'
         ws.cell(row=row, column=4, value=payment.payment_date.strftime('%Y-%m-%d') if payment.payment_date else '').border = thin_border
         ws.cell(row=row, column=5, value=payment_method_map.get(payment.payment_method, payment.payment_method or '')).border = thin_border
         # 解析reference_id(逗号分隔的订单ID)显示订单号
@@ -1049,9 +1049,9 @@ def export_profit_analysis():
         ws.cell(row=row_idx, column=2, value=sales).border = thin_border
         ws.cell(row=row_idx, column=2).number_format = '#,##0.00'
         ws.cell(row=row_idx, column=3, value=purchase).border = thin_border
-        ws.cell(row=row_idx, column=3).number_format = '#,##0.02'
+        ws.cell(row=row_idx, column=3).number_format = '#,##0.00'
         ws.cell(row=row_idx, column=4, value=profit).border = thin_border
-        ws.cell(row=row_idx, column=4).number_format = '#,##0.02'
+        ws.cell(row=row_idx, column=4).number_format = '#,##0.00'
         ws.cell(row=row_idx, column=5, value=margin).border = thin_border
         ws.cell(row=row_idx, column=5).number_format = '0.00'
 
@@ -1171,11 +1171,11 @@ def export_supplier_ap(supplier_id):
         PurchaseReturn.purchase_order_id.in_(supplier_order_ids),
         PurchaseReturn.status == 'completed'
     ).all() if supplier_order_ids else []
-    return_amount = sum(float(r.total_amount) for r in return_records)
+    return_amount = sum(to_decimal(r.total_amount) for r in return_records)
 
     # 计算金额
-    total_amount = sum(float(o.total_amount) for o in orders)
-    paid_amount = sum(float(p.amount) for p in payments)
+    total_amount = sum(to_decimal(o.total_amount) for o in orders)
+    paid_amount = sum(to_decimal(p.amount) for p in payments)
     balance = total_amount - paid_amount - return_amount
 
     # 创建工作簿

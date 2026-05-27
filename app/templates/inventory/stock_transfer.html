@@ -190,6 +190,13 @@
 
 {% block scripts %}
 <script>
+function escapeHtml(text) {
+    if (text == null) return '';
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(String(text)));
+    return div.innerHTML;
+}
+
 $(document).ready(function() {
     let itemCount = 0;
     
@@ -522,10 +529,10 @@ $(document).ready(function() {
             var html = '';
             matchedProducts.slice(0, 5).forEach(function(product) {
                 html += '<div class="mb-2 p-2 border rounded">' +
-                    '<strong>' + product.code + ' - ' + product.name + '</strong><br>' +
-                    '<small class="text-muted">规格: ' + (product.specification || '无') + '</small><br>' +
-                    '<small class="text-muted">单位: ' + product.unit + '</small><br>' +
-                    '<small class="text-success">库存: ' + product.stock_quantity + '</small><br>' +
+                    '<strong>' + escapeHtml(product.code) + ' - ' + escapeHtml(product.name) + '</strong><br>' +
+                    '<small class="text-muted">规格: ' + escapeHtml(product.specification || '无') + '</small><br>' +
+                    '<small class="text-muted">单位: ' + escapeHtml(product.unit) + '</small><br>' +
+                    '<small class="text-success">库存: ' + escapeHtml(product.stock_quantity) + '</small><br>' +
                     '<small class="text-info">采购价: ¥' + (parseFloat(product.purchase_price) || 0).toFixed(2) + '</small>' +
                     '</div>';
             });
