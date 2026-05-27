@@ -143,7 +143,7 @@ def stock_check():
             return redirect(url_for('inventory.stock_check'))
         except SQLAlchemyError as e:
             db.session.rollback()
-            flash(f'盘点失败: {str(e)}', 'danger')
+            flash('盘点失败，请重试', 'danger')
     
     products = Product.query.all()
     warehouses = Warehouse.query.all()
@@ -321,7 +321,7 @@ def stock_transfer():
             return redirect(url_for('inventory.stock_transfer'))
         except SQLAlchemyError as e:
             db.session.rollback()
-            flash(f'调拨失败: {str(e)}', 'danger')
+            flash('调拨失败，请重试', 'danger')
 
     # 验证失败时，从 form.items 构建 items_data 供 JS 回填
     if form.items.data:
@@ -488,8 +488,8 @@ def export_logs():
         elif log_type in VALID_LOG_TYPES:
             query = query.filter_by(change_type=log_type)
 
-    logs = query.order_by(StockLog.created_at.desc()).all()
-    
+    logs = query.order_by(StockLog.created_at.desc()).limit(10000).all()
+
     # 创建Excel工作簿
     wb = Workbook()
     ws = wb.active
@@ -590,7 +590,14 @@ def api_stock_check():
             actual_stock = item.get('actual_stock')
             remark = item.get('remark', '')
             warehouse_id = item.get('warehouse_id')
-            
+
+            try:
+                product_id = int(product_id)
+                actual_stock = float(actual_stock)
+                warehouse_id = int(warehouse_id)
+            except (TypeError, ValueError):
+                continue
+
             if product_id and actual_stock is not None and warehouse_id:
                 product = db.session.query(Product).filter(Product.id == product_id).with_for_update().first()
                 if product:

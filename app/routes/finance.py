@@ -238,24 +238,27 @@ def add_expense():
     form = ExpenseForm()
 
     if form.validate_on_submit():
-        # 生成费用单号 EXYYYYMMDD001
-        expense_number = generate_order_number('EX', Expense)
+        try:
+            expense_number = generate_order_number('EX', Expense)
 
-        # 处理费用数据
-        expense = Expense(
-            expense_number=expense_number,
-            category=form.category.data,
-            amount=form.amount.data,
-            expense_date=form.expense_date.data,
-            payee=form.payee.data,
-            payment_method=form.payment_method.data,
-            notes=form.notes.data,
-            created_by=current_user.id
-        )
-        db.session.add(expense)
-        db.session.commit()
-        flash('费用记录已添加成功!', 'success')
-        return redirect(url_for('finance.expenses'))
+            expense = Expense(
+                expense_number=expense_number,
+                category=form.category.data,
+                amount=form.amount.data,
+                expense_date=form.expense_date.data,
+                payee=form.payee.data,
+                payment_method=form.payment_method.data,
+                notes=form.notes.data,
+                created_by=current_user.id
+            )
+            db.session.add(expense)
+            db.session.commit()
+            flash('费用记录已添加成功!', 'success')
+            return redirect(url_for('finance.expenses'))
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('添加失败，请重试', 'danger')
+            return redirect(url_for('finance.add_expense'))
 
     return render_template('finance/expense_edit.html', title='添加费用', form=form)
 
@@ -313,7 +316,10 @@ def view_receipt(receipt_id):
 @login_required
 def edit_receipt(receipt_id):
     """编辑收款"""
-    receipt = db.session.query(Receipt).filter(Receipt.id == receipt_id).with_for_update().first()
+    if request.method == 'POST':
+        receipt = db.session.query(Receipt).filter(Receipt.id == receipt_id).with_for_update().first()
+    else:
+        receipt = db.session.get(Receipt, receipt_id)
     if receipt is None:
         abort(404)
     form = ReceiptForm(obj=receipt)
@@ -407,7 +413,10 @@ def view_payment(payment_id):
 @login_required
 def edit_payment(payment_id):
     """编辑付款"""
-    payment = db.session.query(Payment).filter(Payment.id == payment_id).with_for_update().first()
+    if request.method == 'POST':
+        payment = db.session.query(Payment).filter(Payment.id == payment_id).with_for_update().first()
+    else:
+        payment = db.session.get(Payment, payment_id)
     if payment is None:
         abort(404)
     form = PaymentForm(obj=payment)

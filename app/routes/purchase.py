@@ -323,8 +323,8 @@ def edit_order(id):
     for item in order.items:
         order_items_data.append({
             'product_id': item.product_id,
-            'quantity': float(item.quantity),
-            'unit_price': float(item.unit_price)
+            'quantity': str(item.quantity),
+            'unit_price': str(item.unit_price)
         })
 
     if request.method == 'POST':
@@ -566,8 +566,12 @@ def delete_order(id):
         sub_balance(supplier, "payable_balance", order.total_amount)
 
     db.session.delete(order)
-    db.session.commit()
-    flash('采购订单删除成功!', 'success')
+    try:
+        db.session.commit()
+        flash('采购订单删除成功!', 'success')
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        flash(f'采购订单删除失败: {str(e)}', 'danger')
     return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
 
 
@@ -657,22 +661,17 @@ def quick_stock_in(id):
 
         # 无需入库时：检查是否所有商品已入库但订单未完成（需更新状态+加余额）
         if total_amount == 0:
-            # 检查是否所有商品都已入库
+            db.session.delete(stock_in)
             all_received = all(
                 to_decimal(oi.received_quantity) >= to_decimal(oi.quantity)
                 for oi in order.items
             )
             if all_received and order.status != 'completed':
-                # 所有商品已入库但订单状态未更新，补记状态和余额
                 order.status = 'completed'
                 supplier = order.supplier
                 if supplier:
                     add_balance(supplier, 'payable_balance', order.total_amount)
-                db.session.commit()
-            elif order.status == 'completed':
-                db.session.commit()  # 已完成，无需操作
-            else:
-                db.session.rollback()
+            db.session.commit()
             flash('此订单所有商品都已入库！', 'warning')
             return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
 
@@ -741,6 +740,9 @@ def new_stock_in_from_order(id):
         flash('只有已确认或部分入库的订单可以入库!', 'danger')
         return redirect(url_for('purchase.view_order', id=id))
 
+    if request.method == 'GET':
+        return redirect(url_for('purchase.view_order', id=id))
+
     # 生成入库单号
     receipt_number = generate_order_number('SI', StockIn)
 
@@ -749,8 +751,8 @@ def new_stock_in_from_order(id):
         receipt_number=receipt_number,
         purchase_order_id=order.id,
         warehouse_id=order.warehouse_id,
-        receipt_date=datetime.now().date(),  # 默认入库时间为今天
-        handler=current_user.username,  # 经办人为当前账号
+        receipt_date=datetime.now().date(),
+        handler=current_user.username,
         notes=f'从采购订单 {order.order_number} 创建入库单',
         created_by=current_user.id,
         status='pending'
@@ -773,15 +775,18 @@ def new_stock_in_from_order(id):
                 amount=amount
             )
             db.session.add(stock_in_item)
-            # 同步更新商品进价
             order_item.product.purchase_price = unit_price
             total_amount += amount
 
     stock_in.total_amount = total_amount
-    db.session.commit()
-
-    flash(f'入库单 {receipt_number} 创建成功!请编辑入库明细后完成入库。', 'success')
-    return redirect(url_for('purchase.edit_stock_in_items', id=stock_in.id))
+    try:
+        db.session.commit()
+        flash(f'入库单 {receipt_number} 创建成功!请编辑入库明细后完成入库。', 'success')
+        return redirect(url_for('purchase.edit_stock_in_items', id=stock_in.id))
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        flash(f'入库单创建失败: {str(e)}', 'danger')
+        return redirect(url_for('purchase.view_order', id=id))
 
 @bp.route('/stock-ins/new', methods=['GET', 'POST'])
 @login_required
@@ -813,10 +818,14 @@ def new_stock_in():
         )
 
         db.session.add(stock_in)
-        db.session.commit()
-
-        flash('入库单创建成功!请添加商品明细。', 'success')
-        return redirect(url_for('purchase.edit_stock_in_items', id=stock_in.id))
+        try:
+            db.session.commit()
+            flash('入库单创建成功!请添加商品明细。', 'success')
+            return redirect(url_for('purchase.edit_stock_in_items', id=stock_in.id))
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            flash(f'入库单创建失败: {str(e)}', 'danger')
+            return redirect(url_for('purchase.index'))
 
     return render_template('purchase/stock_in_edit.html',
                          title='新建入库单',
@@ -941,9 +950,9 @@ def edit_stock_in_items(id):
             'product_name': item.product.name,
             'specification': item.product.specification or '',
             'unit': item.product.unit,
-            'quantity': float(item.quantity),
-            'unit_price': float(item.unit_price),
-            'remaining_quantity': float(item.quantity)
+            'quantity': str(item.quantity),
+            'unit_price': str(item.unit_price),
+            'remaining_quantity': str(item.quantity)
         })
 
     # 如果没有采购订单关联,使用已保存的明细
@@ -951,17 +960,17 @@ def edit_stock_in_items(id):
         order_items_data = saved_items
     elif stock_in.purchase_order:
         for order_item in stock_in.purchase_order.items:
-            remaining_qty = float(order_item.quantity) - float(order_item.received_quantity)
+            remaining_qty = to_decimal(order_item.quantity) - to_decimal(order_item.received_quantity)
             order_items_data.append({
                 'product_id': order_item.product_id,
                 'product_code': order_item.product.code,
                 'product_name': order_item.product.name,
                 'specification': order_item.product.specification or '',
                 'unit': order_item.product.unit,
-                'order_quantity': float(order_item.quantity),
-                'received_quantity': float(order_item.received_quantity),
-                'remaining_quantity': remaining_qty,
-                'unit_price': float(order_item.unit_price)
+                'order_quantity': str(order_item.quantity),
+                'received_quantity': str(order_item.received_quantity),
+                'remaining_quantity': str(remaining_qty),
+                'unit_price': str(order_item.unit_price)
             })
 
     return render_template('purchase/stock_in_items.html',
@@ -1079,9 +1088,12 @@ def delete_stock_in(id):
         return redirect(url_for('purchase.index', tab='stockins'))
 
     db.session.delete(stock_in)
-    db.session.commit()
-
-    flash('入库单删除成功!', 'success')
+    try:
+        db.session.commit()
+        flash('入库单删除成功!', 'success')
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        flash(f'入库单删除失败: {str(e)}', 'danger')
     return redirect(url_for('purchase.index', tab='stockins'))
 
 @bp.route('/stock-ins/<int:id>')
@@ -1253,8 +1265,12 @@ def delete_return(id):
         return redirect(url_for('purchase.returns'))
 
     db.session.delete(purchase_return)
-    db.session.commit()
-    flash('退货单删除成功！', 'success')
+    try:
+        db.session.commit()
+        flash('退货单删除成功！', 'success')
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        flash(f'退货单删除失败: {str(e)}', 'danger')
     return redirect(url_for('purchase.returns'))
 
 

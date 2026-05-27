@@ -184,7 +184,7 @@
 </div>
 <!-- 存储提交的商品明细（验证失败时回填） -->
 <div id="transfer-items-data" style="display: none;">
-    {{ items_data|tojson if items_data else '[]' }}
+    {{ items_data|tojson|safe if items_data else '[]' }}
 </div>
 {% endblock %}
 

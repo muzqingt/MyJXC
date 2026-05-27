@@ -316,7 +316,7 @@ def new_order():
                 flash(f'销售订单创建并出库完成！出库单号: {delivery_number}', 'success')
             except SQLAlchemyError as e:
                 db.session.rollback()
-                flash(f'直接出库失败: {str(e)}', 'danger')
+                flash('直接出库失败，请重试', 'danger')
                 return render_template('sales/order_items.html',
                                      title='新建销售订单',
                                      customers=customers_data,
@@ -337,7 +337,7 @@ def new_order():
             db.session.commit()
         except SQLAlchemyError as e:
             db.session.rollback()
-            flash(f'创建订单失败: {str(e)}', 'danger')
+            flash('创建订单失败，请重试', 'danger')
             return render_template('sales/order_items.html',
                                  title='新建销售订单',
                                  customers=customers_data,
@@ -385,8 +385,8 @@ def edit_order(id):
     for item in order.items:
         order_items_data.append({
             'product_id': item.product_id,
-            'quantity': float(item.quantity),
-            'unit_price': float(item.unit_price)
+            'quantity': str(item.quantity),
+            'unit_price': str(item.unit_price)
         })
     
     if request.method == 'POST':
@@ -690,7 +690,7 @@ def quick_stock_out(id):
 
         # 检查订单是否全部出库
         all_delivered = all(
-            item.delivered_quantity >= item.quantity
+            to_decimal(item.delivered_quantity) >= to_decimal(item.quantity)
             for item in order.items
         )
         
@@ -706,8 +706,8 @@ def quick_stock_out(id):
         
     except SQLAlchemyError as e:
         db.session.rollback()
-        flash(f'出库失败: {str(e)}', 'danger')
-    
+        flash('出库失败，请重试', 'danger')
+
     return redirect(url_for('sales.index', tab='stockouts'))
 
 
@@ -1020,7 +1020,7 @@ def complete_stock_out(id):
             
             # 检查订单是否全部出库
             all_delivered = all(
-                oi.delivered_quantity >= oi.quantity
+                to_decimal(oi.delivered_quantity) >= to_decimal(oi.quantity)
                 for oi in order.items
             )
             
@@ -1037,8 +1037,8 @@ def complete_stock_out(id):
         
     except SQLAlchemyError as e:
         db.session.rollback()
-        flash(f'出库失败: {str(e)}', 'danger')
-    
+        flash('出库失败，请重试', 'danger')
+
     return redirect(url_for('sales.index', tab='stockouts'))
 
 # 删除出库单
@@ -1175,7 +1175,7 @@ def quick_return(id):
         flash(f'退货单 {return_number} 创建成功，库存已更新！', 'success')
     except SQLAlchemyError as e:
         db.session.rollback()
-        flash(f'退货失败: {str(e)}', 'danger')
+        flash('退货失败，请重试', 'danger')
 
     return redirect(url_for('sales.index', tab='returns'))
 
@@ -1249,9 +1249,9 @@ def api_order_items(order_id):
             'product_name': item.product.name,
             'specification': item.product.specification,
             'unit': item.product.unit,
-            'quantity': float(item.quantity),
-            'unit_price': float(item.unit_price),
-            'amount': float(item.amount),
-            'delivered_quantity': float(item.delivered_quantity)
+            'quantity': str(item.quantity),
+            'unit_price': str(item.unit_price),
+            'amount': str(item.amount),
+            'delivered_quantity': str(item.delivered_quantity)
         })
     return jsonify(items)

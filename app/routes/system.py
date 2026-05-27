@@ -177,6 +177,7 @@ def restore_backup():
     try:
         shutil.copy2(backup_path, db_path)
     except OSError:
+        db.session.rollback()
         flash('数据恢复失败，请稍后重试', 'danger')
         return redirect(url_for('system.backup'))
 
@@ -318,7 +319,11 @@ def edit_user(user_id):
         abort(404)
 
     if request.method == 'POST':
-        user.email = request.form.get('email')
+        email = request.form.get('email', '').strip()
+        if email and ('@' not in email or '.' not in email.split('@')[1]):
+            flash('请输入有效的邮箱地址', 'danger')
+            return redirect(url_for('system.edit_user', user_id=user_id))
+        user.email = email
         role = request.form.get('role')
         if role not in ('admin', 'user'):
             role = 'user'
@@ -352,9 +357,13 @@ def delete_user(user_id):
     # 先删除该用户的所有日志
     Log.query.filter_by(user_id=user_id).delete()
     
-    db.session.delete(user)
-    db.session.commit()
-    flash('用户已删除', 'success')
+    try:
+        db.session.delete(user)
+        db.session.commit()
+        flash('用户已删除', 'success')
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('删除用户失败，请稍后重试', 'danger')
     return redirect(url_for('system.user_management'))
 
 @bp.route('/api/system-info')
@@ -407,6 +416,7 @@ def optimize_db():
         db.session.commit()
         return jsonify({'success': True, 'message': '数据库优化完成'})
     except SQLAlchemyError as e:
+        db.session.rollback()
         return jsonify({'success': False, 'message': f'优化失败: {str(e)}'}), 500
 
 @bp.route('/api/system/clean-logs', methods=['POST'])
