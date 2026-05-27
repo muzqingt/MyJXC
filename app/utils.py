@@ -221,3 +221,46 @@ def format_local_dt(dt, fmt='%Y-%m-%d %H:%M:%S'):
     return local.strftime(fmt)
 
 
+def get_redirect_tab(status):
+    """根据订单状态确定跳转的标签页"""
+    if status == 'draft':
+        return 'draft'
+    elif status in ('confirmed', 'partial'):
+        return 'confirmed'
+    elif status == 'completed':
+        return 'completed'
+    return 'draft'
+
+
+# Excel 导出样式常量
+from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+
+EXCEL_HEADER_FONT = Font(bold=True, size=11)
+EXCEL_HEADER_FILL = PatternFill(start_color='D9E1F2', end_color='D9E1F2', fill_type='solid')
+EXCEL_THIN_BORDER = Border(
+    left=Side(style='thin'),
+    right=Side(style='thin'),
+    top=Side(style='thin'),
+    bottom=Side(style='thin')
+)
+EXCEL_HEADER_ALIGNMENT = Alignment(horizontal='center', vertical='center')
+
+
+def apply_excel_header_style(ws, row, max_col):
+    """为 Excel 表头行应用统一样式"""
+    for col in range(1, max_col + 1):
+        cell = ws.cell(row=row, column=col)
+        cell.font = EXCEL_HEADER_FONT
+        cell.fill = EXCEL_HEADER_FILL
+        cell.border = EXCEL_THIN_BORDER
+        cell.alignment = EXCEL_HEADER_ALIGNMENT
+
+
+PAYMENT_METHOD_MAP = {
+    'cash': '现金',
+    'bank_transfer': '银行转账',
+    'check': '支票',
+    'wechat': '微信',
+    'alipay': '支付宝',
+    'other': '其他'
+}
