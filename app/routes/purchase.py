@@ -454,14 +454,18 @@ def edit_order(id):
         # 余额仅在订单 status=completed(已全部入库)时才记录
         if order.status == 'completed':
             if old_supplier and old_supplier.id != supplier_id:
-                # 换了供应商:回滚旧供应商余额,增加新供应商余额
-                sub_balance(old_supplier, "payable_balance", original_total)
+                # 换了供应商:先验证新供应商存在,再执行余额调整
                 new_supplier = Supplier.query.get(supplier_id)
-                if new_supplier:
-                    add_balance(new_supplier, "payable_balance", total_amount)
-            elif order.supplier:
+                if not new_supplier:
+                    flash('供应商不存在', 'danger')
+                    return redirect(url_for('purchase.edit_order', id=id))
+                sub_balance(old_supplier, "payable_balance", original_total)
+                add_balance(new_supplier, "payable_balance", total_amount)
+            elif old_supplier and old_supplier.id == supplier_id:
                 # 同供应商:调整差额
-                add_balance(order.supplier, "payable_balance", total_amount - original_total)
+                if original_total != total_amount:
+                    diff = total_amount - original_total
+                    add_balance(old_supplier, "payable_balance", diff)
 
         if action == 'confirm':
             if len(product_ids) == 0 or total_amount == 0:
@@ -1141,7 +1145,7 @@ def quick_return(id):
             if not product or float(product.stock_quantity) <= 0:
                 continue
 
-            return_qty = min(float(order_item.quantity), float(product.stock_quantity))
+            return_qty = min(float(order_item.received_quantity or 0), float(product.stock_quantity))
             if return_qty <= 0:
                 continue
 

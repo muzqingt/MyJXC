@@ -9,6 +9,13 @@ from app.models import Log, User
 # 创建蓝图
 bp = Blueprint('system', __name__, url_prefix='/system')
 
+def _safe_filename(filename):
+    """确保文件名不包含路径遍历字符"""
+    filename = os.path.basename(filename)
+    if not filename or filename.startswith('.'):
+        return None
+    return filename
+
 @bp.route('/')
 @login_required
 def index():
@@ -113,13 +120,21 @@ def download_backup(filename):
         flash('只有管理员可以下载备份', 'danger')
         return redirect(url_for('system.backup'))
     
+    filename = _safe_filename(filename)
+    if not filename:
+        flash('无效的文件名', 'danger')
+        return redirect(url_for('system.backup'))
+
     backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../backups')
-    filepath = os.path.join(backup_dir, filename)
-    
+    filepath = os.path.realpath(os.path.join(backup_dir, filename))
+    if not filepath.startswith(os.path.realpath(backup_dir)):
+        flash('非法文件路径', 'danger')
+        return redirect(url_for('system.backup'))
+
     if not os.path.exists(filepath):
         flash('备份文件不存在', 'danger')
         return redirect(url_for('system.backup'))
-    
+
     return send_file(filepath, as_attachment=True)
 
 @bp.route('/backup/restore', methods=['POST'])
@@ -134,11 +149,20 @@ def restore_backup():
     if not filename:
         flash('请选择要恢复的备份文件', 'danger')
         return redirect(url_for('system.backup'))
-    
+
+    filename = _safe_filename(filename)
+    if not filename:
+        flash('无效的文件名', 'danger')
+        return redirect(url_for('system.backup'))
+
     backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../backups')
-    backup_path = os.path.join(backup_dir, filename)
+    backup_path = os.path.realpath(os.path.join(backup_dir, filename))
+    if not backup_path.startswith(os.path.realpath(backup_dir)):
+        flash('非法文件路径', 'danger')
+        return redirect(url_for('system.backup'))
+
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../instance/store.db')
-    
+
     if not os.path.exists(backup_path):
         flash('备份文件不存在', 'danger')
         return redirect(url_for('system.backup'))
@@ -179,14 +203,22 @@ def delete_backup():
     if not filename:
         flash('请选择要删除的备份文件', 'danger')
         return redirect(url_for('system.backup'))
-    
+
+    filename = _safe_filename(filename)
+    if not filename:
+        flash('无效的文件名', 'danger')
+        return redirect(url_for('system.backup'))
+
     backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../backups')
-    backup_path = os.path.join(backup_dir, filename)
-    
+    backup_path = os.path.realpath(os.path.join(backup_dir, filename))
+    if not backup_path.startswith(os.path.realpath(backup_dir)):
+        flash('非法文件路径', 'danger')
+        return redirect(url_for('system.backup'))
+
     if not os.path.exists(backup_path):
         flash('备份文件不存在', 'danger')
         return redirect(url_for('system.backup'))
-    
+
     # 不允许删除当前备份文件
     if filename.startswith('current_'):
         flash('不能删除当前备份文件', 'danger')

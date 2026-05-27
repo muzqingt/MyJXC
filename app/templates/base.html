@@ -126,7 +126,12 @@
                             <li><a class="dropdown-item" href="{{ url_for('system.logs') }}">操作日志</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('system.backup') }}">数据备份</a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">退出登录</a></li>
+                            <li>
+                                <form action="{{ url_for('auth.logout') }}" method="post" style="display:inline;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="dropdown-item">退出登录</button>
+                                </form>
+                            </li>
                         </ul>
                     </li>
                     {% else %}

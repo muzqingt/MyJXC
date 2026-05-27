@@ -30,7 +30,13 @@ class Config:
     BOOTSTRAP_BOOTSWATCH_THEME = 'flatly'  # 可选: cerulean, cosmo, flatly, journal, litera, lumen, lux, materia, minty, pulse, sandstone, simplex, sketchy, slate, solar, spacelab, superhero, united, yeti
 
     # Flask-Login remember me settings
-    REMEMBER_COOKIE_SECURE = False  # HTTP环境设为False
+    REMEMBER_COOKIE_SECURE = True
     REMEMBER_COOKIE_HTTPONLY = True
     REMEMBER_COOKIE_SAMESITE = 'Lax'
     REMEMBER_COOKIE_DURATION = 86400 * 7  # 7天
+
+    # Session security settings
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_PROTECTION = 'strong'

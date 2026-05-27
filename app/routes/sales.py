@@ -572,18 +572,6 @@ def quick_stock_out(id):
         flash('此订单没有商品明细！', 'danger')
         return redirect(url_for('sales.index'))
     
-    # 检查库存是否充足
-    insufficient_stock = []
-    for item in order.items:
-        product = item.product
-        remaining_qty = float(item.quantity) - float(item.delivered_quantity)
-        if remaining_qty > 0 and product.stock_quantity < remaining_qty:
-            insufficient_stock.append(f"{product.code} - {product.name} (库存: {product.stock_quantity}, 需求: {remaining_qty})")
-    
-    if insufficient_stock:
-        flash(f'库存不足: {", ".join(insufficient_stock)}', 'danger')
-        return redirect(url_for('sales.index'))
-    
     try:
         today = datetime.now().strftime('%Y%m%d')
         
@@ -618,6 +606,10 @@ def quick_stock_out(id):
             product = Product.query.with_for_update().get(item.product_id)
             if not product:
                 continue
+            if float(product.stock_quantity) < remaining_qty:
+                db.session.rollback()
+                flash(f'商品 {product.name} 库存不足，当前库存: {float(product.stock_quantity)}，需要: {remaining_qty}', 'danger')
+                return redirect(url_for('sales.order_view', id=order.id))
             unit_price = float(item.unit_price)
             product.sale_price = unit_price
 
@@ -1126,7 +1118,7 @@ def quick_return(id):
             if not product:
                 continue
 
-            return_qty = float(order_item.quantity)
+            return_qty = float(order_item.delivered_quantity or 0)
             if return_qty <= 0:
                 continue
 

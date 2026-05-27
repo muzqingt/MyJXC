@@ -84,6 +84,13 @@
 
 {% block extra_js %}
 <script>
+function escapeHtml(text) {
+    if (text == null) return '';
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(String(text)));
+    return div.innerHTML;
+}
+
 $(document).ready(function() {
     // 加载备份列表
     function loadBackupList() {
@@ -95,7 +102,7 @@ $(document).ready(function() {
                     $('#backupList').html(`
                         <div class="alert alert-danger">
                             <i class="bi bi-exclamation-triangle"></i>
-                            ${data.error}
+                            ${escapeHtml(data.error)}
                         </div>
                     `);
                     return;
@@ -128,27 +135,28 @@ $(document).ready(function() {
                 data.forEach(function(backup) {
                     const sizeMB = (backup.size / (1024 * 1024)).toFixed(2);
                     const isCurrentBackup = backup.filename.includes('current_');
+                    const safeFilename = escapeHtml(backup.filename);
                     html += `
                         <tr>
                             <td>
-                                <code>${backup.filename}</code>
+                                <code>${safeFilename}</code>
                                 ${isCurrentBackup ? '<span class="badge bg-warning ms-2">当前备份</span>' : ''}
                             </td>
                             <td>${sizeMB} MB</td>
-                            <td>${backup.created_at}</td>
+                            <td>${escapeHtml(backup.created_at)}</td>
                             <td>
                                 <div class="btn-group btn-group-sm">
-                                    <a href="{{ url_for('system.download_backup', filename='') }}${backup.filename}" 
+                                    <a href="{{ url_for('system.download_backup', filename='') }}${safeFilename}"
                                        class="btn btn-outline-primary" title="下载">
                                         <i class="bi bi-download"></i>
                                     </a>
-                                    <button type="button" class="btn btn-outline-danger restore-btn" 
-                                            data-filename="${backup.filename}"
+                                    <button type="button" class="btn btn-outline-danger restore-btn"
+                                            data-filename="${safeFilename}"
                                             {% if current_user.role != 'admin' %}disabled title="只有管理员可以恢复备份"{% endif %}>
                                         <i class="bi bi-arrow-clockwise"></i>
                                     </button>
-                                    <button type="button" class="btn btn-outline-dark delete-btn" 
-                                            data-filename="${backup.filename}"
+                                    <button type="button" class="btn btn-outline-dark delete-btn"
+                                            data-filename="${safeFilename}"
                                             ${isCurrentBackup ? 'disabled title="不能删除当前备份"' : '{% if current_user.role != "admin" %}disabled title="只有管理员可以删除备份"{% endif %}'}>
                                         <i class="bi bi-trash"></i>
                                     </button>

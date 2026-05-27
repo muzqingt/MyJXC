@@ -1,4 +1,5 @@
 from flask import render_template, redirect, url_for, flash, request, Blueprint
+from urllib.parse import urlparse
 from flask_login import login_user, logout_user, current_user, login_required
 from app import db
 from app.models import User, Log
@@ -40,8 +41,12 @@ def login():
         
         flash('登录成功！', 'success')
         next_page = request.args.get('next')
-        if not next_page or not next_page.startswith('/'):
+        if not next_page:
             next_page = url_for('main.index')
+        else:
+            parsed = urlparse(next_page)
+            if parsed.netloc or parsed.scheme or next_page.startswith('//'):
+                next_page = url_for('main.index')
         return redirect(next_page)
     
     return render_template('auth/login.html', title='登录', form=form)
@@ -63,7 +68,7 @@ def register():
     
     return render_template('auth/register.html', title='注册', form=form)
 
-@bp.route('/logout')
+@bp.route('/logout', methods=['POST'])
 @login_required
 def logout():
     # 记录登出日志
