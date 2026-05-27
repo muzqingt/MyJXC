@@ -170,14 +170,16 @@ def restore_backup():
         return redirect(url_for('system.backup'))
     
     try:
-        # 先备份当前数据库
         current_backup = f'current_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db'
         shutil.copy2(db_path, os.path.join(backup_dir, current_backup))
-        
-        # 恢复备份
-        shutil.copy2(backup_path, db_path)
-        
-        # 记录操作日志
+
+        db.session.remove()
+        try:
+            shutil.copy2(backup_path, db_path)
+        except OSError:
+            flash('数据恢复失败，请稍后重试', 'danger')
+            return redirect(url_for('system.backup'))
+
         log = Log(
             user_id=current_user.id,
             action='恢复数据备份',
@@ -186,7 +188,7 @@ def restore_backup():
         )
         db.session.add(log)
         db.session.commit()
-        
+
         flash(f'数据恢复成功，当前数据库已备份为: {current_backup}', 'success')
     except (OSError, SQLAlchemyError):
         db.session.rollback()
@@ -341,8 +343,7 @@ def edit_user(user_id):
         
         password = request.form.get('password')
         if password:
-            from werkzeug.security import generate_password_hash
-            user.password_hash = generate_password_hash(password)
+            user.set_password(password)
         
         db.session.commit()
         flash('用户信息已更新', 'success')
@@ -439,7 +440,10 @@ def clean_logs():
     try:
         from datetime import timedelta
         cutoff_date = datetime.now() - timedelta(days=90)
-        deleted = Log.query.filter(Log.created_at < cutoff_date).delete()
+        old_logs = Log.query.filter(Log.created_at < cutoff_date).all()
+        deleted = len(old_logs)
+        for log in old_logs:
+            db.session.delete(log)
         db.session.commit()
         return jsonify({'success': True, 'deleted_count': deleted})
     except SQLAlchemyError as e:

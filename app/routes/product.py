@@ -94,9 +94,7 @@ def new_product():
                     product.image_path = new_filename
 
         db.session.add(product)
-        db.session.commit()
-        
-        # 记录日志
+
         log = Log(
             user_id=current_user.id,
             action='添加商品',
@@ -168,9 +166,6 @@ def edit_product(id):
                     file.save(filepath)
                     product.image_path = new_filename
 
-        db.session.commit()
-        
-        # 记录日志
         log = Log(
             user_id=current_user.id,
             action='修改商品',
@@ -332,9 +327,9 @@ def api_products():
             'name': product.name,
             'specification': product.specification,
             'unit': product.unit,
-            'purchase_price': float(product.purchase_price),
-            'sale_price': float(product.sale_price),
-            'stock_quantity': float(product.stock_quantity)
+            'purchase_price': str(product.purchase_price),
+            'sale_price': str(product.sale_price),
+            'stock_quantity': str(product.stock_quantity)
         })
     return jsonify(result)
 
@@ -350,7 +345,7 @@ def api_update_price():
     price_type = data.get('price_type')  # 'sale_price' or 'purchase_price'
     price = data.get('price')
 
-    if not product_id or not price_type or price is None or price is False:
+    if not product_id or not price_type or price is None:
         return jsonify({'success': False, 'message': '参数不完整'})
     
     try:
@@ -374,7 +369,7 @@ def api_update_price():
         return jsonify({'success': True, 'message': '价格已更新'})
     except SQLAlchemyError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
+        return jsonify({'success': False, 'message': '数据库错误，请重试'})
 
 @bp.route('/api/categories')
 @login_required

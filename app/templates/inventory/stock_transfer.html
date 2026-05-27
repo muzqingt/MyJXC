@@ -180,7 +180,7 @@
 
 <!-- 存储商品数据 -->
 <div id="products-data" style="display: none;">
-    {{ products_json|safe if products_json else '[]' }}
+    {{ products_list|tojson|safe if products_list else '[]' }}
 </div>
 <!-- 存储提交的商品明细（验证失败时回填） -->
 <div id="transfer-items-data" style="display: none;">

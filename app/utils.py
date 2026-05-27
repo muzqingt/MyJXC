@@ -178,12 +178,16 @@ def update_stock_and_log(product: Any, warehouse_id: int, quantity: Union[float,
     """
     from app.models import StockLog
     
+    valid_change_types = ('in', 'out', 'adjust_in', 'adjust_out', 'check_in', 'check_out', 'return_in', 'return_out', 'stock_transfer')
+    if change_type not in valid_change_types:
+        raise ValueError(f"Invalid change_type: {change_type}")
+
     before_quantity = to_decimal(product.stock_quantity)
     delta = to_decimal(quantity)
 
-    if change_type == 'in':
+    if change_type == 'in' or change_type.endswith('_in'):
         after_quantity = before_quantity + delta
-    else:  # out
+    else:
         after_quantity = before_quantity - delta
     
     product.stock_quantity = after_quantity

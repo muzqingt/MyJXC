@@ -4,6 +4,7 @@ from app import db
 from app.models import Supplier, Customer, Warehouse
 from app.forms import SupplierForm, CustomerForm, WarehouseForm
 from flask import Blueprint
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
 # 创建蓝图
 bp = Blueprint('partner', __name__, url_prefix='/partner')
@@ -38,7 +39,16 @@ def add_supplier():
         )
 
         db.session.add(supplier)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            flash('编码已存在，请使用其他编码！', 'danger')
+            return render_template('product/supplier_edit.html', title='添加供应商', form=form, action='new')
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('数据库错误，操作失败！', 'danger')
+            return render_template('product/supplier_edit.html', title='添加供应商', form=form, action='new')
 
         flash('供应商添加成功！', 'success')
         return redirect(url_for('partner.suppliers'))
@@ -70,7 +80,17 @@ def edit_supplier(id):
         supplier.address = form.address.data
         supplier.email = form.email.data
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            flash('编码已存在，请使用其他编码！', 'danger')
+            return render_template('product/supplier_edit.html', title='编辑供应商', form=form, supplier=supplier)
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('数据库错误，操作失败！', 'danger')
+            return render_template('product/supplier_edit.html', title='编辑供应商', form=form, supplier=supplier)
+
         flash('供应商修改成功！', 'success')
         return redirect(url_for('partner.suppliers'))
 
@@ -93,7 +113,12 @@ def delete_supplier(id):
         return redirect(url_for('partner.suppliers'))
 
     db.session.delete(supplier)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('数据库错误，删除失败！', 'danger')
+        return redirect(url_for('partner.suppliers'))
 
     flash('供应商删除成功！', 'success')
     return redirect(url_for('partner.suppliers'))
@@ -128,7 +153,16 @@ def add_customer():
         )
 
         db.session.add(customer)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            flash('编码已存在，请使用其他编码！', 'danger')
+            return render_template('product/customer_edit.html', title='添加客户', form=form, action='new')
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('数据库错误，操作失败！', 'danger')
+            return render_template('product/customer_edit.html', title='添加客户', form=form, action='new')
 
         flash('客户添加成功！', 'success')
         return redirect(url_for('partner.customers'))
@@ -160,7 +194,17 @@ def edit_customer(id):
         customer.address = form.address.data
         customer.email = form.email.data
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            flash('编码已存在，请使用其他编码！', 'danger')
+            return render_template('product/customer_edit.html', title='编辑客户', form=form, customer=customer)
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('数据库错误，操作失败！', 'danger')
+            return render_template('product/customer_edit.html', title='编辑客户', form=form, customer=customer)
+
         flash('客户修改成功！', 'success')
         return redirect(url_for('partner.customers'))
 
@@ -183,7 +227,12 @@ def delete_customer(id):
         return redirect(url_for('partner.customers'))
 
     db.session.delete(customer)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('数据库错误，删除失败！', 'danger')
+        return redirect(url_for('partner.customers'))
 
     flash('客户删除成功！', 'success')
     return redirect(url_for('partner.customers'))
@@ -217,7 +266,16 @@ def add_warehouse():
         )
 
         db.session.add(warehouse)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            flash('编码已存在，请使用其他编码！', 'danger')
+            return render_template('product/warehouse_edit.html', title='添加仓库', form=form, action='new')
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('数据库错误，操作失败！', 'danger')
+            return render_template('product/warehouse_edit.html', title='添加仓库', form=form, action='new')
 
         flash('仓库添加成功！', 'success')
         return redirect(url_for('partner.warehouses'))
@@ -248,7 +306,17 @@ def edit_warehouse(id):
         warehouse.manager = form.manager.data
         warehouse.phone = form.phone.data
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            flash('编码已存在，请使用其他编码！', 'danger')
+            return render_template('product/warehouse_edit.html', title='编辑仓库', form=form, warehouse=warehouse)
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('数据库错误，操作失败！', 'danger')
+            return render_template('product/warehouse_edit.html', title='编辑仓库', form=form, warehouse=warehouse)
+
         flash('仓库修改成功！', 'success')
         return redirect(url_for('partner.warehouses'))
 
@@ -272,7 +340,12 @@ def delete_warehouse(id):
         return redirect(url_for('partner.warehouses'))
 
     db.session.delete(warehouse)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('数据库错误，删除失败！', 'danger')
+        return redirect(url_for('partner.warehouses'))
 
     flash('仓库删除成功！', 'success')
     return redirect(url_for('partner.warehouses'))

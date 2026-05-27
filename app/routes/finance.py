@@ -107,29 +107,31 @@ def add_receipt():
     form.customer_id.choices = [(0, '请选择客户')] + [(c.id, c.name) for c in Customer.query.all()]
 
     if form.validate_on_submit():
-        # 生成收款单号 RCYYYYMMDD001
-        receipt_number = generate_order_number('RC', Receipt)
+        try:
+            receipt_number = generate_order_number('RC', Receipt)
 
-        # 处理收款数据
-        receipt = Receipt(
-            receipt_number=receipt_number,
-            customer_id=form.customer_id.data,
-            amount=form.amount.data,
-            receipt_date=form.receipt_date.data,
-            payment_method=form.payment_method.data,
-            reference_type=form.reference_type.data,
-            reference_id=form.reference_id.data.strip() if form.reference_id.data else None,
-            notes=form.notes.data,
-            created_by=current_user.id
-        )
-        db.session.add(receipt)
+            receipt = Receipt(
+                receipt_number=receipt_number,
+                customer_id=form.customer_id.data,
+                amount=form.amount.data,
+                receipt_date=form.receipt_date.data,
+                payment_method=form.payment_method.data,
+                reference_type=form.reference_type.data,
+                reference_id=form.reference_id.data.strip() if form.reference_id.data else None,
+                notes=form.notes.data,
+                created_by=current_user.id
+            )
+            db.session.add(receipt)
 
-        # 更新客户应收余额(收款减少应收)
-        customer = db.session.get(Customer, form.customer_id.data)
-        if customer:
-            sub_balance(customer, "receivable_balance", form.amount.data)
+            customer = db.session.get(Customer, form.customer_id.data)
+            if customer:
+                sub_balance(customer, "receivable_balance", form.amount.data)
 
-        db.session.commit()
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('添加失败，请重试!', 'danger')
+            return redirect(url_for('finance.add_receipt'))
         flash('收款记录已添加成功!', 'success')
         return redirect(url_for('finance.receipts'))
 
@@ -173,29 +175,31 @@ def add_payment():
     form.supplier_id.choices = [(0, '请选择供应商')] + [(s.id, s.name) for s in Supplier.query.all()]
 
     if form.validate_on_submit():
-        # 生成付款单号 PYYYYMMDD001
-        payment_number = generate_order_number('PY', Payment)
+        try:
+            payment_number = generate_order_number('PY', Payment)
 
-        # 处理付款数据
-        payment = Payment(
-            payment_number=payment_number,
-            supplier_id=form.supplier_id.data,
-            amount=form.amount.data,
-            payment_date=form.payment_date.data,
-            payment_method=form.payment_method.data,
-            reference_type=form.reference_type.data,
-            reference_id=form.reference_id.data.strip() if form.reference_id.data else None,
-            notes=form.notes.data,
-            created_by=current_user.id
-        )
-        db.session.add(payment)
+            payment = Payment(
+                payment_number=payment_number,
+                supplier_id=form.supplier_id.data,
+                amount=form.amount.data,
+                payment_date=form.payment_date.data,
+                payment_method=form.payment_method.data,
+                reference_type=form.reference_type.data,
+                reference_id=form.reference_id.data.strip() if form.reference_id.data else None,
+                notes=form.notes.data,
+                created_by=current_user.id
+            )
+            db.session.add(payment)
 
-        # 更新供应商应付余额(付款减少应付)
-        supplier = db.session.get(Supplier, form.supplier_id.data)
-        if supplier:
-            sub_balance(supplier, "payable_balance", form.amount.data)
+            supplier = db.session.get(Supplier, form.supplier_id.data)
+            if supplier:
+                sub_balance(supplier, "payable_balance", form.amount.data)
 
-        db.session.commit()
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('添加失败，请重试!', 'danger')
+            return redirect(url_for('finance.add_payment'))
         flash('付款记录已添加成功!', 'success')
         return redirect(url_for('finance.payments'))
 
@@ -534,6 +538,11 @@ def ar_ap_search():
     supplier_ap_balance = 0  # 应付余额
     supplier_payments = []
     supplier_orders = []
+
+    customer_returns = []
+    customer_return_amount = 0
+    supplier_returns = []
+    supplier_return_amount = 0
 
     # 按客户检索应收：关联查询销售订单、收款记录、退货记录
     if customer_id:

@@ -3,7 +3,8 @@ main - 首页路由
 """
 from flask import Blueprint, render_template
 from flask_login import login_required, current_user
-from datetime import datetime, timedelta
+from datetime import datetime
+from decimal import Decimal
 from app import db
 from app.models import (
     Product, PurchaseOrder, SalesOrder,
@@ -18,8 +19,7 @@ bp = Blueprint('main', __name__)
 def index():
     """业务概览仪表板"""
     today = datetime.now().date()
-    yesterday = today - timedelta(days=1)
-    
+
     # 今日采购订单
     today_purchase_orders = PurchaseOrder.query.filter(
         db.func.date(PurchaseOrder.created_at) == today
@@ -75,15 +75,15 @@ def index():
         db.func.sum(PurchaseOrder.total_amount)
     ).filter(
         db.func.date(PurchaseOrder.created_at) == today
-    ).scalar() or 0
-    
+    ).scalar() or Decimal('0')
+
     # 今日销售金额
     today_sales_amount = db.session.query(
         db.func.sum(SalesOrder.total_amount)
     ).filter(
         db.func.date(SalesOrder.created_at) == today
-    ).scalar() or 0
-    
+    ).scalar() or Decimal('0')
+
     # 最近采购订单
     recent_purchase_orders = PurchaseOrder.query.order_by(
         PurchaseOrder.created_at.desc()
