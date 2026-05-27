@@ -1,5 +1,7 @@
-from flask import render_template, redirect, url_for, flash, request, jsonify, Blueprint, send_file, abort
+from flask import render_template, redirect, url_for, flash, request, jsonify, Blueprint, send_file, abort, current_app
 from flask_login import login_required, current_user
+from flask_wtf.csrf import validate_csrf
+from wtforms import ValidationError
 import os
 import shutil
 from datetime import datetime
@@ -31,6 +33,7 @@ def index():
 @login_required
 def logs():
     """操作日志"""
+    _require_admin()
     page = request.args.get('page', 1, type=int)
     per_page = 20
     
@@ -56,9 +59,9 @@ def create_backup():
     # 创建备份目录
     backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../backups')
     os.makedirs(backup_dir, exist_ok=True)
-    
+
     # 备份数据库文件
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../instance/store.db')
+    db_path = current_app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     description = request.form.get('description', '').strip()
     # 清理描述用于文件名：只保留安全字符
@@ -109,10 +112,10 @@ def list_backups():
             backups.append({
                 'filename': filename,
                 'size': stat.st_size,
-                'created_at': datetime.fromtimestamp(stat.st_ctime).strftime('%Y-%m-%d %H:%M:%S')
+                'modified_at': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
             })
-    
-    backups.sort(key=lambda x: x['created_at'], reverse=True)
+
+    backups.sort(key=lambda x: x['modified_at'], reverse=True)
     return jsonify(backups)
 
 @bp.route('/backup/download/<filename>')
@@ -160,7 +163,7 @@ def restore_backup():
         flash('非法文件路径', 'danger')
         return redirect(url_for('system.backup'))
 
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../instance/store.db')
+    db_path = current_app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
 
     if not os.path.exists(backup_path):
         flash('备份文件不存在', 'danger')
@@ -274,6 +277,11 @@ def user_management():
 def add_user():
     """添加用户"""
     _require_admin()
+    try:
+        validate_csrf(request.form.get('csrf_token'))
+    except ValidationError:
+        flash('请求无效，请重试。', 'danger')
+        return redirect(url_for('system.user_management'))
 
     username = request.form.get('username')
     password = request.form.get('password')
@@ -319,6 +327,12 @@ def edit_user(user_id):
         abort(404)
 
     if request.method == 'POST':
+        try:
+            validate_csrf(request.form.get('csrf_token'))
+        except ValidationError:
+            flash('请求无效，请重试。', 'danger')
+            return redirect(url_for('system.user_management'))
+
         email = request.form.get('email', '').strip()
         if email and ('@' not in email or '.' not in email.split('@')[1]):
             flash('请输入有效的邮箱地址', 'danger')
@@ -329,11 +343,14 @@ def edit_user(user_id):
             role = 'user'
         user.role = role
         user.is_active = request.form.get('is_active') == '1'
-        
+
         password = request.form.get('password')
         if password:
+            if len(password) < 6 or len(password) > 128:
+                flash('密码长度必须在6到128个字符之间', 'danger')
+                return redirect(url_for('system.edit_user', user_id=user_id))
             user.set_password(password)
-        
+
         db.session.commit()
         flash('用户信息已更新', 'success')
         return redirect(url_for('system.user_management'))
@@ -345,6 +362,11 @@ def edit_user(user_id):
 def delete_user(user_id):
     """删除用户"""
     _require_admin()
+    try:
+        validate_csrf(request.form.get('csrf_token'))
+    except ValidationError:
+        flash('请求无效，请重试。', 'danger')
+        return redirect(url_for('system.user_management'))
 
     if user_id == current_user.id:
         flash('不能删除当前登录用户', 'danger')
@@ -373,7 +395,7 @@ def system_info_api():
     _require_admin()
 
     # 获取数据库大小
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../instance/store.db')
+    db_path = current_app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
     db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
     
     # 获取用户数量
@@ -412,8 +434,8 @@ def optimize_db():
 
     try:
         # VACUUM 命令优化 SQLite 数据库
+        db.session.execute(db.text('COMMIT'))
         db.session.execute(db.text('VACUUM'))
-        db.session.commit()
         return jsonify({'success': True, 'message': '数据库优化完成'})
     except SQLAlchemyError as e:
         db.session.rollback()
@@ -435,6 +457,7 @@ def clean_logs():
         db.session.commit()
         return jsonify({'success': True, 'deleted_count': deleted})
     except SQLAlchemyError as e:
+        db.session.rollback()
         return jsonify({'success': False, 'message': f'清理失败: {str(e)}'}), 500
 
 @bp.route('/api/system/export-db')
@@ -443,7 +466,7 @@ def export_db():
     """导出数据库"""
     _require_admin()
 
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../instance/store.db')
+    db_path = current_app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
     export_filename = f'export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db'
     
     if not os.path.exists(db_path):
@@ -458,6 +481,10 @@ def export_db():
 def save_settings():
     """保存系统设置"""
     _require_admin()
+    try:
+        validate_csrf(request.form.get('csrf_token'))
+    except ValidationError:
+        return jsonify({'success': False, 'message': '请求无效，请重试。'}), 400
 
     from app.models import SystemSetting
     

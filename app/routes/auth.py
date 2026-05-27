@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 from flask_login import login_user, logout_user, current_user, login_required
 from flask_wtf.csrf import validate_csrf
 from wtforms import ValidationError
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from app import db
 from app.models import User, Log
 from app.forms import LoginForm, RegistrationForm
@@ -68,8 +68,13 @@ def register():
         user = User(username=form.username.data, email=form.email.data, is_active=False)
         user.set_password(form.password.data)
         db.session.add(user)
-        db.session.commit()
-        
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            flash('用户名已存在，请选择其他用户名。', 'danger')
+            return render_template('auth/register.html', title='注册', form=form)
+
         flash('注册成功！请等待管理员激活账户后登录。', 'success')
         return redirect(url_for('auth.login'))
     
@@ -141,10 +146,10 @@ def change_password():
     db.session.add(log)
     try:
         db.session.commit()
+        flash('密码修改成功', 'success')
     except SQLAlchemyError:
         db.session.rollback()
 
-    flash('密码修改成功', 'success')
     return redirect(url_for('auth.profile'))
 
 @bp.route('/change-email', methods=['POST'])
@@ -184,8 +189,8 @@ def change_email():
     db.session.add(log)
     try:
         db.session.commit()
+        flash('邮箱修改成功', 'success')
     except SQLAlchemyError:
         db.session.rollback()
 
-    flash('邮箱修改成功', 'success')
     return redirect(url_for('auth.profile'))

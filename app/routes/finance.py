@@ -6,8 +6,6 @@ from app.models import Receipt, Payment, Expense, Customer, Supplier, SalesOrder
 from app.forms import ReceiptForm, PaymentForm, ExpenseForm
 from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill
 from app.utils import to_decimal, add_balance, sub_balance, generate_order_number, PAYMENT_METHOD_MAP, apply_excel_header_style, EXCEL_HEADER_FONT, EXCEL_HEADER_FILL, EXCEL_THIN_BORDER, EXCEL_HEADER_ALIGNMENT
 import io
 
@@ -731,6 +729,8 @@ def supplier_ap_detail(supplier_id):
 def export_customer_ar(customer_id):
     """导出客户应收报表"""
     from urllib.parse import quote
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
     # TODO: 添加业务级权限检查，例如检查当前用户是否有权访问该客户的数据
     customer = db.session.get(Customer, customer_id)
     if customer is None:
@@ -856,6 +856,7 @@ def export_customer_ar(customer_id):
 def export_receipts():
     """导出收款记录"""
     from urllib.parse import quote
+    from openpyxl import Workbook
 
     receipts_list = Receipt.query.order_by(Receipt.receipt_date.desc()).all()
 
@@ -919,6 +920,7 @@ def export_receipts():
 def export_payments():
     """导出付款记录"""
     from urllib.parse import quote
+    from openpyxl import Workbook
 
     payments_list = Payment.query.order_by(Payment.payment_date.desc()).all()
 
@@ -982,6 +984,7 @@ def export_payments():
 def export_profit_analysis():
     """导出利润分析报表"""
     from urllib.parse import quote
+    from openpyxl import Workbook
 
     # 获取销售数据
     sales_data = db.session.query(
@@ -1048,6 +1051,7 @@ def export_profit_analysis():
 def export_expenses():
     """导出费用报表"""
     from urllib.parse import quote
+    from openpyxl import Workbook
 
     expenses_list = Expense.query.order_by(Expense.expense_date.desc()).all()
 
@@ -1103,6 +1107,8 @@ def export_expenses():
 def export_supplier_ap(supplier_id):
     """导出供应商应付报表"""
     from urllib.parse import quote
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
     # TODO: 添加业务级权限检查，例如检查当前用户是否有权访问该供应商的数据
     supplier = db.session.get(Supplier, supplier_id)
     if supplier is None:

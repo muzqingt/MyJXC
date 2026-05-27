@@ -66,15 +66,15 @@ def index():
         return_query = return_query.filter(SalesReturn.return_date <= end_date)
     returns_list = return_query.order_by(SalesReturn.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
 
-    customers = Customer.query.all()
-    warehouses = Warehouse.query.all()
+    customers = Customer.query.limit(200).all()
+    warehouses = Warehouse.query.limit(100).all()
 
     # 预计算已退货的订单ID集合（用于模板显示"已退货"状态）
     returned_order_ids = set(
         r.sales_order_id for r in SalesReturn.query.filter(
             SalesReturn.status == 'completed',
             SalesReturn.sales_order_id.isnot(None)
-        ).all()
+        ).limit(500).all()
     )
 
     return render_template('sales/index.html',
@@ -112,6 +112,8 @@ def new_order():
     
     if request.method == 'POST':
         order_status = request.form.get('order_status', 'draft')
+        if order_status not in ('draft', 'confirmed', 'completed'):
+            order_status = 'draft'
         
         # 获取表单数据
         customer_id = request.form.get('customer_id', type=int)
@@ -228,30 +230,6 @@ def new_order():
 
         # 如果选择直接出库
         if order_status == 'completed':
-            # 检查库存是否充足
-            insufficient_stock = []
-            for item_data in order_items_list:
-                product = item_data['product']
-                if product.stock_quantity < item_data['quantity']:
-                    insufficient_stock.append(f"{product.code} - {product.name} (库存: {product.stock_quantity}, 需求: {item_data['quantity']})")
-
-            if insufficient_stock:
-                db.session.rollback()
-                flash(f'库存不足: {", ".join(insufficient_stock)}', 'danger')
-                return render_template('sales/order_items.html',
-                                     title='新建销售订单',
-                                     customers=customers_data,
-                                     warehouses=warehouses,
-                                     products=products_data,
-                                     action='new',
-                                     submitted_customer_id=customer_id,
-                                     submitted_warehouse_id=warehouse_id if warehouse_id else '',
-                                     submitted_order_date=order_date,
-                                     submitted_delivery_date=delivery_date,
-                                     submitted_notes=notes,
-                                     order_items=order_items_list,
-                                     default_warehouse_id=default_warehouse_id)
-
             try:
                 delivery_number = generate_order_number('OUT', StockOut)
 
@@ -271,6 +249,22 @@ def new_order():
 
                 for item_data in order_items_list:
                     product = db.session.query(Product).filter(Product.id == item_data['product'].id).with_for_update().first()
+                    if product.stock_quantity < item_data['quantity']:
+                        db.session.rollback()
+                        flash(f'库存不足: {product.code} - {product.name} (库存: {product.stock_quantity}, 需求: {item_data["quantity"]})', 'danger')
+                        return render_template('sales/order_items.html',
+                                             title='新建销售订单',
+                                             customers=customers_data,
+                                             warehouses=warehouses,
+                                             products=products_data,
+                                             action='new',
+                                             submitted_customer_id=customer_id,
+                                             submitted_warehouse_id=warehouse_id if warehouse_id else '',
+                                             submitted_order_date=order_date,
+                                             submitted_delivery_date=delivery_date,
+                                             submitted_notes=notes,
+                                             order_items=order_items_list,
+                                             default_warehouse_id=default_warehouse_id)
                     quantity = item_data['quantity']
                     unit_price = item_data['unit_price']
                     amount = item_data['amount']
@@ -510,9 +504,14 @@ def edit_order(id):
 
         order.total_amount = total_amount
 
-        db.session.commit()
-        flash('销售订单修改成功！', 'success')
-        return redirect(url_for('sales.index', tab=get_redirect_tab(order.status)))
+        try:
+            db.session.commit()
+            flash('销售订单修改成功！', 'success')
+            return redirect(url_for('sales.index', tab=get_redirect_tab(order.status)))
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('修改订单失败，请重试', 'danger')
+            return redirect(url_for('sales.index'))
     
     return render_template('sales/order_items.html',
                          title='编辑销售订单',
@@ -743,14 +742,14 @@ def view_order(id):
 @login_required
 def new_stock_out_from_order(id):
     """从销售订单创建出库单（预填未出库商品）"""
-    order = db.session.query(SalesOrder).options(selectinload(SalesOrder.items).selectinload(SalesOrderItem.product)).filter(SalesOrder.id == id).first()
+    order = db.session.query(SalesOrder).options(selectinload(SalesOrder.items).selectinload(SalesOrderItem.product)).filter(SalesOrder.id == id).with_for_update().first()
     if order is None:
         abort(404)
 
     if order.status not in ['confirmed', 'partial']:
         flash('只有已确认或部分出库的订单可以创建出库单！', 'danger')
         return redirect(url_for('sales.view_order', id=id))
-    
+
     # 生成出库单号
     delivery_number = generate_order_number('OUT', StockOut)
 
@@ -842,6 +841,10 @@ def edit_stock_out_items(id):
     if stock_out is None:
         abort(404)
 
+    if stock_out.status == 'completed':
+        flash('已完成的出库单不能修改！', 'danger')
+        return redirect(url_for('sales.index', tab='stockouts'))
+
     if request.method == 'POST':
         # 处理商品明细
         product_ids = request.form.getlist('product_id[]')
@@ -858,8 +861,8 @@ def edit_stock_out_items(id):
             if product_ids[i] and quantities[i] and unit_prices[i]:
                 has_items = True
                 try:
-                    qty = float(quantities[i])
-                    price = float(unit_prices[i])
+                    qty = to_decimal(quantities[i])
+                    price = to_decimal(unit_prices[i])
                     if qty <= 0 or price < 0:
                         flash('数量必须大于0，单价不能为负数！', 'danger')
                         items_data = [{
@@ -1006,8 +1009,8 @@ def complete_stock_out(id):
         stock_out.updated_at = datetime.now()
 
         # 如果有关联销售订单，重新计算已出库数量（基于所有已完成出库单）
-        if stock_out.sales_order:
-            order = stock_out.sales_order
+        if stock_out.sales_order_id:
+            order = db.session.query(SalesOrder).filter(SalesOrder.id == stock_out.sales_order_id).with_for_update().first()
             for order_item in order.items:
                 total_delivered = sum(
                     so_item.quantity

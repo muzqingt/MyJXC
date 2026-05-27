@@ -28,7 +28,7 @@ def index():
     tab = request.args.get('tab', 'orders')
 
     # 获取采购订单
-    order_query = PurchaseOrder.query
+    order_query = PurchaseOrder.query.options(selectinload(PurchaseOrder.supplier))
 
     if status:
         order_query = order_query.filter_by(status=status)
@@ -45,7 +45,7 @@ def index():
     orders = order_query.order_by(PurchaseOrder.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
 
     # 获取入库单
-    stock_in_query = StockIn.query
+    stock_in_query = StockIn.query.options(selectinload(StockIn.warehouse))
 
     if warehouse_id:
         stock_in_query = stock_in_query.filter_by(warehouse_id=warehouse_id)
@@ -59,7 +59,7 @@ def index():
     stock_ins = stock_in_query.order_by(StockIn.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
 
     # 获取退货单
-    return_query = PurchaseReturn.query
+    return_query = PurchaseReturn.query.options(selectinload(PurchaseReturn.purchase_order).selectinload(PurchaseOrder.supplier))
     if start_date:
         return_query = return_query.filter(PurchaseReturn.return_date >= start_date)
     if end_date:
@@ -168,6 +168,8 @@ def new_order():
 
         if order_status not in ('draft', 'confirmed', 'completed'):
             order_status = 'draft'
+        if order_status != 'draft' and current_user.role != 'admin':
+            order_status = 'draft'
 
         order = PurchaseOrder(
             order_number=order_number,
@@ -213,6 +215,11 @@ def new_order():
                         'unit_price': unit_price,
                         'amount': amount
                     })
+
+        if not order_items_list:
+            db.session.rollback()
+            flash('请添加商品', 'danger')
+            return redirect(url_for('purchase.new_order'))
 
         order.total_amount = total_amount
 
@@ -284,12 +291,17 @@ def new_order():
                 flash(f'采购订单创建并入库完成!入库单号: {receipt_number}', 'success')
             except SQLAlchemyError as e:
                 db.session.rollback()
-                flash(f'直接入库失败: {str(e)}', 'danger')
+                flash('直接入库失败，请稍后重试', 'danger')
                 return redirect(url_for('purchase.new_order'))
         else:
             flash('采购订单创建成功!', 'success')
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            flash('采购订单创建失败，请稍后重试', 'danger')
+            return redirect(url_for('purchase.new_order'))
         return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
 
     return render_template('purchase/order_items.html',
@@ -431,37 +443,9 @@ def edit_order(id):
 
         order.total_amount = total_amount
 
-        # 调整供应商余额(差额)- 仅对已完成的订单
-        # 注意:confirmed/partial 状态的订单尚未实际入库,不调整余额
-        # 余额仅在订单 status=completed(已全部入库)时才记录
-        if order.status == 'completed':
-            if old_supplier and old_supplier.id != supplier_id:
-                # 换了供应商:先验证新供应商存在,再执行余额调整
-                new_supplier = db.session.get(Supplier, supplier_id)
-                if not new_supplier:
-                    flash('供应商不存在', 'danger')
-                    return redirect(url_for('purchase.edit_order', id=id))
-                if to_decimal(old_supplier.payable_balance) < original_total:
-                    flash('原供应商应付余额不足，无法完成此修改!', 'danger')
-                    return redirect(url_for('purchase.edit_order', id=id))
-                sub_balance(old_supplier, "payable_balance", original_total)
-                add_balance(new_supplier, "payable_balance", total_amount)
-            elif old_supplier and old_supplier.id == supplier_id:
-                # 同供应商:调整差额
-                if original_total != total_amount:
-                    diff = total_amount - original_total
-                    if diff > 0:
-                        add_balance(old_supplier, "payable_balance", diff)
-                    else:
-                        if to_decimal(old_supplier.payable_balance) < abs(diff):
-                            flash('供应商应付余额不足，无法完成此修改!', 'danger')
-                            return redirect(url_for('purchase.edit_order', id=id))
-                        sub_balance(old_supplier, "payable_balance", abs(diff))
-
         if action == 'confirm':
             if len(product_ids) == 0 or total_amount == 0:
                 flash('请先添加商品明细!', 'danger')
-                # 重建商品明细数据(用于回填)
                 order_items_list = []
                 for i in range(len(product_ids)):
                     if product_ids[i] and quantities[i] and unit_prices[i]:
@@ -493,11 +477,33 @@ def edit_order(id):
                                      submitted_notes=notes,
                                      order_items=order_items_list)
 
+        if order.status == 'completed':
+            if old_supplier and old_supplier.id != supplier_id:
+                new_supplier = db.session.get(Supplier, supplier_id)
+                if not new_supplier:
+                    flash('供应商不存在', 'danger')
+                    return redirect(url_for('purchase.edit_order', id=id))
+                if to_decimal(old_supplier.payable_balance) < original_total:
+                    flash('原供应商应付余额不足，无法完成此修改!', 'danger')
+                    return redirect(url_for('purchase.edit_order', id=id))
+                sub_balance(old_supplier, "payable_balance", original_total)
+                add_balance(new_supplier, "payable_balance", total_amount)
+            elif old_supplier and old_supplier.id == supplier_id:
+                if original_total != total_amount:
+                    diff = total_amount - original_total
+                    if diff > 0:
+                        add_balance(old_supplier, "payable_balance", diff)
+                    else:
+                        if to_decimal(old_supplier.payable_balance) < abs(diff):
+                            flash('供应商应付余额不足，无法完成此修改!', 'danger')
+                            return redirect(url_for('purchase.edit_order', id=id))
+                        sub_balance(old_supplier, "payable_balance", abs(diff))
+
         try:
             db.session.commit()
         except SQLAlchemyError as e:
             db.session.rollback()
-            flash(f'采购订单修改失败: {str(e)}', 'danger')
+            flash('采购订单修改失败，请稍后重试', 'danger')
             return redirect(url_for('purchase.index'))
 
         flash('采购订单修改成功!', 'success')
@@ -561,17 +567,16 @@ def delete_order(id):
         return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
 
     # 只有已完成的订单才需要回滚供应商应付余额（confirmed/partial 未实际入库，无余额记录）
-    supplier = order.supplier
-    if supplier and order.status == 'completed':
-        sub_balance(supplier, "payable_balance", order.total_amount)
-
-    db.session.delete(order)
     try:
+        supplier = order.supplier
+        if supplier and order.status == 'completed':
+            sub_balance(supplier, "payable_balance", order.total_amount)
+        db.session.delete(order)
         db.session.commit()
         flash('采购订单删除成功!', 'success')
     except SQLAlchemyError as e:
         db.session.rollback()
-        flash(f'采购订单删除失败: {str(e)}', 'danger')
+        flash('采购订单删除失败，请稍后重试', 'danger')
     return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
 
 
@@ -696,7 +701,7 @@ def quick_stock_in(id):
         flash(f'入库单 {receipt_number} 创建成功,库存已更新', 'success')
     except SQLAlchemyError as e:
         db.session.rollback()
-        flash(f'入库失败: {str(e)}', 'danger')
+        flash('入库失败，请稍后重试', 'danger')
 
     return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
 
@@ -785,7 +790,7 @@ def new_stock_in_from_order(id):
         return redirect(url_for('purchase.edit_stock_in_items', id=stock_in.id))
     except SQLAlchemyError as e:
         db.session.rollback()
-        flash(f'入库单创建失败: {str(e)}', 'danger')
+        flash('入库单创建失败，请稍后重试', 'danger')
         return redirect(url_for('purchase.view_order', id=id))
 
 @bp.route('/stock-ins/new', methods=['GET', 'POST'])
@@ -824,7 +829,7 @@ def new_stock_in():
             return redirect(url_for('purchase.edit_stock_in_items', id=stock_in.id))
         except SQLAlchemyError as e:
             db.session.rollback()
-            flash(f'入库单创建失败: {str(e)}', 'danger')
+            flash('入库单创建失败，请稍后重试', 'danger')
             return redirect(url_for('purchase.index'))
 
     return render_template('purchase/stock_in_edit.html',
@@ -839,6 +844,10 @@ def edit_stock_in_items(id):
     stock_in = db.session.get(StockIn, id)
     if stock_in is None:
         abort(404)
+
+    if stock_in.status == 'completed':
+        flash('已完成的入库单不能修改!', 'danger')
+        return redirect(url_for('purchase.index', tab='stockins'))
 
     if request.method == 'POST':
         # 处理商品明细
@@ -858,8 +867,8 @@ def edit_stock_in_items(id):
                 # 验证数量和单价为正数
                 try:
                     pid = int(product_ids[i])
-                    qty = float(quantities[i])
-                    price = float(unit_prices[i])
+                    qty = to_decimal(quantities[i])
+                    price = to_decimal(unit_prices[i])
                     if qty <= 0 or price < 0:
                         flash('数量必须大于0,单价不能为负数!', 'danger')
                         items_data = [{
@@ -930,7 +939,12 @@ def edit_stock_in_items(id):
                     product.purchase_price = unit_price
 
         stock_in.total_amount = total_amount
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            flash('商品明细保存失败，请稍后重试', 'danger')
+            return redirect(url_for('purchase.edit_stock_in_items', id=id))
 
         flash('商品明细保存成功!', 'success')
         return redirect(url_for('purchase.index', tab='stockins'))
@@ -1070,7 +1084,7 @@ def complete_stock_in(id):
 
     except SQLAlchemyError as e:
         db.session.rollback()
-        flash(f'入库失败: {str(e)}', 'danger')
+        flash('入库失败，请稍后重试', 'danger')
 
     return redirect(url_for('purchase.index', tab='stockins'))
 
@@ -1093,7 +1107,7 @@ def delete_stock_in(id):
         flash('入库单删除成功!', 'success')
     except SQLAlchemyError as e:
         db.session.rollback()
-        flash(f'入库单删除失败: {str(e)}', 'danger')
+        flash('入库单删除失败，请稍后重试', 'danger')
     return redirect(url_for('purchase.index', tab='stockins'))
 
 @bp.route('/stock-ins/<int:id>')
@@ -1212,7 +1226,7 @@ def quick_return(id):
         flash(f'退货单 {return_number} 创建成功，库存已更新！', 'success')
     except SQLAlchemyError as e:
         db.session.rollback()
-        flash(f'退货失败: {str(e)}', 'danger')
+        flash('退货失败，请稍后重试', 'danger')
 
     return redirect(url_for('purchase.index', tab='returns'))
 
@@ -1270,7 +1284,7 @@ def delete_return(id):
         flash('退货单删除成功！', 'success')
     except SQLAlchemyError as e:
         db.session.rollback()
-        flash(f'退货单删除失败: {str(e)}', 'danger')
+        flash('退货单删除失败，请稍后重试', 'danger')
     return redirect(url_for('purchase.returns'))
 
 
@@ -1290,9 +1304,9 @@ def api_order_items(order_id):
             'product_name': item.product.name,
             'specification': item.product.specification,
             'unit': item.product.unit,
-            'quantity': float(item.quantity),
-            'unit_price': float(item.unit_price),
-            'amount': float(item.amount),
-            'received_quantity': float(item.received_quantity)
+            'quantity': str(item.quantity),
+            'unit_price': str(item.unit_price),
+            'amount': str(item.amount),
+            'received_quantity': str(item.received_quantity)
         })
     return jsonify(items)
