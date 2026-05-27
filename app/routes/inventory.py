@@ -7,7 +7,7 @@ from app.models import Product, Warehouse, StockLog, StockIn, StockOut, Category
 import io
 from decimal import Decimal
 from app.forms import StockAdjustForm, StockTransferForm
-from app.utils import to_decimal
+from app.utils import to_decimal, apply_excel_header_style, EXCEL_HEADER_FONT, EXCEL_HEADER_FILL, EXCEL_THIN_BORDER, EXCEL_HEADER_ALIGNMENT
 
 
 def get_product_stock_in_warehouse(product_id, warehouse_id):
@@ -341,7 +341,6 @@ def export_warehouse_stock(warehouse_id):
     """导出仓库库存报表"""
     from urllib.parse import quote
     from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
     warehouse = Warehouse.query.get_or_404(warehouse_id)
     products = Product.query.all()
@@ -350,21 +349,10 @@ def export_warehouse_stock(warehouse_id):
     ws = wb.active
     ws.title = f'{warehouse.name}库存'
 
-    header_font = Font(bold=True, color='FFFFFF')
-    header_fill = PatternFill(start_color='4472C4', end_color='4472C4', fill_type='solid')
-    header_alignment = Alignment(horizontal='center', vertical='center')
-    thin_border = Border(
-        left=Side(style='thin'), right=Side(style='thin'),
-        top=Side(style='thin'), bottom=Side(style='thin')
-    )
-
     headers = ['商品编码', '商品名称', '规格', '单位', '当前库存', '安全库存', '采购价', '销售价', '库存状态']
     for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_alignment
-        cell.border = thin_border
+        ws.cell(row=1, column=col, value=header)
+    apply_excel_header_style(ws, 1, len(headers))
 
     for row_idx, product in enumerate(products, 2):
         stock = float(product.stock_quantity or 0)
@@ -376,19 +364,19 @@ def export_warehouse_stock(warehouse_id):
         else:
             status = '正常'
 
-        ws.cell(row=row_idx, column=1, value=product.code).border = thin_border
-        ws.cell(row=row_idx, column=2, value=product.name).border = thin_border
-        ws.cell(row=row_idx, column=3, value=product.specification or '').border = thin_border
-        ws.cell(row=row_idx, column=4, value=product.unit or '').border = thin_border
-        ws.cell(row=row_idx, column=5, value=stock).border = thin_border
+        ws.cell(row=row_idx, column=1, value=product.code).border = EXCEL_THIN_BORDER
+        ws.cell(row=row_idx, column=2, value=product.name).border = EXCEL_THIN_BORDER
+        ws.cell(row=row_idx, column=3, value=product.specification or '').border = EXCEL_THIN_BORDER
+        ws.cell(row=row_idx, column=4, value=product.unit or '').border = EXCEL_THIN_BORDER
+        ws.cell(row=row_idx, column=5, value=stock).border = EXCEL_THIN_BORDER
         ws.cell(row=row_idx, column=5).number_format = '#,##0.00'
-        ws.cell(row=row_idx, column=6, value=safety).border = thin_border
+        ws.cell(row=row_idx, column=6, value=safety).border = EXCEL_THIN_BORDER
         ws.cell(row=row_idx, column=6).number_format = '#,##0.00'
-        ws.cell(row=row_idx, column=7, value=float(product.purchase_price or 0)).border = thin_border
+        ws.cell(row=row_idx, column=7, value=float(product.purchase_price or 0)).border = EXCEL_THIN_BORDER
         ws.cell(row=row_idx, column=7).number_format = '#,##0.00'
-        ws.cell(row=row_idx, column=8, value=float(product.sale_price or 0)).border = thin_border
+        ws.cell(row=row_idx, column=8, value=float(product.sale_price or 0)).border = EXCEL_THIN_BORDER
         ws.cell(row=row_idx, column=8).number_format = '#,##0.00'
-        ws.cell(row=row_idx, column=9, value=status).border = thin_border
+        ws.cell(row=row_idx, column=9, value=status).border = EXCEL_THIN_BORDER
 
     ws.column_dimensions['A'].width = 12
     ws.column_dimensions['B'].width = 20
@@ -475,7 +463,6 @@ def export_logs():
     """导出库存流水日志"""
     from flask import Response
     from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
@@ -502,25 +489,11 @@ def export_logs():
     ws = wb.active
     ws.title = '库存流水'
     
-    # 设置表头样式
-    header_font = Font(bold=True, color='FFFFFF')
-    header_fill = PatternFill(start_color='4472C4', end_color='4472C4', fill_type='solid')
-    header_alignment = Alignment(horizontal='center', vertical='center')
-    thin_border = Border(
-        left=Side(style='thin'),
-        right=Side(style='thin'),
-        top=Side(style='thin'),
-        bottom=Side(style='thin')
-    )
-    
     # 写入表头
     headers = ['时间', '单号', '类型', '商品编码', '商品名称', '仓库', '数量', '操作前库存', '操作后库存', '操作人', '备注']
     for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_alignment
-        cell.border = thin_border
+        ws.cell(row=1, column=col, value=header)
+    apply_excel_header_style(ws, 1, len(headers))
     
     # 类型映射
     type_mapping = {
@@ -537,17 +510,17 @@ def export_logs():
     
     # 写入数据
     for row, log in enumerate(logs, 2):
-        ws.cell(row=row, column=1, value=log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else '').border = thin_border
-        ws.cell(row=row, column=2, value=log.reference_number or '').border = thin_border
-        ws.cell(row=row, column=3, value=type_mapping.get(log.change_type, log.change_type)).border = thin_border
-        ws.cell(row=row, column=4, value=log.product.code if log.product else '').border = thin_border
-        ws.cell(row=row, column=5, value=log.product.name if log.product else '').border = thin_border
-        ws.cell(row=row, column=6, value=log.warehouse.name if log.warehouse else '').border = thin_border
-        ws.cell(row=row, column=7, value=float(log.quantity) if log.quantity else 0).border = thin_border
-        ws.cell(row=row, column=8, value=float(log.before_quantity) if log.before_quantity else 0).border = thin_border
-        ws.cell(row=row, column=9, value=float(log.after_quantity) if log.after_quantity else 0).border = thin_border
-        ws.cell(row=row, column=10, value=log.creator.username if log.creator else '系统').border = thin_border
-        ws.cell(row=row, column=11, value=log.notes or '').border = thin_border
+        ws.cell(row=row, column=1, value=log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else '').border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=2, value=log.reference_number or '').border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=3, value=type_mapping.get(log.change_type, log.change_type)).border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=4, value=log.product.code if log.product else '').border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=5, value=log.product.name if log.product else '').border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=6, value=log.warehouse.name if log.warehouse else '').border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=7, value=float(log.quantity) if log.quantity else 0).border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=8, value=float(log.before_quantity) if log.before_quantity else 0).border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=9, value=float(log.after_quantity) if log.after_quantity else 0).border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=10, value=log.creator.username if log.creator else '系统').border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=11, value=log.notes or '').border = EXCEL_THIN_BORDER
     
     # 设置列宽
     ws.column_dimensions['A'].width = 20

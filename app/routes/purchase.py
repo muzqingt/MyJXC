@@ -3,20 +3,10 @@ from flask_login import login_required, current_user
 from app import db
 from sqlalchemy.orm import selectinload
 from app.models import PurchaseOrder, SystemSetting, PurchaseOrderItem, StockIn, StockInItem, Supplier, Warehouse, Product, StockLog, Log, PurchaseReturn, PurchaseReturnItem
-from app.utils import to_decimal, add_balance, sub_balance
+from app.utils import to_decimal, add_balance, sub_balance, get_redirect_tab, build_products_data, build_partners_data, generate_order_number
 from app.forms import PurchaseOrderForm, PurchaseOrderItemForm, StockInForm
 from datetime import datetime, timezone
 import urllib.parse
-
-def get_redirect_tab():
-    """从referer获取当前tab,默认返回orders"""
-    referer = request.referrer
-    if referer:
-        parsed = urllib.parse.urlparse(referer)
-        query_params = urllib.parse.parse_qs(parsed.query)
-        if 'tab' in query_params:
-            return query_params['tab'][0]
-    return 'orders'
 
 # 创建蓝图
 bp = Blueprint('purchase', __name__, url_prefix='/purchase')
@@ -104,22 +94,10 @@ def index():
 @login_required
 def new_order():
     suppliers = Supplier.query.all()
-    suppliers_data = [{
-        'id': s.id,
-        'code': s.code,
-        'name': s.name
-    } for s in suppliers]
+    partners_data = build_partners_data(suppliers)
     warehouses = Warehouse.query.all()
     products = Product.query.all()
-    products_data = [{
-        'id': p.id,
-        'code': p.code,
-        'name': p.name,
-        'specification': p.specification or '',
-        'unit': p.unit,
-        'purchase_price': float(p.purchase_price) if p.purchase_price else 0,
-        'stock_quantity': float(p.stock_quantity) if p.stock_quantity else 0
-    } for p in products]
+    products_data = build_products_data(products)
 
     # 获取默认仓库设置
     default_warehouse_id = SystemSetting.get_value('DEFAULT_WAREHOUSE')
@@ -160,7 +138,7 @@ def new_order():
                         })
             return render_template('purchase/order_items.html',
                                  title='新建采购订单',
-                                 suppliers=suppliers_data,
+                                 suppliers=partners_data,
                                  warehouses=warehouses,
                                  products=products_data,
                                  action='new',
@@ -172,13 +150,7 @@ def new_order():
                                  order_items=order_items_list)
 
         # 生成订单号
-        today = datetime.now().strftime('%Y%m%d')
-        last_order = PurchaseOrder.query.filter(PurchaseOrder.order_number.like(f'PO{today}%')).order_by(PurchaseOrder.id.desc()).first()
-        if last_order:
-            last_num = int(last_order.order_number[10:]) if len(last_order.order_number) > 10 else 0
-            order_number = f'PO{today}{last_num + 1:03d}'
-        else:
-            order_number = f'PO{today}001'
+        order_number = generate_order_number('PO', PurchaseOrder)
 
         order = PurchaseOrder(
             order_number=order_number,
@@ -225,12 +197,7 @@ def new_order():
         if order_status == 'completed':
             try:
                 # 生成入库单号
-                last_stock_in = StockIn.query.filter(StockIn.receipt_number.like(f'SI{today}%')).order_by(StockIn.id.desc()).first()
-                if last_stock_in:
-                    last_num = int(last_stock_in.receipt_number[10:]) if len(last_stock_in.receipt_number) > 10 else 0
-                    receipt_number = f'SI{today}{last_num + 1:03d}'
-                else:
-                    receipt_number = f'SI{today}001'
+                receipt_number = generate_order_number('SI', StockIn)
 
                 stock_in = StockIn(
                     receipt_number=receipt_number,
@@ -297,7 +264,7 @@ def new_order():
                 flash(f'直接入库失败: {str(e)}', 'danger')
                 return render_template('purchase/order_items.html',
                                      title='新建采购订单',
-                                     suppliers=suppliers_data,
+                                     suppliers=partners_data,
                                      warehouses=warehouses,
                                      products=products_data,
                                      action='new',
@@ -316,7 +283,7 @@ def new_order():
 
     return render_template('purchase/order_items.html',
                          title='新建采购订单',
-                         suppliers=suppliers_data,
+                         suppliers=partners_data,
                          warehouses=warehouses,
                          products=products_data,
                          action='new',
@@ -332,22 +299,10 @@ def edit_order(id):
         return redirect(url_for('purchase.index', tab=get_redirect_tab()))
 
     suppliers = Supplier.query.all()
-    suppliers_data = [{
-        'id': s.id,
-        'code': s.code,
-        'name': s.name
-    } for s in suppliers]
+    partners_data = build_partners_data(suppliers)
     warehouses = Warehouse.query.all()
     products = Product.query.all()
-    products_data = [{
-        'id': p.id,
-        'code': p.code,
-        'name': p.name,
-        'specification': p.specification or '',
-        'unit': p.unit,
-        'purchase_price': float(p.purchase_price) if p.purchase_price else 0,
-        'stock_quantity': float(p.stock_quantity) if p.stock_quantity else 0
-    } for p in products]
+    products_data = build_products_data(products)
 
     # 订单商品明细
     order_items_data = []
@@ -389,7 +344,7 @@ def edit_order(id):
             return render_template('purchase/order_items.html',
                                  title='编辑采购订单',
                                  order=order,
-                                 suppliers=suppliers_data,
+                                 suppliers=partners_data,
                                  warehouses=warehouses,
                                  products=products_data,
                                  action='edit',
@@ -486,7 +441,7 @@ def edit_order(id):
                 return render_template('purchase/order_items.html',
                                      title='编辑采购订单',
                                      order=order,
-                                     suppliers=suppliers_data,
+                                     suppliers=partners_data,
                                      warehouses=warehouses,
                                      products=products_data,
                                      action='edit',
@@ -505,7 +460,7 @@ def edit_order(id):
     return render_template('purchase/order_items.html',
                          title='编辑采购订单',
                          order=order,
-                         suppliers=suppliers_data,
+                         suppliers=partners_data,
                          warehouses=warehouses,
                          products=products_data,
                          order_items=order_items_data,
@@ -583,13 +538,7 @@ def quick_stock_in(id):
         return redirect(url_for('purchase.index', tab=get_redirect_tab()))
 
     try:
-        today = datetime.now().strftime('%Y%m%d')
-        last_stock_in = StockIn.query.filter(StockIn.receipt_number.like(f'SI{today}%')).order_by(StockIn.id.desc()).first()
-        if last_stock_in:
-            last_num = int(last_stock_in.receipt_number[10:]) if len(last_stock_in.receipt_number) > 10 else 0
-            receipt_number = f'SI{today}{last_num + 1:03d}'
-        else:
-            receipt_number = f'SI{today}001'
+        receipt_number = generate_order_number('SI', StockIn)
 
         stock_in = StockIn(
             receipt_number=receipt_number,
@@ -735,13 +684,7 @@ def new_stock_in_from_order(id):
         return redirect(url_for('purchase.view_order', id=id))
 
     # 生成入库单号
-    today = datetime.now().strftime('%Y%m%d')
-    last_stock_in = StockIn.query.filter(StockIn.receipt_number.like(f'SI{today}%')).order_by(StockIn.id.desc()).first()
-    if last_stock_in:
-        last_num = int(last_stock_in.receipt_number[10:]) if len(last_stock_in.receipt_number) > 10 else 0
-        receipt_number = f'SI{today}{last_num + 1:03d}'
-    else:
-        receipt_number = f'SI{today}001'
+    receipt_number = generate_order_number('SI', StockIn)
 
     # 创建入库单,预填采购订单信息
     stock_in = StockIn(
@@ -797,13 +740,7 @@ def new_stock_in():
 
     if form.validate_on_submit():
         # 生成入库单号
-        today = datetime.now().strftime('%Y%m%d')
-        last_stock_in = StockIn.query.filter(StockIn.receipt_number.like(f'SI{today}%')).order_by(StockIn.id.desc()).first()
-        if last_stock_in:
-            last_num = int(last_stock_in.receipt_number[10:]) if len(last_stock_in.receipt_number) > 10 else 0
-            receipt_number = f'SI{today}{last_num + 1:03d}'
-        else:
-            receipt_number = f'SI{today}001'
+        receipt_number = generate_order_number('SI', StockIn)
 
         stock_in = StockIn(
             receipt_number=receipt_number,
@@ -840,15 +777,7 @@ def edit_stock_in_items(id):
 
         # 构建 products_data(供验证失败时重新渲染模板用)
         products = Product.query.all()
-        products_data = [{
-            'id': p.id,
-            'code': p.code,
-            'name': p.name,
-            'specification': p.specification or '',
-            'unit': p.unit,
-            'purchase_price': float(p.purchase_price) if p.purchase_price else 0,
-            'stock_quantity': float(p.stock_quantity) if p.stock_quantity else 0
-        } for p in products]
+        products_data = build_products_data(products)
 
         # 验证:至少要有一行商品明细
         has_items = False
@@ -924,17 +853,7 @@ def edit_stock_in_items(id):
 
     products = Product.query.all()
     # Convert products to dictionaries for JSON serialization
-    products_data = []
-    for product in products:
-        products_data.append({
-            'id': product.id,
-            'code': product.code,
-            'name': product.name,
-            'specification': product.specification or '',
-            'unit': product.unit,
-            'purchase_price': float(product.purchase_price) if product.purchase_price else 0,
-            'stock_quantity': float(product.stock_quantity) if product.stock_quantity else 0
-        })
+    products_data = build_products_data(products)
 
     # 获取采购订单的商品信息和剩余未入库数量
     order_items_data = []
@@ -1116,13 +1035,7 @@ def quick_return(id):
         return redirect(url_for('purchase.index', tab='orders'))
 
     try:
-        today = datetime.now().strftime('%Y%m%d')
-        last_return = PurchaseReturn.query.filter(PurchaseReturn.return_number.like(f'PR{today}%')).order_by(PurchaseReturn.id.desc()).first()
-        if last_return:
-            last_num = int(last_return.return_number[10:]) if len(last_return.return_number) > 10 else 0
-            return_number = f'PR{today}{last_num + 1:03d}'
-        else:
-            return_number = f'PR{today}001'
+        return_number = generate_order_number('PR', PurchaseReturn)
 
         purchase_return = PurchaseReturn(
             return_number=return_number,

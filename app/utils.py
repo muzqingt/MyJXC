@@ -78,7 +78,8 @@ def generate_order_number(prefix, model_class, date_field_name='created_at'):
     # 使用filter通过字段名构建查询
     filter_field = getattr(model_class, 'order_number', None) or \
                    getattr(model_class, 'receipt_number', None) or \
-                   getattr(model_class, 'delivery_number', None)
+                   getattr(model_class, 'delivery_number', None) or \
+                   getattr(model_class, 'return_number', None)
     
     if filter_field:
         last_order = model_class.query.filter(filter_field.like(like_pattern)).order_by(
@@ -89,7 +90,7 @@ def generate_order_number(prefix, model_class, date_field_name='created_at'):
     
     if last_order:
         # 尝试从订单号提取序号
-        order_str = str(last_order.order_number or last_order.receipt_number or last_order.delivery_number)
+        order_str = str(last_order.order_number or last_order.receipt_number or last_order.delivery_number or last_order.return_number)
         prefix_len = len(prefix) + len(today)
         if len(order_str) > prefix_len:
             try:
@@ -221,7 +222,7 @@ def format_local_dt(dt, fmt='%Y-%m-%d %H:%M:%S'):
     return local.strftime(fmt)
 
 
-def get_redirect_tab(status):
+def get_redirect_tab(status=None):
     """根据订单状态确定跳转的标签页"""
     if status == 'draft':
         return 'draft'
