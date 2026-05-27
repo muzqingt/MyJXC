@@ -1,7 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, make_response, abort
 from flask_login import login_required, current_user
 from datetime import datetime
-import json
 from decimal import Decimal
 from app import db
 from app.models import Product, Warehouse, StockLog
@@ -10,24 +9,27 @@ from app.forms import StockAdjustForm, StockTransferForm
 from app.utils import to_decimal, apply_excel_header_style, EXCEL_THIN_BORDER
 from sqlalchemy.exc import SQLAlchemyError
 
+VALID_LOG_TYPES = {'in', 'out', 'check_in', 'check_out', 'adjust_in', 'adjust_out', 'return_in', 'return_out', 'stock_transfer'}
 
 def get_product_stock_in_warehouse(product_id, warehouse_id):
     """根据 StockLog 计算某商品在指定仓库的实际库存
-    
+
     注意：返回实际库存（可为负数），调用方需自行判断库存异常。
     使用 max(0, ...) 会掩盖调拨/出库计算错误，不利于排查问题。
     """
-    logs = db.session.query(StockLog).filter(
+    stock_in_types = ('in', 'check_in', 'adjust_in', 'return_in')
+    result = db.session.query(
+        db.func.sum(
+            db.case(
+                (StockLog.change_type.in_(stock_in_types), StockLog.quantity),
+                else_=-StockLog.quantity
+            )
+        )
+    ).filter(
         StockLog.product_id == product_id,
         StockLog.warehouse_id == warehouse_id
-    ).all()
-    stock = Decimal('0')
-    for log in logs:
-        if log.change_type in ('in', 'check_in', 'adjust_in', 'return_in'):
-            stock += to_decimal(log.quantity)
-        elif log.change_type in ('out', 'check_out', 'adjust_out', 'stock_transfer', 'return_out'):
-            stock -= to_decimal(log.quantity)
-    return stock
+    ).scalar()
+    return to_decimal(result) if result is not None else Decimal('0')
 
 # 创建蓝图
 bp = Blueprint('inventory', __name__, url_prefix='/inventory')
@@ -424,7 +426,6 @@ def stock_logs():
         query = query.filter(StockLog.created_at >= start_date)
     if end_date:
         query = query.filter(StockLog.created_at <= end_date + ' 23:59:59')
-    VALID_LOG_TYPES = {'in', 'out', 'check_in', 'check_out', 'adjust_in', 'adjust_out', 'return_in', 'return_out', 'stock_transfer'}
     if log_type:
         if log_type == 'check':
             query = query.filter(StockLog.change_type.like('check%'))
@@ -434,7 +435,7 @@ def stock_logs():
             query = query.filter_by(change_type=log_type)
 
     logs = query.order_by(StockLog.created_at.desc()).limit(100).all()
-    
+
     return render_template('inventory/logs.html',
                          title='库存流水',
                          logs=logs,
@@ -479,7 +480,6 @@ def export_logs():
         query = query.filter(StockLog.created_at >= start_date)
     if end_date:
         query = query.filter(StockLog.created_at <= end_date + ' 23:59:59')
-    VALID_LOG_TYPES = {'in', 'out', 'check_in', 'check_out', 'adjust_in', 'adjust_out', 'return_in', 'return_out', 'stock_transfer'}
     if log_type:
         if log_type == 'check':
             query = query.filter(StockLog.change_type.like('check%'))
@@ -632,7 +632,7 @@ def api_stock_check():
         return jsonify({'success': True, 'message': '盘点保存成功'})
     except SQLAlchemyError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': '盘点保存失败，请重试'}), 500
 
 @bp.route('/stock-adjust', methods=['GET', 'POST'])
 @login_required
@@ -703,7 +703,7 @@ def stock_adjust():
             return redirect(url_for('inventory.product_list'))
         except SQLAlchemyError as e:
             db.session.rollback()
-            flash(f'调整失败: {str(e)}', 'danger')
+            flash('调整失败，请重试', 'danger')
 
     return render_template('inventory/stock_adjust.html',
                          title='库存调整',

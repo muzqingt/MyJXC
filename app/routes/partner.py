@@ -1,7 +1,7 @@
 from flask import render_template, redirect, url_for, flash, request, abort
-from flask_login import login_required
+from flask_login import login_required, current_user
 from app import db
-from app.models import Supplier, Customer, Warehouse, PurchaseOrder, Payment, SalesOrder, Receipt, StockIn, StockOut, StockLog
+from app.models import Supplier, Customer, Warehouse, PurchaseOrder, Payment, SalesOrder, Receipt, StockIn, StockOut, StockLog, Log
 from app.forms import SupplierForm, CustomerForm, WarehouseForm
 from flask import Blueprint
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
@@ -13,7 +13,7 @@ bp = Blueprint('partner', __name__, url_prefix='/partner')
 @bp.route('/suppliers')
 @login_required
 def suppliers():
-    suppliers = Supplier.query.order_by(Supplier.created_at.desc()).all()
+    suppliers = Supplier.query.order_by(Supplier.created_at.desc()).limit(500).all()
     return render_template('product/suppliers.html',
                          title='供应商管理',
                          suppliers=suppliers)
@@ -39,6 +39,13 @@ def add_supplier():
         )
 
         db.session.add(supplier)
+        log = Log(
+            user_id=current_user.id,
+            action='添加供应商',
+            details=f'添加供应商: {supplier.code} - {supplier.name}',
+            ip_address=request.remote_addr
+        )
+        db.session.add(log)
         try:
             db.session.commit()
         except IntegrityError:
@@ -80,6 +87,13 @@ def edit_supplier(id):
         supplier.address = form.address.data
         supplier.email = form.email.data
 
+        log = Log(
+            user_id=current_user.id,
+            action='修改供应商',
+            details=f'修改供应商: {supplier.code} - {supplier.name}',
+            ip_address=request.remote_addr
+        )
+        db.session.add(log)
         try:
             db.session.commit()
         except IntegrityError:
@@ -115,8 +129,15 @@ def delete_supplier(id):
         flash('该供应商已有采购或付款记录，无法删除！', 'danger')
         return redirect(url_for('partner.suppliers'))
 
-    db.session.delete(supplier)
+    log = Log(
+        user_id=current_user.id,
+        action='删除供应商',
+        details=f'删除供应商: {supplier.code} - {supplier.name}',
+        ip_address=request.remote_addr
+    )
+    db.session.add(log)
     try:
+        db.session.delete(supplier)
         db.session.commit()
     except SQLAlchemyError:
         db.session.rollback()
@@ -130,7 +151,7 @@ def delete_supplier(id):
 @bp.route('/customers')
 @login_required
 def customers():
-    customers = Customer.query.order_by(Customer.created_at.desc()).all()
+    customers = Customer.query.order_by(Customer.created_at.desc()).limit(500).all()
     return render_template('product/customers.html',
                          title='客户管理',
                          customers=customers)
@@ -156,6 +177,13 @@ def add_customer():
         )
 
         db.session.add(customer)
+        log = Log(
+            user_id=current_user.id,
+            action='添加客户',
+            details=f'添加客户: {customer.code} - {customer.name}',
+            ip_address=request.remote_addr
+        )
+        db.session.add(log)
         try:
             db.session.commit()
         except IntegrityError:
@@ -197,6 +225,13 @@ def edit_customer(id):
         customer.address = form.address.data
         customer.email = form.email.data
 
+        log = Log(
+            user_id=current_user.id,
+            action='修改客户',
+            details=f'修改客户: {customer.code} - {customer.name}',
+            ip_address=request.remote_addr
+        )
+        db.session.add(log)
         try:
             db.session.commit()
         except IntegrityError:
@@ -231,8 +266,15 @@ def delete_customer(id):
         flash('该客户已有销售或收款记录，无法删除！', 'danger')
         return redirect(url_for('partner.customers'))
 
-    db.session.delete(customer)
+    log = Log(
+        user_id=current_user.id,
+        action='删除客户',
+        details=f'删除客户: {customer.code} - {customer.name}',
+        ip_address=request.remote_addr
+    )
+    db.session.add(log)
     try:
+        db.session.delete(customer)
         db.session.commit()
     except SQLAlchemyError:
         db.session.rollback()
@@ -246,7 +288,7 @@ def delete_customer(id):
 @bp.route('/warehouses')
 @login_required
 def warehouses():
-    warehouses = Warehouse.query.order_by(Warehouse.created_at.desc()).all()
+    warehouses = Warehouse.query.order_by(Warehouse.created_at.desc()).limit(500).all()
     return render_template('product/warehouses.html',
                          title='仓库管理',
                          warehouses=warehouses)
@@ -271,6 +313,13 @@ def add_warehouse():
         )
 
         db.session.add(warehouse)
+        log = Log(
+            user_id=current_user.id,
+            action='添加仓库',
+            details=f'添加仓库: {warehouse.code} - {warehouse.name}',
+            ip_address=request.remote_addr
+        )
+        db.session.add(log)
         try:
             db.session.commit()
         except IntegrityError:
@@ -311,6 +360,13 @@ def edit_warehouse(id):
         warehouse.manager = form.manager.data
         warehouse.phone = form.phone.data
 
+        log = Log(
+            user_id=current_user.id,
+            action='修改仓库',
+            details=f'修改仓库: {warehouse.code} - {warehouse.name}',
+            ip_address=request.remote_addr
+        )
+        db.session.add(log)
         try:
             db.session.commit()
         except IntegrityError:
@@ -346,8 +402,15 @@ def delete_warehouse(id):
         flash('该仓库已有库存记录，无法删除！', 'danger')
         return redirect(url_for('partner.warehouses'))
 
-    db.session.delete(warehouse)
+    log = Log(
+        user_id=current_user.id,
+        action='删除仓库',
+        details=f'删除仓库: {warehouse.code} - {warehouse.name}',
+        ip_address=request.remote_addr
+    )
+    db.session.add(log)
     try:
+        db.session.delete(warehouse)
         db.session.commit()
     except SQLAlchemyError:
         db.session.rollback()

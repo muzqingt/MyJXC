@@ -212,14 +212,15 @@ $(document).ready(function() {
     function addItemRow(productId, quantity) {
         const rowId = itemCount++;
         
-        const row = 
+        var safeQuantity = escapeHtml(quantity || '');
+        const row =
             '<tr id="row-' + rowId + '" data-index="' + rowId + '">' +
                 '<td>' +
                     '<div class="product-search-wrapper" id="product-wrapper-' + rowId + '"></div>' +
                 '</td>' +
                 '<td>' +
                     '<input type="number" name="items-' + rowId + '-quantity" class="form-control quantity-input" ' +
-                           'data-row="' + rowId + '" step="0.01" min="0.01" value="' + (quantity || '') + '">' +
+                           'data-row="' + rowId + '" step="0.01" min="0.01" value="' + safeQuantity + '">' +
                 '</td>' +
                 '<td class="text-center unit-display" id="unit-' + rowId + '">-</td>' +
                 '<td class="text-end stock-display" id="stock-' + rowId + '">-</td>' +

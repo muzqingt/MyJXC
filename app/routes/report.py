@@ -410,9 +410,13 @@ def export_sales_ranking():
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=30)
     else:
-        start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
-        end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
-    
+        try:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+        except ValueError:
+            flash('日期格式无效，请使用YYYY-MM-DD格式', 'error')
+            return redirect(url_for('report.index'))
+
     ranking_data = db.session.query(
         Product.id,
         Product.code,

@@ -7,7 +7,7 @@ from datetime import datetime
 import os
 from werkzeug.utils import secure_filename
 from flask import Blueprint
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from app.utils import to_decimal
 
 def _save_product_image(file, product):
@@ -119,8 +119,20 @@ def new_product():
             )
             db.session.add(log)
             db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            if product.image_path:
+                filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], product.image_path)
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+            flash('商品编号已存在，请使用其他编号！', 'danger')
+            return redirect(url_for('product.new_product'))
         except SQLAlchemyError:
             db.session.rollback()
+            if product.image_path:
+                filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], product.image_path)
+                if os.path.exists(filepath):
+                    os.remove(filepath)
             flash('商品添加失败，请重试！', 'danger')
             return redirect(url_for('product.new_product'))
 
@@ -172,8 +184,13 @@ def edit_product(id):
             ip_address=request.remote_addr
         )
         db.session.add(log)
-        db.session.commit()
-        
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('商品修改失败，请重试！', 'danger')
+            return redirect(url_for('product.edit_product', id=product.id))
+
         flash('商品修改成功！', 'success')
         return redirect(url_for('product.index'))
     
