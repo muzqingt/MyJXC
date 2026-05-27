@@ -428,7 +428,7 @@ def clean_logs():
     try:
         from datetime import timedelta
         cutoff_date = datetime.now() - timedelta(days=90)
-        old_logs = Log.query.filter(Log.created_at < cutoff_date).all()
+        old_logs = Log.query.filter(Log.created_at < cutoff_date).limit(1000).all()
         deleted = len(old_logs)
         for log in old_logs:
             db.session.delete(log)

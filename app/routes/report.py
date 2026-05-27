@@ -572,8 +572,6 @@ def export_supplier():
 @login_required
 def export_products():
     """导出商品数据"""
-    from openpyxl import Workbook
-    
     products = Product.query.order_by(Product.code).all()
     
     wb = Workbook()

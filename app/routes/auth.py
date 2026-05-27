@@ -50,6 +50,7 @@ def login():
         if not next_page:
             next_page = url_for('main.index')
         else:
+            next_page = next_page.strip()
             parsed = urlparse(next_page)
             if parsed.netloc or parsed.scheme or next_page.startswith('//'):
                 next_page = url_for('main.index')
@@ -119,7 +120,11 @@ def change_password():
     if len(new_password) < 6:
         flash('新密码长度至少6位', 'danger')
         return redirect(url_for('auth.profile'))
-    
+
+    if len(new_password) > 128:
+        flash('新密码长度不能超过128位', 'danger')
+        return redirect(url_for('auth.profile'))
+
     if new_password != confirm_password:
         flash('两次输入的密码不一致', 'danger')
         return redirect(url_for('auth.profile'))

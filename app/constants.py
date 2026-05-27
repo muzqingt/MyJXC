@@ -64,6 +64,15 @@ class PaymentMethod:
         return cls.LABELS.get(method, method)
 
 
+VALID_CHANGE_TYPES = (
+    ChangeType.IN, ChangeType.OUT,
+    ChangeType.ADJUST_IN, ChangeType.ADJUST_OUT,
+    ChangeType.CHECK_IN, ChangeType.CHECK_OUT,
+    ChangeType.RETURN_IN, ChangeType.RETURN_OUT,
+    ChangeType.TRANSFER,
+)
+
+
 class UserRole:
     """用户角色"""
     ADMIN = 'admin'

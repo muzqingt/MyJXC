@@ -335,7 +335,9 @@ def delete_category(id):
 @bp.route('/api/products')
 @login_required
 def api_products():
-    products = Product.query.all()
+    limit = request.args.get('limit', 100, type=int)
+    limit = min(max(limit, 1), 1000)
+    products = Product.query.limit(limit).all()
     result = []
     for product in products:
         result.append({

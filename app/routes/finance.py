@@ -518,7 +518,7 @@ def financial_summary_api():
         'today_receipts': float(today_receipts),
         'today_payments': float(today_payments),
         'today_expenses': float(today_expenses),
-        'today_profit': float(today_receipts - today_payments - today_expenses)
+        'today_net_receipts': float(today_receipts - today_payments - today_expenses)
     })
 
 @bp.route('/ar-ap-search')
@@ -730,6 +730,7 @@ def supplier_ap_detail(supplier_id):
 @login_required
 def export_customer_ar(customer_id):
     """导出客户应收报表"""
+    from urllib.parse import quote
     # TODO: 添加业务级权限检查，例如检查当前用户是否有权访问该客户的数据
     customer = db.session.get(Customer, customer_id)
     if customer is None:
@@ -846,7 +847,8 @@ def export_customer_ar(customer_id):
 
     response = make_response(output.getvalue())
     response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    response.headers['Content-Disposition'] = f'attachment; filename=customer_ar_{customer.code}_{datetime.now().strftime("%Y%m%d")}.xlsx'
+    filename = f'customer_ar_{customer.code}_{datetime.now().strftime("%Y%m%d")}.xlsx'
+    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8\'\'{quote(filename)}'
     return response
 
 @bp.route('/export-receipts')
@@ -908,7 +910,7 @@ def export_receipts():
 
     response = make_response(output.getvalue())
     response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8\'{quote(filename)}'
+    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8\'\'{quote(filename)}'
     return response
 
 
@@ -971,7 +973,7 @@ def export_payments():
 
     response = make_response(output.getvalue())
     response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8\'{quote(filename)}'
+    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8\'\'{quote(filename)}'
     return response
 
 
@@ -1037,7 +1039,7 @@ def export_profit_analysis():
     filename = f'profit_analysis_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
     response = make_response(output.getvalue())
     response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8''{quote(filename)}'
+    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8\'\'{quote(filename)}'
     return response
 
 
@@ -1100,6 +1102,7 @@ def export_expenses():
 @login_required
 def export_supplier_ap(supplier_id):
     """导出供应商应付报表"""
+    from urllib.parse import quote
     # TODO: 添加业务级权限检查，例如检查当前用户是否有权访问该供应商的数据
     supplier = db.session.get(Supplier, supplier_id)
     if supplier is None:
@@ -1216,5 +1219,6 @@ def export_supplier_ap(supplier_id):
 
     response = make_response(output.getvalue())
     response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    response.headers['Content-Disposition'] = f'attachment; filename=supplier_ap_{supplier.code}_{datetime.now().strftime("%Y%m%d")}.xlsx'
+    filename = f'supplier_ap_{supplier.code}_{datetime.now().strftime("%Y%m%d")}.xlsx'
+    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8\'\'{quote(filename)}'
     return response

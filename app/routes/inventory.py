@@ -564,7 +564,10 @@ def logs_statistics():
     
     stock_in_count = StockLog.query.filter_by(change_type='in').count()
     stock_out_count = StockLog.query.filter_by(change_type='out').count()
-    transfer_count = StockLog.query.filter(StockLog.change_type.in_(['transfer', 'check_in', 'check_out'])).count()
+    transfer_count = StockLog.query.filter(
+        StockLog.change_type.in_(['out', 'in']),
+        StockLog.reference_type == 'stock_transfer'
+    ).count()
     check_count = StockLog.query.filter(StockLog.change_type.like('check%')).count()
     
     return jsonify({
@@ -579,7 +582,6 @@ def logs_statistics():
 def api_stock_check():
     """库存盘点API"""
     try:
-        import json
         data = request.get_json()
         
         check_data = data.get('check_data', [])
