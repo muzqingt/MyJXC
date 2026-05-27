@@ -3,20 +3,9 @@ from flask_login import login_required, current_user
 from app import db
 from sqlalchemy.orm import selectinload
 from app.models import SalesOrder, SystemSetting, SalesOrderItem, StockOut, StockOutItem, Customer, Warehouse, Product, StockLog, Log, SalesReturn, SalesReturnItem
-from app.utils import to_decimal, add_balance, sub_balance
+from app.utils import to_decimal, add_balance, sub_balance, get_redirect_tab, build_products_data, build_partners_data, generate_order_number
 from app.forms import SalesOrderForm, SalesOrderItemForm, StockOutForm
 from datetime import datetime, timezone
-import urllib.parse
-
-def get_redirect_tab():
-    """从referer获取当前tab，默认返回orders"""
-    referer = request.referrer
-    if referer:
-        parsed = urllib.parse.urlparse(referer)
-        query_params = urllib.parse.parse_qs(parsed.query)
-        if 'tab' in query_params:
-            return query_params['tab'][0]
-    return 'orders'
 
 # 创建蓝图
 bp = Blueprint('sales', __name__, url_prefix='/sales')
@@ -105,23 +94,11 @@ def index():
 @login_required
 def new_order():
     customers = Customer.query.all()
-    customers_data = [{
-        'id': c.id,
-        'code': c.code,
-        'name': c.name
-    } for c in customers]
+    customers_data = build_partners_data(customers)
     warehouses = Warehouse.query.all()
     products = Product.query.all()
-    products_data = [{
-        'id': p.id,
-        'code': p.code,
-        'name': p.name,
-        'specification': p.specification or '',
-        'unit': p.unit,
-        'sale_price': float(p.sale_price) if p.sale_price else 0,
-        'stock_quantity': float(p.stock_quantity) if p.stock_quantity else 0
-    } for p in products]
-    
+    products_data = build_products_data(products, include_purchase_price=False)
+
     # 获取默认仓库设置
     default_warehouse_id = SystemSetting.get_value('DEFAULT_WAREHOUSE')
     if default_warehouse_id:
@@ -172,13 +149,7 @@ def new_order():
                                  order_items=order_items_list)
 
         # 生成订单号
-        today = datetime.now().strftime('%Y%m%d')
-        last_order = SalesOrder.query.filter(SalesOrder.order_number.like(f'SO{today}%')).order_by(SalesOrder.id.desc()).first()
-        if last_order:
-            last_num = int(last_order.order_number[10:]) if len(last_order.order_number) > 10 else 0
-            order_number = f'SO{today}{last_num + 1:03d}'
-        else:
-            order_number = f'SO{today}001'
+        order_number = generate_order_number('SO', SalesOrder)
 
         order = SalesOrder(
             order_number=order_number,
@@ -248,13 +219,7 @@ def new_order():
                                      default_warehouse_id=default_warehouse_id)
 
             try:
-                today = datetime.now().strftime('%Y%m%d')
-                last_stock_out = StockOut.query.filter(StockOut.delivery_number.like(f'OUT{today}%')).order_by(StockOut.id.desc()).first()
-                if last_stock_out:
-                    last_num = int(last_stock_out.delivery_number[11:]) if len(last_stock_out.delivery_number) > 11 else 0
-                    delivery_number = f'OUT{today}{last_num + 1:03d}'
-                else:
-                    delivery_number = f'OUT{today}001'
+                delivery_number = generate_order_number('OUT', StockOut)
 
                 stock_out = StockOut(
                     delivery_number=delivery_number,
@@ -353,26 +318,14 @@ def edit_order(id):
     
     if order.status == 'completed':
         flash('已完成的订单不能修改！', 'danger')
-        return redirect(url_for('sales.index', tab=get_redirect_tab()))
+        return redirect(url_for('sales.index', tab=get_redirect_tab(order.status)))
     
     customers = Customer.query.all()
-    customers_data = [{
-        'id': c.id,
-        'code': c.code,
-        'name': c.name
-    } for c in customers]
+    customers_data = build_partners_data(customers)
     warehouses = Warehouse.query.all()
     products = Product.query.all()
-    products_data = [{
-        'id': p.id,
-        'code': p.code,
-        'name': p.name,
-        'specification': p.specification or '',
-        'unit': p.unit,
-        'sale_price': float(p.sale_price) if p.sale_price else 0,
-        'stock_quantity': float(p.stock_quantity) if p.stock_quantity else 0
-    } for p in products]
-    
+    products_data = build_products_data(products, include_purchase_price=False)
+
     # 订单商品明细
     order_items_data = []
     for item in order.items:
@@ -489,7 +442,7 @@ def edit_order(id):
         
         db.session.commit()
         flash('销售订单修改成功！', 'success')
-        return redirect(url_for('sales.index', tab=get_redirect_tab()))
+        return redirect(url_for('sales.index', tab=get_redirect_tab(order.status)))
     
     return render_template('sales/order_items.html',
                          title='编辑销售订单',
@@ -573,15 +526,8 @@ def quick_stock_out(id):
         return redirect(url_for('sales.index'))
     
     try:
-        today = datetime.now().strftime('%Y%m%d')
-        
-        last_stock_out = StockOut.query.filter(StockOut.delivery_number.like(f'OUT{today}%')).order_by(StockOut.id.desc()).first()
-        if last_stock_out:
-            last_num = int(last_stock_out.delivery_number[11:]) if len(last_stock_out.delivery_number) > 11 else 0
-            delivery_number = f'OUT{today}{last_num + 1:03d}'
-        else:
-            delivery_number = f'OUT{today}001'
-        
+        delivery_number = generate_order_number('OUT', StockOut)
+
         stock_out = StockOut(
             delivery_number=delivery_number,
             sales_order_id=order.id,
@@ -725,14 +671,8 @@ def new_stock_out_from_order(id):
         return redirect(url_for('sales.view_order', id=id))
     
     # 生成出库单号
-    today = datetime.now().strftime('%Y%m%d')
-    last_stock_out = StockOut.query.filter(StockOut.delivery_number.like(f'OUT{today}%')).order_by(StockOut.id.desc()).first()
-    if last_stock_out:
-        last_num = int(last_stock_out.delivery_number[11:]) if len(last_stock_out.delivery_number) > 11 else 0
-        delivery_number = f'OUT{today}{last_num + 1:03d}'
-    else:
-        delivery_number = f'OUT{today}001'
-    
+    delivery_number = generate_order_number('OUT', StockOut)
+
     # 创建出库单，预填销售订单信息
     stock_out = StockOut(
         delivery_number=delivery_number,
@@ -788,14 +728,8 @@ def new_stock_out():
     
     if form.validate_on_submit():
         # 生成出库单号
-        today = datetime.now().strftime('%Y%m%d')
-        last_stock_out = StockOut.query.filter(StockOut.delivery_number.like(f'OUT{today}%')).order_by(StockOut.id.desc()).first()
-        if last_stock_out:
-            last_num = int(last_stock_out.delivery_number[11:]) if len(last_stock_out.delivery_number) > 11 else 0
-            delivery_number = f'OUT{today}{last_num + 1:03d}'
-        else:
-            delivery_number = f'OUT{today}001'
-        
+        delivery_number = generate_order_number('OUT', StockOut)
+
         stock_out = StockOut(
             delivery_number=delivery_number,
             sales_order_id=form.sales_order_id.data if form.sales_order_id.data != 0 else None,
@@ -831,15 +765,7 @@ def edit_stock_out_items(id):
         
         # 构建 products_data（供验证失败时重新渲染模板用）
         products = Product.query.all()
-        products_data = [{
-            'id': p.id,
-            'code': p.code,
-            'name': p.name,
-            'specification': p.specification or '',
-            'unit': p.unit,
-            'sale_price': float(p.sale_price) if p.sale_price else 0,
-            'stock_quantity': float(p.stock_quantity) if p.stock_quantity else 0
-        } for p in products]
+        products_data = build_products_data(products, include_purchase_price=False)
         
         # 验证：至少要有一行商品明细
         has_items = False
@@ -913,17 +839,7 @@ def edit_stock_out_items(id):
         return redirect(url_for('sales.index', tab='stockouts'))
     
     products = Product.query.all()
-    products_data = []
-    for product in products:
-        products_data.append({
-            'id': product.id,
-            'code': product.code,
-            'name': product.name,
-            'specification': product.specification or '',
-            'unit': product.unit,
-            'sale_price': float(product.sale_price) if product.sale_price else 0,
-            'stock_quantity': float(product.stock_quantity) if product.stock_quantity else 0
-        })
+    products_data = build_products_data(products, include_purchase_price=False)
     
     return render_template('sales/stock_out_items.html', 
                          title='编辑出库明细',
@@ -1089,13 +1005,7 @@ def quick_return(id):
         return redirect(url_for('sales.index', tab='orders'))
 
     try:
-        today = datetime.now().strftime('%Y%m%d')
-        last_return = SalesReturn.query.filter(SalesReturn.return_number.like(f'SR{today}%')).order_by(SalesReturn.id.desc()).first()
-        if last_return:
-            last_num = int(last_return.return_number[10:]) if len(last_return.return_number) > 10 else 0
-            return_number = f'SR{today}{last_num + 1:03d}'
-        else:
-            return_number = f'SR{today}001'
+        return_number = generate_order_number('SR', SalesReturn)
 
         sales_return = SalesReturn(
             return_number=return_number,

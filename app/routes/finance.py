@@ -8,7 +8,7 @@ from sqlalchemy import or_
 from decimal import Decimal, ROUND_HALF_UP
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-from app.utils import to_decimal, add_balance, sub_balance
+from app.utils import to_decimal, add_balance, sub_balance, generate_order_number, PAYMENT_METHOD_MAP, apply_excel_header_style, EXCEL_HEADER_FONT, EXCEL_HEADER_FILL, EXCEL_THIN_BORDER, EXCEL_HEADER_ALIGNMENT
 import io
 
 # 创建蓝图
@@ -108,13 +108,7 @@ def add_receipt():
 
     if form.validate_on_submit():
         # 生成收款单号 RCYYYYMMDD001
-        today = datetime.now().strftime('%Y%m%d')
-        last_receipt = Receipt.query.filter(Receipt.receipt_number.like(f'RC{today}%')).order_by(Receipt.id.desc()).first()
-        if last_receipt:
-            last_num = int(last_receipt.receipt_number[10:]) if len(last_receipt.receipt_number) > 10 else 0
-            receipt_number = f'RC{today}{last_num + 1:03d}'
-        else:
-            receipt_number = f'RC{today}001'
+        receipt_number = generate_order_number('RC', Receipt)
 
         # 处理收款数据
         receipt = Receipt(
@@ -180,13 +174,7 @@ def add_payment():
 
     if form.validate_on_submit():
         # 生成付款单号 PYYYYMMDD001
-        today = datetime.now().strftime('%Y%m%d')
-        last_payment = Payment.query.filter(Payment.payment_number.like(f'PY{today}%')).order_by(Payment.id.desc()).first()
-        if last_payment:
-            last_num = int(last_payment.payment_number[10:]) if len(last_payment.payment_number) > 10 else 0
-            payment_number = f'PY{today}{last_num + 1:03d}'
-        else:
-            payment_number = f'PY{today}001'
+        payment_number = generate_order_number('PY', Payment)
 
         # 处理付款数据
         payment = Payment(
@@ -247,13 +235,7 @@ def add_expense():
 
     if form.validate_on_submit():
         # 生成费用单号 EXYYYYMMDD001
-        today = datetime.now().strftime('%Y%m%d')
-        last_expense = Expense.query.filter(Expense.expense_number.like(f'EX{today}%')).order_by(Expense.id.desc()).first()
-        if last_expense:
-            last_num = int(last_expense.expense_number[10:]) if len(last_expense.expense_number) > 10 else 0
-            expense_number = f'EX{today}{last_num + 1:03d}'
-        else:
-            expense_number = f'EX{today}001'
+        expense_number = generate_order_number('EX', Expense)
 
         # 处理费用数据
         expense = Expense(
@@ -838,42 +820,20 @@ def export_receipts():
     ws = wb.active
     ws.title = '收款记录'
 
-    # 设置表头样式
-    header_font = Font(bold=True, color='FFFFFF')
-    header_fill = PatternFill(start_color='4472C4', end_color='4472C4', fill_type='solid')
-    header_alignment = Alignment(horizontal='center', vertical='center')
-    thin_border = Border(
-        left=Side(style='thin'),
-        right=Side(style='thin'),
-        top=Side(style='thin'),
-        bottom=Side(style='thin')
-    )
-
     # 写入表头
     headers = ['收款单号', '客户', '收款金额', '收款日期', '支付方式', '关联订单', '备注', '创建时间']
     for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_alignment
-        cell.border = thin_border
-
-    # 支付方式映射
-    payment_method_map = {
-        'cash': '现金',
-        'bank_transfer': '银行转账',
-        'wechat': '微信支付',
-        'alipay': '支付宝'
-    }
+        ws.cell(row=1, column=col, value=header)
+    apply_excel_header_style(ws, 1, len(headers))
 
     # 写入数据
     for row, receipt in enumerate(receipts_list, 2):
-        ws.cell(row=row, column=1, value=receipt.receipt_number).border = thin_border
-        ws.cell(row=row, column=2, value=receipt.customer.name if receipt.customer else '').border = thin_border
-        ws.cell(row=row, column=3, value=float(receipt.amount) if receipt.amount else 0).border = thin_border
+        ws.cell(row=row, column=1, value=receipt.receipt_number).border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=2, value=receipt.customer.name if receipt.customer else '').border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=3, value=float(receipt.amount) if receipt.amount else 0).border = EXCEL_THIN_BORDER
         ws.cell(row=row, column=3).number_format = '#,##0.00'
-        ws.cell(row=row, column=4, value=receipt.receipt_date.strftime('%Y-%m-%d') if receipt.receipt_date else '').border = thin_border
-        ws.cell(row=row, column=5, value=payment_method_map.get(receipt.payment_method, receipt.payment_method or '')).border = thin_border
+        ws.cell(row=row, column=4, value=receipt.receipt_date.strftime('%Y-%m-%d') if receipt.receipt_date else '').border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=5, value=PAYMENT_METHOD_MAP.get(receipt.payment_method, receipt.payment_method or '')).border = EXCEL_THIN_BORDER
         # 解析reference_id(逗号分隔的订单ID)显示订单号
         ref_orders = ''
         if receipt.reference_type == 'sales_order' and receipt.reference_id:
@@ -883,9 +843,9 @@ def export_receipts():
                 ref_orders = ','.join([o.order_number for o in orders]) or receipt.reference_id
             except (ValueError, TypeError):
                 ref_orders = receipt.reference_id or ''
-        ws.cell(row=row, column=6, value=ref_orders).border = thin_border
-        ws.cell(row=row, column=7, value=receipt.notes or '').border = thin_border
-        ws.cell(row=row, column=8, value=receipt.created_at.strftime('%Y-%m-%d %H:%M:%S') if receipt.created_at else '').border = thin_border
+        ws.cell(row=row, column=6, value=ref_orders).border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=7, value=receipt.notes or '').border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=8, value=receipt.created_at.strftime('%Y-%m-%d %H:%M:%S') if receipt.created_at else '').border = EXCEL_THIN_BORDER
 
     # 设置列宽
     ws.column_dimensions['A'].width = 15
@@ -923,42 +883,20 @@ def export_payments():
     ws = wb.active
     ws.title = '付款记录'
 
-    # 设置表头样式
-    header_font = Font(bold=True, color='FFFFFF')
-    header_fill = PatternFill(start_color='4472C4', end_color='4472C4', fill_type='solid')
-    header_alignment = Alignment(horizontal='center', vertical='center')
-    thin_border = Border(
-        left=Side(style='thin'),
-        right=Side(style='thin'),
-        top=Side(style='thin'),
-        bottom=Side(style='thin')
-    )
-
     # 写入表头
     headers = ['付款单号', '供应商', '付款金额', '付款日期', '支付方式', '关联订单', '备注', '创建时间']
     for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_alignment
-        cell.border = thin_border
-
-    # 支付方式映射
-    payment_method_map = {
-        'cash': '现金',
-        'bank_transfer': '银行转账',
-        'wechat': '微信支付',
-        'alipay': '支付宝'
-    }
+        ws.cell(row=1, column=col, value=header)
+    apply_excel_header_style(ws, 1, len(headers))
 
     # 写入数据
     for row, payment in enumerate(payments_list, 2):
-        ws.cell(row=row, column=1, value=payment.payment_number).border = thin_border
-        ws.cell(row=row, column=2, value=payment.supplier.name if payment.supplier else '').border = thin_border
-        ws.cell(row=row, column=3, value=float(payment.amount) if payment.amount else 0).border = thin_border
+        ws.cell(row=row, column=1, value=payment.payment_number).border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=2, value=payment.supplier.name if payment.supplier else '').border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=3, value=float(payment.amount) if payment.amount else 0).border = EXCEL_THIN_BORDER
         ws.cell(row=row, column=3).number_format = '#,##0.00'
-        ws.cell(row=row, column=4, value=payment.payment_date.strftime('%Y-%m-%d') if payment.payment_date else '').border = thin_border
-        ws.cell(row=row, column=5, value=payment_method_map.get(payment.payment_method, payment.payment_method or '')).border = thin_border
+        ws.cell(row=row, column=4, value=payment.payment_date.strftime('%Y-%m-%d') if payment.payment_date else '').border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=5, value=PAYMENT_METHOD_MAP.get(payment.payment_method, payment.payment_method or '')).border = EXCEL_THIN_BORDER
         # 解析reference_id(逗号分隔的订单ID)显示订单号
         ref_orders = ''
         if payment.reference_type == 'purchase_order' and payment.reference_id:
@@ -968,9 +906,9 @@ def export_payments():
                 ref_orders = ','.join([o.order_number for o in orders]) or payment.reference_id
             except (ValueError, TypeError):
                 ref_orders = payment.reference_id or ''
-        ws.cell(row=row, column=6, value=ref_orders).border = thin_border
-        ws.cell(row=row, column=7, value=payment.notes or '').border = thin_border
-        ws.cell(row=row, column=8, value=payment.created_at.strftime('%Y-%m-%d %H:%M:%S') if payment.created_at else '').border = thin_border
+        ws.cell(row=row, column=6, value=ref_orders).border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=7, value=payment.notes or '').border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=8, value=payment.created_at.strftime('%Y-%m-%d %H:%M:%S') if payment.created_at else '').border = EXCEL_THIN_BORDER
 
     # 设置列宽
     ws.column_dimensions['A'].width = 15
@@ -1018,21 +956,10 @@ def export_profit_analysis():
     ws = wb.active
     ws.title = '利润分析'
 
-    header_font = Font(bold=True, color='FFFFFF')
-    header_fill = PatternFill(start_color='4472C4', end_color='4472C4', fill_type='solid')
-    header_alignment = Alignment(horizontal='center', vertical='center')
-    thin_border = Border(
-        left=Side(style='thin'), right=Side(style='thin'),
-        top=Side(style='thin'), bottom=Side(style='thin')
-    )
-
     headers = ['月份', '销售金额', '采购成本', '毛利', '毛利率(%)']
     for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_alignment
-        cell.border = thin_border
+        ws.cell(row=1, column=col, value=header)
+    apply_excel_header_style(ws, 1, len(headers))
 
     # 合并数据(以销售数据月份为基准)
     sales_dict = {str(s.month): float(s.sales_amount or 0) for s in sales_data}
@@ -1045,14 +972,14 @@ def export_profit_analysis():
         profit = sales - purchase
         margin = (profit / sales * 100) if sales > 0 else 0
 
-        ws.cell(row=row_idx, column=1, value=month).border = thin_border
-        ws.cell(row=row_idx, column=2, value=sales).border = thin_border
+        ws.cell(row=row_idx, column=1, value=month).border = EXCEL_THIN_BORDER
+        ws.cell(row=row_idx, column=2, value=sales).border = EXCEL_THIN_BORDER
         ws.cell(row=row_idx, column=2).number_format = '#,##0.00'
-        ws.cell(row=row_idx, column=3, value=purchase).border = thin_border
+        ws.cell(row=row_idx, column=3, value=purchase).border = EXCEL_THIN_BORDER
         ws.cell(row=row_idx, column=3).number_format = '#,##0.00'
-        ws.cell(row=row_idx, column=4, value=profit).border = thin_border
+        ws.cell(row=row_idx, column=4, value=profit).border = EXCEL_THIN_BORDER
         ws.cell(row=row_idx, column=4).number_format = '#,##0.00'
-        ws.cell(row=row_idx, column=5, value=margin).border = thin_border
+        ws.cell(row=row_idx, column=5, value=margin).border = EXCEL_THIN_BORDER
         ws.cell(row=row_idx, column=5).number_format = '0.00'
 
     ws.column_dimensions['A'].width = 12
@@ -1085,46 +1012,24 @@ def export_expenses():
     ws = wb.active
     ws.title = '费用报表'
 
-    # 设置表头样式
-    header_font = Font(bold=True, color='FFFFFF')
-    header_fill = PatternFill(start_color='4472C4', end_color='4472C4', fill_type='solid')
-    header_alignment = Alignment(horizontal='center', vertical='center')
-    thin_border = Border(
-        left=Side(style='thin'),
-        right=Side(style='thin'),
-        top=Side(style='thin'),
-        bottom=Side(style='thin')
-    )
-
     # 写入表头
     headers = ['费用单号', '费用类别', '费用金额', '费用日期', '收款方', '付款方式', '备注', '操作人', '创建时间']
     for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_alignment
-        cell.border = thin_border
-
-    # 支付方式映射
-    payment_method_map = {
-        'cash': '现金',
-        'bank_transfer': '银行转账',
-        'wechat': '微信支付',
-        'alipay': '支付宝'
-    }
+        ws.cell(row=1, column=col, value=header)
+    apply_excel_header_style(ws, 1, len(headers))
 
     # 写入数据
     for row, expense in enumerate(expenses_list, 2):
-        ws.cell(row=row, column=1, value=expense.expense_number).border = thin_border
-        ws.cell(row=row, column=2, value=expense.category).border = thin_border
-        ws.cell(row=row, column=3, value=float(expense.amount) if expense.amount else 0).border = thin_border
+        ws.cell(row=row, column=1, value=expense.expense_number).border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=2, value=expense.category).border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=3, value=float(expense.amount) if expense.amount else 0).border = EXCEL_THIN_BORDER
         ws.cell(row=row, column=3).number_format = '#,##0.00'
-        ws.cell(row=row, column=4, value=expense.expense_date.strftime('%Y-%m-%d') if expense.expense_date else '').border = thin_border
-        ws.cell(row=row, column=5, value=expense.payee or '').border = thin_border
-        ws.cell(row=row, column=6, value=payment_method_map.get(expense.payment_method, expense.payment_method or '')).border = thin_border
-        ws.cell(row=row, column=7, value=expense.notes or '').border = thin_border
-        ws.cell(row=row, column=8, value=expense.creator.username if expense.creator else '系统').border = thin_border
-        ws.cell(row=row, column=9, value=expense.created_at.strftime('%Y-%m-%d %H:%M:%S') if expense.created_at else '').border = thin_border
+        ws.cell(row=row, column=4, value=expense.expense_date.strftime('%Y-%m-%d') if expense.expense_date else '').border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=5, value=expense.payee or '').border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=6, value=PAYMENT_METHOD_MAP.get(expense.payment_method, expense.payment_method or '')).border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=7, value=expense.notes or '').border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=8, value=expense.creator.username if expense.creator else '系统').border = EXCEL_THIN_BORDER
+        ws.cell(row=row, column=9, value=expense.created_at.strftime('%Y-%m-%d %H:%M:%S') if expense.created_at else '').border = EXCEL_THIN_BORDER
 
     # 设置列宽
     ws.column_dimensions['A'].width = 15

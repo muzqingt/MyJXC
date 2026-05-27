@@ -1,13 +1,17 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from flask_bootstrap import Bootstrap
 from flask_wtf import CSRFProtect
 from flask_login import LoginManager
 from datetime import datetime
 import os
 
+from config import config
+
 # 初始化扩展
 db = SQLAlchemy()
+migrate = Migrate()
 bootstrap = Bootstrap()
 csrf = CSRFProtect()
 login_manager = LoginManager()
@@ -15,23 +19,27 @@ login_manager.login_view = 'auth.login'
 login_manager.login_message = '请先登录以访问此页面。'
 login_manager.login_message_category = 'warning'
 
-def create_app(config_class='config.Config'):
+def create_app(config_name=None):
+    if config_name is None:
+        config_name = os.environ.get('FLASK_ENV', 'default')
     app = Flask(__name__)
-    app.config.from_object(config_class)
-    
+    app.config.from_object(config[config_name])
+
     # 确保上传目录存在
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    
+
     # 初始化扩展
     db.init_app(app)
+    migrate.init_app(app, db)
     bootstrap.init_app(app)
     csrf.init_app(app)
     login_manager.init_app(app)
-    
+
     # 注册蓝图
-    from app.routes import auth, product, purchase, sales, inventory, finance, report, system, main
+    from app.routes import auth, product, partner, purchase, sales, inventory, finance, report, system, main
     app.register_blueprint(auth.bp)
     app.register_blueprint(product.bp)
+    app.register_blueprint(partner.bp)
     app.register_blueprint(purchase.bp)
     app.register_blueprint(sales.bp)
     app.register_blueprint(inventory.bp)
@@ -39,11 +47,7 @@ def create_app(config_class='config.Config'):
     app.register_blueprint(report.bp)
     app.register_blueprint(system.bp)
     app.register_blueprint(main.bp)
-    
-    # 创建数据库表
-    with app.app_context():
-        db.create_all()
-    
+
     # 注册模板上下文处理器
     @app.context_processor
     def inject_template_functions():
@@ -52,7 +56,7 @@ def create_app(config_class='config.Config'):
             'now': datetime.now,
             'format_local_dt': format_local_dt
         }
-    
+
     # 注册 Jinja2 过滤器
     from app.utils import localize_dt
     @app.template_filter('localize')

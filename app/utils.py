@@ -3,8 +3,9 @@
 """
 from flask import flash, redirect, url_for
 from datetime import datetime
-
 from decimal import Decimal, ROUND_HALF_UP
+
+from app import db
 
 
 def to_decimal(value, default=Decimal('0')):
@@ -60,8 +61,6 @@ def sub_balance(customer_or_supplier, field_name, amount):
     # 刷新 ORM 对象，防止后续 commit() 用脏数据覆盖刚写入的数据库值
     db.session.refresh(customer_or_supplier)
 
-from app import db
-
 
 def generate_order_number(prefix, model_class, date_field_name='created_at'):
     """
@@ -78,7 +77,8 @@ def generate_order_number(prefix, model_class, date_field_name='created_at'):
     # 使用filter通过字段名构建查询
     filter_field = getattr(model_class, 'order_number', None) or \
                    getattr(model_class, 'receipt_number', None) or \
-                   getattr(model_class, 'delivery_number', None)
+                   getattr(model_class, 'delivery_number', None) or \
+                   getattr(model_class, 'return_number', None)
     
     if filter_field:
         last_order = model_class.query.filter(filter_field.like(like_pattern)).order_by(
@@ -89,7 +89,7 @@ def generate_order_number(prefix, model_class, date_field_name='created_at'):
     
     if last_order:
         # 尝试从订单号提取序号
-        order_str = str(last_order.order_number or last_order.receipt_number or last_order.delivery_number)
+        order_str = str(last_order.order_number or last_order.receipt_number or last_order.delivery_number or last_order.return_number)
         prefix_len = len(prefix) + len(today)
         if len(order_str) > prefix_len:
             try:
@@ -221,3 +221,46 @@ def format_local_dt(dt, fmt='%Y-%m-%d %H:%M:%S'):
     return local.strftime(fmt)
 
 
+def get_redirect_tab(status=None):
+    """根据订单状态确定跳转的标签页"""
+    if status == 'draft':
+        return 'draft'
+    elif status in ('confirmed', 'partial'):
+        return 'confirmed'
+    elif status == 'completed':
+        return 'completed'
+    return 'draft'
+
+
+# Excel 导出样式常量
+from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+
+EXCEL_HEADER_FONT = Font(bold=True, size=11)
+EXCEL_HEADER_FILL = PatternFill(start_color='D9E1F2', end_color='D9E1F2', fill_type='solid')
+EXCEL_THIN_BORDER = Border(
+    left=Side(style='thin'),
+    right=Side(style='thin'),
+    top=Side(style='thin'),
+    bottom=Side(style='thin')
+)
+EXCEL_HEADER_ALIGNMENT = Alignment(horizontal='center', vertical='center')
+
+
+def apply_excel_header_style(ws, row, max_col):
+    """为 Excel 表头行应用统一样式"""
+    for col in range(1, max_col + 1):
+        cell = ws.cell(row=row, column=col)
+        cell.font = EXCEL_HEADER_FONT
+        cell.fill = EXCEL_HEADER_FILL
+        cell.border = EXCEL_THIN_BORDER
+        cell.alignment = EXCEL_HEADER_ALIGNMENT
+
+
+PAYMENT_METHOD_MAP = {
+    'cash': '现金',
+    'bank_transfer': '银行转账',
+    'check': '支票',
+    'wechat': '微信',
+    'alipay': '支付宝',
+    'other': '其他'
+}

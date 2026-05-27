@@ -6,7 +6,7 @@
 
 {% block actions %}
 <div class="btn-group">
-    <a href="{{ url_for('product.new_customer') }}" class="btn btn-primary">
+    <a href="{{ url_for('partner.add_customer') }}" class="btn btn-primary">
         <i class="bi bi-plus-circle"></i> 添加客户
     </a>
     <a href="{{ url_for('product.index') }}" class="btn btn-outline-secondary">
@@ -45,7 +45,7 @@
                                 <td>{{ customer.created_at.strftime('%Y-%m-%d') }}</td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
-                                        <a href="{{ url_for('product.edit_customer', id=customer.id) }}" 
+                                        <a href="{{ url_for('partner.edit_customer', id=customer.id) }}" 
                                            class="btn btn-outline-primary" title="编辑">
                                             <i class="bi bi-pencil"></i>
                                         </a>
@@ -63,7 +63,7 @@
                 <div class="text-center text-muted py-5">
                     <i class="bi bi-people" style="font-size: 3rem;"></i>
                     <p class="mt-2">暂无客户数据</p>
-                    <a href="{{ url_for('product.new_customer') }}" class="btn btn-primary mt-2">
+                    <a href="{{ url_for('partner.add_customer') }}" class="btn btn-primary mt-2">
                         <i class="bi bi-plus-circle"></i> 添加第一个客户
                     </a>
                 </div>
@@ -114,7 +114,7 @@ $(document).ready(function() {
         }
         var csrf = '{{ csrf_token() }}';
         var form = $('<form method="post"></form>');
-        form.attr('action', '/product/customers/' + id + '/delete');
+        form.attr('action', '/partner/customers/' + id + '/delete');
         form.append($('<input type="hidden" name="csrf_token">').val(csrf));
         $('body').append(form);
         form.submit();
