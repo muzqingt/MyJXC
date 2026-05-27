@@ -27,8 +27,7 @@ def login():
         
         login_user(user, remember=form.remember_me.data)
         user.last_login = datetime.now()
-        db.session.commit()
-        
+
         # 记录登录日志
         log = Log(
             user_id=user.id,
@@ -110,8 +109,7 @@ def change_password():
         return redirect(url_for('auth.profile'))
     
     current_user.set_password(new_password)
-    db.session.commit()
-    
+
     # 记录日志
     log = Log(
         user_id=current_user.id,
@@ -134,7 +132,7 @@ def change_email():
         flash('邮箱地址不能为空', 'danger')
         return redirect(url_for('auth.profile'))
     
-    if '@' not in new_email:
+    if '@' not in new_email or '.' not in new_email.split('@')[1]:
         flash('请输入有效的邮箱地址', 'danger')
         return redirect(url_for('auth.profile'))
     
@@ -145,8 +143,7 @@ def change_email():
         return redirect(url_for('auth.profile'))
     
     current_user.email = new_email
-    db.session.commit()
-    
+
     # 记录日志
     log = Log(
         user_id=current_user.id,

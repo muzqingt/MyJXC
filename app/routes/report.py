@@ -4,7 +4,8 @@ from datetime import datetime, timedelta
 from app import db
 from app.models import Product, SalesOrder, PurchaseOrder, Customer, Supplier, Receipt, PurchaseOrderItem, SalesOrderItem
 from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from openpyxl.styles import Font, Alignment
+from app.utils import EXCEL_HEADER_FONT, EXCEL_HEADER_FILL, EXCEL_THIN_BORDER, EXCEL_HEADER_ALIGNMENT
 from io import BytesIO
 from decimal import Decimal
 from urllib.parse import quote
@@ -12,27 +13,15 @@ from urllib.parse import quote
 # 创建蓝图
 bp = Blueprint('report', __name__, url_prefix='/report')
 
-# 样式定义
-header_font = Font(bold=True, color='FFFFFF')
-header_fill = PatternFill(start_color='4472C4', end_color='4472C4', fill_type='solid')
-header_alignment = Alignment(horizontal='center', vertical='center')
-cell_alignment = Alignment(horizontal='center', vertical='center')
-thin_border = Border(
-    left=Side(style='thin'),
-    right=Side(style='thin'),
-    top=Side(style='thin'),
-    bottom=Side(style='thin')
-)
-
 def set_header_style(cell):
-    cell.font = header_font
-    cell.fill = header_fill
-    cell.alignment = header_alignment
-    cell.border = thin_border
+    cell.font = EXCEL_HEADER_FONT
+    cell.fill = EXCEL_HEADER_FILL
+    cell.alignment = EXCEL_HEADER_ALIGNMENT
+    cell.border = EXCEL_THIN_BORDER
 
 def set_cell_style(cell):
-    cell.alignment = cell_alignment
-    cell.border = thin_border
+    cell.alignment = EXCEL_HEADER_ALIGNMENT
+    cell.border = EXCEL_THIN_BORDER
 
 @bp.route('/')
 @login_required
@@ -53,9 +42,13 @@ def inventory_report():
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=30)
     else:
-        start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
-        end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
-    
+        try:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+        except ValueError:
+            flash('日期格式无效，请使用YYYY-MM-DD格式', 'error')
+            return redirect(url_for('report.index'))
+
     # 查询采购数据
     purchase_data = db.session.query(
         Product.id,
@@ -121,9 +114,13 @@ def sales_ranking():
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=30)
     else:
-        start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
-        end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
-    
+        try:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+        except ValueError:
+            flash('日期格式无效，请使用YYYY-MM-DD格式', 'error')
+            return redirect(url_for('report.index'))
+
     # 查询销售排行榜
     ranking_data = db.session.query(
         Product.id,
@@ -193,8 +190,12 @@ def daily_report():
     """经营日报"""
     report_date = request.args.get('date', datetime.now().date())
     if isinstance(report_date, str):
-        report_date = datetime.strptime(report_date, '%Y-%m-%d').date()
-    
+        try:
+            report_date = datetime.strptime(report_date, '%Y-%m-%d').date()
+        except ValueError:
+            flash('日期格式无效，请使用YYYY-MM-DD格式', 'error')
+            return redirect(url_for('report.index'))
+
     # 当日销售统计
     daily_sales = db.session.query(
         db.func.sum(SalesOrder.total_amount).label('total_sales'),

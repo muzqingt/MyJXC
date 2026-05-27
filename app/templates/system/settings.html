@@ -220,6 +220,13 @@ function loadSystemInfo() {
     });
 }
 
+function escapeHtml(text) {
+    if (text == null) return '';
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(String(text)));
+    return div.innerHTML;
+}
+
 function loadRecentLogs() {
     $.ajax({
         url: '/system/api/system/recent-logs',
@@ -231,9 +238,9 @@ function loadRecentLogs() {
             } else {
                 logs.forEach(function(log) {
                     html += '<tr>' +
-                        '<td>' + log.created_at + '</td>' +
-                        '<td>' + (log.username || '系统') + '</td>' +
-                        '<td>' + log.action + '</td>' +
+                        '<td>' + escapeHtml(log.created_at) + '</td>' +
+                        '<td>' + escapeHtml(log.username || '系统') + '</td>' +
+                        '<td>' + escapeHtml(log.action) + '</td>' +
                         '</tr>';
                 });
             }

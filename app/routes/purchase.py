@@ -129,7 +129,12 @@ def new_order():
             order_items_list = []
             for i in range(len(product_ids)):
                 if product_ids[i] and quantities[i] and unit_prices[i]:
-                    product = db.session.get(Product, int(product_ids[i]))
+                    try:
+                        pid = int(product_ids[i])
+                    except ValueError:
+                        flash('商品ID无效!', 'danger')
+                        return redirect(url_for('purchase.new_order'))
+                    product = db.session.get(Product, pid)
                     if product:
                         order_items_list.append({
                             'product_id': product.id,
@@ -172,7 +177,13 @@ def new_order():
         order_items_list = []
         for i in range(len(product_ids)):
             if product_ids[i] and quantities[i] and unit_prices[i]:
-                product = db.session.get(Product, int(product_ids[i]))
+                try:
+                    pid = int(product_ids[i])
+                except ValueError:
+                    db.session.rollback()
+                    flash('商品ID无效!', 'danger')
+                    return redirect(url_for('purchase.new_order'))
+                product = db.session.get(Product, pid)
                 if product:
                     quantity = to_decimal(quantities[i])
                     unit_price = to_decimal(unit_prices[i])
@@ -337,7 +348,12 @@ def edit_order(id):
             order_items_list = []
             for i in range(len(product_ids)):
                 if product_ids[i] and quantities[i] and unit_prices[i]:
-                    product = db.session.get(Product, int(product_ids[i]))
+                    try:
+                        pid = int(product_ids[i])
+                    except ValueError:
+                        flash('商品ID无效!', 'danger')
+                        return redirect(url_for('purchase.edit_order', id=id))
+                    product = db.session.get(Product, pid)
                     if product:
                         order_items_list.append({
                             'product_id': product.id,
@@ -376,7 +392,11 @@ def edit_order(id):
 
         for i in range(len(product_ids)):
             if product_ids[i] and quantities[i] and unit_prices[i]:
-                product_id = int(product_ids[i])
+                try:
+                    product_id = int(product_ids[i])
+                except ValueError:
+                    flash('商品ID无效!', 'danger')
+                    return redirect(url_for('purchase.edit_order', id=id))
                 remaining_product_ids.add(product_id)
                 product = db.session.get(Product, product_id)
                 if product:
@@ -434,7 +454,12 @@ def edit_order(id):
                 order_items_list = []
                 for i in range(len(product_ids)):
                     if product_ids[i] and quantities[i] and unit_prices[i]:
-                        product = db.session.get(Product, int(product_ids[i]))
+                        try:
+                            pid = int(product_ids[i])
+                        except ValueError:
+                            flash('商品ID无效!', 'danger')
+                            return redirect(url_for('purchase.edit_order', id=id))
+                        product = db.session.get(Product, pid)
                         if product:
                             order_items_list.append({
                                 'product_id': product.id,
@@ -457,7 +482,12 @@ def edit_order(id):
                                      submitted_notes=notes,
                                      order_items=order_items_list)
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            flash(f'采购订单修改失败: {str(e)}', 'danger')
+            return redirect(url_for('purchase.index'))
 
         flash('采购订单修改成功!', 'success')
         return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
@@ -618,7 +648,7 @@ def quick_stock_in(id):
         if total_amount == 0:
             # 检查是否所有商品都已入库
             all_received = all(
-                float(oi.received_quantity) >= float(oi.quantity)
+                to_decimal(oi.received_quantity) >= to_decimal(oi.quantity)
                 for oi in order.items
             )
             if all_received and order.status != 'completed':
@@ -639,7 +669,7 @@ def quick_stock_in(id):
 
         # 检查订单是否全部入库
         all_received = all(
-            float(oi.received_quantity) >= float(oi.quantity)
+            to_decimal(oi.received_quantity) >= to_decimal(oi.quantity)
             for oi in order.items
         )
 
@@ -673,7 +703,7 @@ def view_order(id):
     # 准备订单商品数据用于JavaScript确认框
     order_items_data = []
     for item in order.items:
-        remaining = float(item.quantity) - float(item.received_quantity)
+        remaining = to_decimal(item.quantity) - to_decimal(item.received_quantity)
         if remaining > 0:
             order_items_data.append({
                 'name': item.product.name,
@@ -807,12 +837,13 @@ def edit_stock_in_items(id):
                 has_items = True
                 # 验证数量和单价为正数
                 try:
+                    pid = int(product_ids[i])
                     qty = float(quantities[i])
                     price = float(unit_prices[i])
                     if qty <= 0 or price < 0:
                         flash('数量必须大于0,单价不能为负数!', 'danger')
                         items_data = [{
-                            'product_id': int(product_ids[i]),
+                            'product_id': pid,
                             'quantity': qty,
                             'unit_price': price
                         } for i in range(len(product_ids)) if product_ids[i]]
@@ -822,12 +853,19 @@ def edit_stock_in_items(id):
                             products=products_data,
                             order_items=items_data)
                 except (ValueError, TypeError):
-                    flash('数量和单价必须是有效数字!', 'danger')
-                    items_data = [{
-                        'product_id': int(product_ids[i]) if product_ids[i] else 0,
-                        'quantity': float(quantities[i]) if quantities[i] else 0,
-                        'unit_price': float(unit_prices[i]) if unit_prices[i] else 0
-                    } for i in range(len(product_ids)) if product_ids[i]]
+                    flash('商品ID、数量和单价必须是有效数字!', 'danger')
+                    items_data = []
+                    for j in range(len(product_ids)):
+                        if product_ids[j]:
+                            try:
+                                item_pid = int(product_ids[j])
+                            except ValueError:
+                                item_pid = 0
+                            items_data.append({
+                                'product_id': item_pid,
+                                'quantity': float(quantities[j]) if quantities[j] else 0,
+                                'unit_price': float(unit_prices[j]) if unit_prices[j] else 0
+                            })
                     return render_template('purchase/stock_in_items.html',
                         title='编辑入库明细',
                         stock_in=stock_in,
@@ -848,7 +886,12 @@ def edit_stock_in_items(id):
         total_amount = 0
         for i in range(len(product_ids)):
             if product_ids[i] and quantities[i] and unit_prices[i]:
-                product = db.session.get(Product, int(product_ids[i]))
+                try:
+                    pid = int(product_ids[i])
+                except ValueError:
+                    flash('商品ID无效!', 'danger')
+                    return redirect(url_for('purchase.edit_stock_in_items', id=id))
+                product = db.session.get(Product, pid)
                 if product:
                     quantity = to_decimal(quantities[i])
                     unit_price = to_decimal(unit_prices[i])
@@ -994,11 +1037,11 @@ def complete_stock_in(id):
             )
 
             if all_received:
-                order.status = 'completed'
-                # 更新供应商应付余额（使用订单总额，而非仅本次入库金额）
-                supplier = order.supplier
-                if supplier:
-                    add_balance(supplier, "payable_balance", order.total_amount)
+                if order.status != 'completed':
+                    order.status = 'completed'
+                    supplier = order.supplier
+                    if supplier:
+                        add_balance(supplier, "payable_balance", order.total_amount)
             else:
                 order.status = 'partial'
 
@@ -1050,7 +1093,7 @@ def quick_return(id):
     """快捷退货: 从采购订单直接退货(一次性完成)"""
     order = db.session.query(PurchaseOrder).options(
         selectinload(PurchaseOrder.items).selectinload(PurchaseOrderItem.product)
-    ).filter(PurchaseOrder.id == id).first()
+    ).filter(PurchaseOrder.id == id).with_for_update().first()
     if order is None:
         abort(404)
 
@@ -1087,7 +1130,10 @@ def quick_return(id):
         has_items = False
         for order_item in order.items:
             product = db.session.query(Product).filter(Product.id == order_item.product_id).with_for_update().first()
-            if not product or to_decimal(product.stock_quantity) <= 0:
+            if not product:
+                continue
+            if to_decimal(product.stock_quantity) <= 0:
+                flash(f'商品 {product.name} 库存为0，已跳过退货', 'warning')
                 continue
 
             # 退货数量取"已入库数量"和"当前库存"的较小值，防止退货数超过实际库存

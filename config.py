@@ -14,10 +14,13 @@ class Config:
         with open(_secret_key_file, 'r') as f:
             SECRET_KEY = f.read().strip()
     else:
-        os.makedirs(os.path.dirname(_secret_key_file), exist_ok=True)
-        SECRET_KEY = secrets.token_hex(32)
-        with open(_secret_key_file, 'w') as f:
-            f.write(SECRET_KEY)
+        try:
+            os.makedirs(os.path.dirname(_secret_key_file), exist_ok=True)
+            SECRET_KEY = secrets.token_hex(32)
+            with open(_secret_key_file, 'w') as f:
+                f.write(SECRET_KEY)
+        except OSError:
+            SECRET_KEY = os.urandom(32).hex()
 
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
         'sqlite:///' + os.path.join(BASEDIR, 'instance', 'store.db')
@@ -58,5 +61,5 @@ class ProductionConfig(Config):
 config = {
     'development': DevelopmentConfig,
     'production': ProductionConfig,
-    'default': DevelopmentConfig
+    'default': ProductionConfig
 }

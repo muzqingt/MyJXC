@@ -109,11 +109,11 @@ def generate_order_number(prefix: str, model_class: type, date_field_name: str =
         if len(order_str) > prefix_len:
             try:
                 last_num = int(order_str[prefix_len:])
-                return f'{prefix}{today}{last_num + 1:03d}'
+                return f'{prefix}{today}{last_num + 1:04d}'
             except (ValueError, IndexError):
                 pass
-        return f'{prefix}{today}001'
-    return f'{prefix}{today}001'
+        return f'{prefix}{today}0001'
+    return f'{prefix}{today}0001'
 
 
 def build_products_data(products: list, include_purchase_price: bool = True, include_sale_price: bool = True) -> list[dict]:
@@ -178,12 +178,16 @@ def update_stock_and_log(product: Any, warehouse_id: int, quantity: Union[float,
     """
     from app.models import StockLog
     
+    valid_change_types = ('in', 'out', 'adjust_in', 'adjust_out', 'check_in', 'check_out', 'return_in', 'return_out', 'stock_transfer')
+    if change_type not in valid_change_types:
+        raise ValueError(f"Invalid change_type: {change_type}")
+
     before_quantity = to_decimal(product.stock_quantity)
     delta = to_decimal(quantity)
 
-    if change_type == 'in':
+    if change_type == 'in' or change_type.endswith('_in'):
         after_quantity = before_quantity + delta
-    else:  # out
+    else:
         after_quantity = before_quantity - delta
     
     product.stock_quantity = after_quantity

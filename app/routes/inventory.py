@@ -170,8 +170,7 @@ def stock_transfer():
     products = Product.query.all()
     today = datetime.now().strftime('%Y-%m-%d')
 
-    # 将产品转换为JSON格式供前端使用
-    products_json = json.dumps([{
+    products_list = [{
         'id': p.id,
         'code': p.code,
         'name': p.name,
@@ -179,7 +178,7 @@ def stock_transfer():
         'unit': p.unit,
         'stock_quantity': float(p.stock_quantity) if p.stock_quantity else 0,
         'purchase_price': float(p.purchase_price) if p.purchase_price else 0
-    } for p in products])
+    } for p in products]
 
     # 创建表单并设置仓库选项
     form = StockTransferForm()
@@ -215,7 +214,7 @@ def stock_transfer():
                                      form=form,
                                      warehouses=warehouses,
                                      products=products,
-                                     products_json=products_json,
+                                     products_list=products_list,
                                      today=today,
                                      items_data=items_data)
 
@@ -258,8 +257,7 @@ def stock_transfer():
                         quantity = to_decimal(item['quantity'])
                         pid = product.id
 
-                        # 源仓库当前追踪库存（含本次调拨前序迭代的变动）
-                        actual_stock = product_warehouse_stock[pid][from_warehouse_id]
+                        actual_stock = get_product_stock_in_warehouse(pid, from_warehouse_id)
                         if actual_stock < quantity:
                             flash(f'{product.name} 库存不足！', 'danger')
                             items_data = [
@@ -273,7 +271,7 @@ def stock_transfer():
                                                  form=form,
                                                  warehouses=warehouses,
                                                  products=products,
-                                                 products_json=products_json,
+                                                 products_list=products_list,
                                                  today=today,
                                                  items_data=items_data)
 
@@ -334,7 +332,7 @@ def stock_transfer():
                          form=form,
                          warehouses=warehouses,
                          products=products,
-                         products_json=products_json,
+                         products_list=products_list,
                          today=today,
                          items_data=items_data)
 
@@ -421,19 +419,16 @@ def stock_logs():
     if start_date:
         query = query.filter(StockLog.created_at >= start_date)
     if end_date:
-        # 如果有开始日期，则结束日期加一天；否则只比较日期部分
-        if start_date:
-            query = query.filter(StockLog.created_at <= end_date + ' 23:59:59')
-        else:
-            query = query.filter(StockLog.created_at <= end_date + ' 23:59:59')
+        query = query.filter(StockLog.created_at <= end_date + ' 23:59:59')
+    VALID_LOG_TYPES = {'in', 'out', 'check_in', 'check_out', 'adjust_in', 'adjust_out', 'return_in', 'return_out', 'stock_transfer'}
     if log_type:
         if log_type == 'check':
             query = query.filter(StockLog.change_type.like('check%'))
         elif log_type == 'adjust':
             query = query.filter(StockLog.change_type.like('adjust%'))
-        else:
+        elif log_type in VALID_LOG_TYPES:
             query = query.filter_by(change_type=log_type)
-    
+
     logs = query.order_by(StockLog.created_at.desc()).limit(100).all()
     
     return render_template('inventory/logs.html',
@@ -480,14 +475,15 @@ def export_logs():
         query = query.filter(StockLog.created_at >= start_date)
     if end_date:
         query = query.filter(StockLog.created_at <= end_date + ' 23:59:59')
+    VALID_LOG_TYPES = {'in', 'out', 'check_in', 'check_out', 'adjust_in', 'adjust_out', 'return_in', 'return_out', 'stock_transfer'}
     if log_type:
         if log_type == 'check':
             query = query.filter(StockLog.change_type.like('check%'))
         elif log_type == 'adjust':
             query = query.filter(StockLog.change_type.like('adjust%'))
-        else:
+        elif log_type in VALID_LOG_TYPES:
             query = query.filter_by(change_type=log_type)
-    
+
     logs = query.order_by(StockLog.created_at.desc()).all()
     
     # 创建Excel工作簿

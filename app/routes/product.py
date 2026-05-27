@@ -10,6 +10,29 @@ from flask import Blueprint
 from sqlalchemy.exc import SQLAlchemyError
 from app.utils import to_decimal
 
+def _save_product_image(file, product):
+    if file.content_type not in ['image/jpeg', 'image/png', 'image/gif', 'image/jpg']:
+        return '只能上传 JPG/PNG/GIF 格式图片'
+    file.seek(0, 2)
+    size = file.tell()
+    file.seek(0)
+    if size > 2 * 1024 * 1024:
+        return '图片大小不能超过 2MB'
+    filename = secure_filename(file.filename)
+    if filename:
+        file_ext = os.path.splitext(filename)[1].lower()
+        if file_ext in ['.jpg', '.jpeg', '.png', '.gif']:
+            if product.image_path:
+                old_filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], product.image_path)
+                if os.path.exists(old_filepath):
+                    os.remove(old_filepath)
+            new_filename = f"product_{secure_filename(product.code)}{file_ext}"
+            filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], new_filename)
+            file.save(filepath)
+            product.image_path = new_filename
+    return None
+
+
 # 创建蓝图
 bp = Blueprint('product', __name__, url_prefix='/product')
 
@@ -72,31 +95,14 @@ def new_product():
             description=form.description.data
         )
         
-        # 处理图片上传
         if form.image.data:
-            file = form.image.data
-            if file.content_type not in ['image/jpeg', 'image/png', 'image/gif', 'image/jpg']:
-                flash('只能上传 JPG/PNG/GIF 格式图片', 'danger')
+            error = _save_product_image(form.image.data, product)
+            if error:
+                flash(error, 'danger')
                 return redirect(url_for('product.new_product'))
-            file.seek(0, 2)  # seek to end
-            size = file.tell()
-            file.seek(0)  # reset
-            if size > 2 * 1024 * 1024:  # 2MB limit
-                flash('图片大小不能超过 2MB', 'danger')
-                return redirect(url_for('product.new_product'))
-            filename = secure_filename(file.filename)
-            if filename:
-                file_ext = os.path.splitext(filename)[1].lower()
-                if file_ext in ['.jpg', '.jpeg', '.png', '.gif']:
-                    new_filename = f"product_{product.code}{file_ext}"
-                    filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], new_filename)
-                    file.save(filepath)
-                    product.image_path = new_filename
-        
+
         db.session.add(product)
-        db.session.commit()
-        
-        # 记录日志
+
         log = Log(
             user_id=current_user.id,
             action='添加商品',
@@ -141,36 +147,12 @@ def edit_product(id):
         product.description = form.description.data
         product.updated_at = datetime.now()
         
-        # 处理图片上传
         if form.image.data:
-            file = form.image.data
-            if file.content_type not in ['image/jpeg', 'image/png', 'image/gif', 'image/jpg']:
-                flash('只能上传 JPG/PNG/GIF 格式图片', 'danger')
+            error = _save_product_image(form.image.data, product)
+            if error:
+                flash(error, 'danger')
                 return redirect(url_for('product.edit_product', id=product.id))
-            file.seek(0, 2)  # seek to end
-            size = file.tell()
-            file.seek(0)  # reset
-            if size > 2 * 1024 * 1024:  # 2MB limit
-                flash('图片大小不能超过 2MB', 'danger')
-                return redirect(url_for('product.edit_product', id=product.id))
-            filename = secure_filename(file.filename)
-            if filename:
-                file_ext = os.path.splitext(filename)[1].lower()
-                if file_ext in ['.jpg', '.jpeg', '.png', '.gif']:
-                    # 删除旧图片
-                    if product.image_path:
-                        old_filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], product.image_path)
-                        if os.path.exists(old_filepath):
-                            os.remove(old_filepath)
-                    
-                    new_filename = f"product_{product.code}{file_ext}"
-                    filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], new_filename)
-                    file.save(filepath)
-                    product.image_path = new_filename
-        
-        db.session.commit()
-        
-        # 记录日志
+
         log = Log(
             user_id=current_user.id,
             action='修改商品',
@@ -217,10 +199,15 @@ def delete_product(id):
         ip_address=request.remote_addr
     )
     db.session.add(log)
-    
-    db.session.delete(product)
-    db.session.commit()
-    
+
+    try:
+        db.session.delete(product)
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('删除商品失败，请重试！', 'danger')
+        return redirect(url_for('product.index'))
+
     flash('商品删除成功！', 'success')
     return redirect(url_for('product.index'))
 
@@ -327,9 +314,9 @@ def api_products():
             'name': product.name,
             'specification': product.specification,
             'unit': product.unit,
-            'purchase_price': float(product.purchase_price),
-            'sale_price': float(product.sale_price),
-            'stock_quantity': float(product.stock_quantity)
+            'purchase_price': str(product.purchase_price),
+            'sale_price': str(product.sale_price),
+            'stock_quantity': str(product.stock_quantity)
         })
     return jsonify(result)
 
@@ -345,7 +332,7 @@ def api_update_price():
     price_type = data.get('price_type')  # 'sale_price' or 'purchase_price'
     price = data.get('price')
 
-    if not product_id or not price_type or price is None or price is False:
+    if not product_id or not price_type or price is None:
         return jsonify({'success': False, 'message': '参数不完整'})
     
     try:
@@ -369,7 +356,7 @@ def api_update_price():
         return jsonify({'success': True, 'message': '价格已更新'})
     except SQLAlchemyError as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
+        return jsonify({'success': False, 'message': '数据库错误，请重试'})
 
 @bp.route('/api/categories')
 @login_required

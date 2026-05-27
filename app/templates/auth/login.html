@@ -50,9 +50,11 @@
             </div>
         </div>
         
+        {% if config.DEBUG %}
         <div class="mt-3 text-center text-muted">
             <small>默认管理员账号：admin / admin123</small>
         </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

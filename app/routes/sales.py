@@ -302,7 +302,24 @@ def new_order():
         else:
             flash('销售订单创建成功！', 'success')
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            flash(f'创建订单失败: {str(e)}', 'danger')
+            return render_template('sales/order_items.html',
+                                 title='新建销售订单',
+                                 customers=customers_data,
+                                 warehouses=warehouses,
+                                 products=products_data,
+                                 action='new',
+                                 submitted_customer_id=customer_id,
+                                 submitted_warehouse_id=warehouse_id if warehouse_id else '',
+                                 submitted_order_date=order_date,
+                                 submitted_delivery_date=delivery_date,
+                                 submitted_notes=notes,
+                                 order_items=order_items_list,
+                                 default_warehouse_id=default_warehouse_id)
         return redirect(url_for('sales.index'))
 
     return render_template('sales/order_items.html',
@@ -435,15 +452,13 @@ def edit_order(id):
         # 调整客户应收余额（差额）- 仅对已完成的订单
         # 注意：confirmed/partial 状态的订单尚未实际出库，不调整余额
         # 余额仅在订单 status=completed（已全部出库）时才记录
-        if order.status == 'completed':
+        if order.status != 'draft':
             if old_customer and old_customer.id != customer_id:
-                # 换了客户：回滚旧客户余额，增加新客户余额
                 sub_balance(old_customer, "receivable_balance", original_total)
                 new_customer = db.session.get(Customer, customer_id)
                 if new_customer:
                     add_balance(new_customer, "receivable_balance", total_amount)
             elif order.customer:
-                # 同客户：调整差额
                 add_balance(order.customer, "receivable_balance", total_amount - original_total)
         
         db.session.commit()
@@ -631,8 +646,7 @@ def quick_stock_out(id):
         )
         
         if all_delivered:
-            # 订单首次完成时补记应收余额（非completed→completed不重复记）
-            if order.customer:
+            if order.status != 'completed' and order.customer:
                 add_balance(order.customer, "receivable_balance", order.total_amount)
             order.status = 'completed'
         else:
@@ -962,11 +976,9 @@ def complete_stock_out(id):
             )
             
             if all_delivered:
+                if order.status != 'completed' and order.customer:
+                    add_balance(order.customer, "receivable_balance", order.total_amount)
                 order.status = 'completed'
-                # 更新客户应收余额（使用订单总额，而非仅本次出库金额）
-                customer = order.customer
-                if customer:
-                    add_balance(customer, "receivable_balance", order.total_amount)
             else:
                 order.status = 'partial'
 

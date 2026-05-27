@@ -84,9 +84,10 @@ def create_backup():
         if description:
             msg += f'（{description}）'
         flash(msg, 'success')
-    except Exception as e:
-        flash(f'备份创建失败: {str(e)}', 'danger')
-    
+    except (OSError, SQLAlchemyError):
+        db.session.rollback()
+        flash('备份创建失败，请稍后重试', 'danger')
+
     return redirect(url_for('system.backup'))
 
 @bp.route('/backup/list')
@@ -169,14 +170,16 @@ def restore_backup():
         return redirect(url_for('system.backup'))
     
     try:
-        # 先备份当前数据库
         current_backup = f'current_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db'
         shutil.copy2(db_path, os.path.join(backup_dir, current_backup))
-        
-        # 恢复备份
-        shutil.copy2(backup_path, db_path)
-        
-        # 记录操作日志
+
+        db.session.remove()
+        try:
+            shutil.copy2(backup_path, db_path)
+        except OSError:
+            flash('数据恢复失败，请稍后重试', 'danger')
+            return redirect(url_for('system.backup'))
+
         log = Log(
             user_id=current_user.id,
             action='恢复数据备份',
@@ -185,11 +188,12 @@ def restore_backup():
         )
         db.session.add(log)
         db.session.commit()
-        
+
         flash(f'数据恢复成功，当前数据库已备份为: {current_backup}', 'success')
-    except Exception as e:
-        flash(f'数据恢复失败: {str(e)}', 'danger')
-    
+    except (OSError, SQLAlchemyError):
+        db.session.rollback()
+        flash('数据恢复失败，请稍后重试', 'danger')
+
     return redirect(url_for('system.backup'))
 
 @bp.route('/backup/delete', methods=['POST'])
@@ -239,8 +243,9 @@ def delete_backup():
         db.session.commit()
         
         flash(f'备份文件已删除: {filename}', 'success')
-    except Exception as e:
-        flash(f'删除备份失败: {str(e)}', 'danger')
+    except (OSError, SQLAlchemyError):
+        db.session.rollback()
+        flash('删除备份失败，请稍后重试', 'danger')
     
     return redirect(url_for('system.backup'))
 
@@ -294,7 +299,9 @@ def add_user():
     password = request.form.get('password')
     email = request.form.get('email')
     role = request.form.get('role', 'user')
-    
+    if role not in ('admin', 'user'):
+        role = 'user'
+
     if not username or not password:
         flash('用户名和密码不能为空', 'danger')
         return redirect(url_for('system.user_management'))
@@ -328,13 +335,15 @@ def edit_user(user_id):
 
     if request.method == 'POST':
         user.email = request.form.get('email')
-        user.role = request.form.get('role')
+        role = request.form.get('role')
+        if role not in ('admin', 'user'):
+            role = 'user'
+        user.role = role
         user.is_active = request.form.get('is_active') == '1'
         
         password = request.form.get('password')
         if password:
-            from werkzeug.security import generate_password_hash
-            user.password_hash = generate_password_hash(password)
+            user.set_password(password)
         
         db.session.commit()
         flash('用户信息已更新', 'success')
@@ -431,7 +440,10 @@ def clean_logs():
     try:
         from datetime import timedelta
         cutoff_date = datetime.now() - timedelta(days=90)
-        deleted = Log.query.filter(Log.created_at < cutoff_date).delete()
+        old_logs = Log.query.filter(Log.created_at < cutoff_date).all()
+        deleted = len(old_logs)
+        for log in old_logs:
+            db.session.delete(log)
         db.session.commit()
         return jsonify({'success': True, 'deleted_count': deleted})
     except SQLAlchemyError as e:
@@ -451,7 +463,8 @@ def export_db():
     if not os.path.exists(db_path):
         flash('数据库文件不存在', 'danger')
         return redirect(url_for('system.settings'))
-    
+
+    db.session.remove()
     return send_file(db_path, as_attachment=True, download_name=export_filename)
 
 @bp.route('/api/system/settings', methods=['POST'])
