@@ -154,12 +154,43 @@ def new_order():
         # 生成订单号
         order_number = generate_order_number('SO', SalesOrder)
 
+        try:
+            parsed_order_date = datetime.strptime(order_date, '%Y-%m-%d').date()
+        except ValueError:
+            flash('订单日期格式不正确！', 'danger')
+            return render_template('sales/order_items.html',
+                                 title='新建销售订单',
+                                 customers=customers_data,
+                                 warehouses=warehouses,
+                                 products=products_data,
+                                 action='new',
+                                 submitted_customer_id=customer_id,
+                                 submitted_warehouse_id=warehouse_id if warehouse_id else '',
+                                 submitted_order_date=order_date,
+                                 submitted_delivery_date=delivery_date,
+                                 submitted_notes=notes)
+        try:
+            parsed_delivery_date = datetime.strptime(delivery_date, '%Y-%m-%d').date() if delivery_date else None
+        except ValueError:
+            flash('交货日期格式不正确！', 'danger')
+            return render_template('sales/order_items.html',
+                                 title='新建销售订单',
+                                 customers=customers_data,
+                                 warehouses=warehouses,
+                                 products=products_data,
+                                 action='new',
+                                 submitted_customer_id=customer_id,
+                                 submitted_warehouse_id=warehouse_id if warehouse_id else '',
+                                 submitted_order_date=order_date,
+                                 submitted_delivery_date=delivery_date,
+                                 submitted_notes=notes)
+
         order = SalesOrder(
             order_number=order_number,
             customer_id=customer_id,
             warehouse_id=warehouse_id,
-            order_date=datetime.strptime(order_date, '%Y-%m-%d').date(),
-            delivery_date=datetime.strptime(delivery_date, '%Y-%m-%d').date() if delivery_date else None,
+            order_date=parsed_order_date,
+            delivery_date=parsed_delivery_date,
             notes=notes,
             created_by=current_user.id,
             status='confirmed'
@@ -239,7 +270,7 @@ def new_order():
                 db.session.flush()
 
                 for item_data in order_items_list:
-                    product = item_data['product']
+                    product = db.session.query(Product).filter(Product.id == item_data['product'].id).with_for_update().first()
                     quantity = item_data['quantity']
                     unit_price = item_data['unit_price']
                     amount = item_data['amount']
@@ -285,7 +316,7 @@ def new_order():
                 flash(f'销售订单创建并出库完成！出库单号: {delivery_number}', 'success')
             except SQLAlchemyError as e:
                 db.session.rollback()
-                flash(f'直接出库失败: {str(e)}', 'danger')
+                flash('直接出库失败，请重试', 'danger')
                 return render_template('sales/order_items.html',
                                      title='新建销售订单',
                                      customers=customers_data,
@@ -306,7 +337,7 @@ def new_order():
             db.session.commit()
         except SQLAlchemyError as e:
             db.session.rollback()
-            flash(f'创建订单失败: {str(e)}', 'danger')
+            flash('创建订单失败，请重试', 'danger')
             return render_template('sales/order_items.html',
                                  title='新建销售订单',
                                  customers=customers_data,
@@ -354,8 +385,8 @@ def edit_order(id):
     for item in order.items:
         order_items_data.append({
             'product_id': item.product_id,
-            'quantity': float(item.quantity),
-            'unit_price': float(item.unit_price)
+            'quantity': str(item.quantity),
+            'unit_price': str(item.unit_price)
         })
     
     if request.method == 'POST':
@@ -401,15 +432,45 @@ def edit_order(id):
                                  order_items=order_items_list)
         
         # 更新订单基本信息
-        old_customer = order.customer
         order.customer_id = customer_id
         order.warehouse_id = warehouse_id
-        order.order_date = datetime.strptime(order_date, '%Y-%m-%d').date()
-        order.delivery_date = datetime.strptime(delivery_date, '%Y-%m-%d').date() if delivery_date else None
+        try:
+            order.order_date = datetime.strptime(order_date, '%Y-%m-%d').date()
+        except ValueError:
+            flash('订单日期格式不正确！', 'danger')
+            return render_template('sales/order_items.html',
+                                 title='编辑销售订单',
+                                 order=order,
+                                 customers=customers_data,
+                                 warehouses=warehouses,
+                                 products=products_data,
+                                 action='edit',
+                                 submitted_customer_id=customer_id,
+                                 submitted_warehouse_id=warehouse_id if warehouse_id else '',
+                                 submitted_order_date=order_date,
+                                 submitted_delivery_date=delivery_date,
+                                 submitted_notes=notes,
+                                 order_items=order_items_data)
+        try:
+            order.delivery_date = datetime.strptime(delivery_date, '%Y-%m-%d').date() if delivery_date else None
+        except ValueError:
+            flash('交货日期格式不正确！', 'danger')
+            return render_template('sales/order_items.html',
+                                 title='编辑销售订单',
+                                 order=order,
+                                 customers=customers_data,
+                                 warehouses=warehouses,
+                                 products=products_data,
+                                 action='edit',
+                                 submitted_customer_id=customer_id,
+                                 submitted_warehouse_id=warehouse_id if warehouse_id else '',
+                                 submitted_order_date=order_date,
+                                 submitted_delivery_date=delivery_date,
+                                 submitted_notes=notes,
+                                 order_items=order_items_data)
         order.notes = notes
         
         # 更新商品明细（保留已出库数量，只删除本次移除的商品）
-        original_total = to_decimal(order.total_amount)
         existing_items = {item.product_id: item for item in order.items}
         remaining_product_ids = set()
         total_amount = 0
@@ -448,19 +509,7 @@ def edit_order(id):
             db.session.delete(item)
 
         order.total_amount = total_amount
-        
-        # 调整客户应收余额（差额）- 仅对已完成的订单
-        # 注意：confirmed/partial 状态的订单尚未实际出库，不调整余额
-        # 余额仅在订单 status=completed（已全部出库）时才记录
-        if order.status != 'draft':
-            if old_customer and old_customer.id != customer_id:
-                sub_balance(old_customer, "receivable_balance", original_total)
-                new_customer = db.session.get(Customer, customer_id)
-                if new_customer:
-                    add_balance(new_customer, "receivable_balance", total_amount)
-            elif order.customer:
-                add_balance(order.customer, "receivable_balance", total_amount - original_total)
-        
+
         db.session.commit()
         flash('销售订单修改成功！', 'success')
         return redirect(url_for('sales.index', tab=get_redirect_tab(order.status)))
@@ -641,7 +690,7 @@ def quick_stock_out(id):
 
         # 检查订单是否全部出库
         all_delivered = all(
-            item.delivered_quantity >= item.quantity
+            to_decimal(item.delivered_quantity) >= to_decimal(item.quantity)
             for item in order.items
         )
         
@@ -657,8 +706,8 @@ def quick_stock_out(id):
         
     except SQLAlchemyError as e:
         db.session.rollback()
-        flash(f'出库失败: {str(e)}', 'danger')
-    
+        flash('出库失败，请重试', 'danger')
+
     return redirect(url_for('sales.index', tab='stockouts'))
 
 
@@ -971,7 +1020,7 @@ def complete_stock_out(id):
             
             # 检查订单是否全部出库
             all_delivered = all(
-                oi.delivered_quantity >= oi.quantity
+                to_decimal(oi.delivered_quantity) >= to_decimal(oi.quantity)
                 for oi in order.items
             )
             
@@ -988,8 +1037,8 @@ def complete_stock_out(id):
         
     except SQLAlchemyError as e:
         db.session.rollback()
-        flash(f'出库失败: {str(e)}', 'danger')
-    
+        flash('出库失败，请重试', 'danger')
+
     return redirect(url_for('sales.index', tab='stockouts'))
 
 # 删除出库单
@@ -1126,7 +1175,7 @@ def quick_return(id):
         flash(f'退货单 {return_number} 创建成功，库存已更新！', 'success')
     except SQLAlchemyError as e:
         db.session.rollback()
-        flash(f'退货失败: {str(e)}', 'danger')
+        flash('退货失败，请重试', 'danger')
 
     return redirect(url_for('sales.index', tab='returns'))
 
@@ -1200,9 +1249,9 @@ def api_order_items(order_id):
             'product_name': item.product.name,
             'specification': item.product.specification,
             'unit': item.product.unit,
-            'quantity': float(item.quantity),
-            'unit_price': float(item.unit_price),
-            'amount': float(item.amount),
-            'delivered_quantity': float(item.delivered_quantity)
+            'quantity': str(item.quantity),
+            'unit_price': str(item.unit_price),
+            'amount': str(item.amount),
+            'delivered_quantity': str(item.delivered_quantity)
         })
     return jsonify(items)

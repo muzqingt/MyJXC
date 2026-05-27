@@ -1,7 +1,7 @@
 from flask import render_template, redirect, url_for, flash, request, jsonify, current_app, abort
 from flask_login import login_required, current_user
 from app import db
-from app.models import Product, Category, Log
+from app.models import Product, Category, Log, PurchaseOrderItem, SalesOrderItem, StockInItem, StockOutItem, StockLog
 from app.forms import ProductForm, CategoryForm, SearchForm
 from datetime import datetime
 import os
@@ -12,6 +12,11 @@ from app.utils import to_decimal
 
 def _save_product_image(file, product):
     if file.content_type not in ['image/jpeg', 'image/png', 'image/gif', 'image/jpg']:
+        return '只能上传 JPG/PNG/GIF 格式图片'
+    file.seek(0)
+    header = file.read(8)
+    file.seek(0)
+    if not (header[:3] == b'\xff\xd8\xff' or header[:4] == b'\x89PNG' or header[:4] == b'GIF8'):
         return '只能上传 JPG/PNG/GIF 格式图片'
     file.seek(0, 2)
     size = file.tell()
@@ -26,7 +31,10 @@ def _save_product_image(file, product):
                 old_filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], product.image_path)
                 if os.path.exists(old_filepath):
                     os.remove(old_filepath)
-            new_filename = f"product_{secure_filename(product.code)}{file_ext}"
+            safe_code = secure_filename(product.code)
+            if not safe_code:
+                safe_code = f'product_{product.id}'
+            new_filename = f"product_{safe_code}{file_ext}"
             filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], new_filename)
             file.save(filepath)
             product.image_path = new_filename
@@ -101,17 +109,21 @@ def new_product():
                 flash(error, 'danger')
                 return redirect(url_for('product.new_product'))
 
-        db.session.add(product)
+        try:
+            db.session.add(product)
+            log = Log(
+                user_id=current_user.id,
+                action='添加商品',
+                details=f'添加商品: {product.code} - {product.name}',
+                ip_address=request.remote_addr
+            )
+            db.session.add(log)
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('商品添加失败，请重试！', 'danger')
+            return redirect(url_for('product.new_product'))
 
-        log = Log(
-            user_id=current_user.id,
-            action='添加商品',
-            details=f'添加商品: {product.code} - {product.name}',
-            ip_address=request.remote_addr
-        )
-        db.session.add(log)
-        db.session.commit()
-        
         flash('商品添加成功！', 'success')
         return redirect(url_for('product.index'))
     
@@ -179,9 +191,11 @@ def delete_product(id):
         abort(404)
 
     # 检查是否有相关记录
-    if (len(product.purchase_order_items) > 0 or len(product.sales_order_items) > 0
-            or len(product.stock_in_items) > 0 or len(product.stock_out_items) > 0
-            or len(product.stock_logs) > 0):
+    if (db.session.query(PurchaseOrderItem).filter_by(product_id=id).first() is not None
+            or db.session.query(SalesOrderItem).filter_by(product_id=id).first() is not None
+            or db.session.query(StockInItem).filter_by(product_id=id).first() is not None
+            or db.session.query(StockOutItem).filter_by(product_id=id).first() is not None
+            or db.session.query(StockLog).filter_by(product_id=id).first() is not None):
         flash('该商品已有库存或订单记录，无法删除！', 'danger')
         return redirect(url_for('product.index'))
     
@@ -243,9 +257,14 @@ def new_category():
             description=form.description.data
         )
         
-        db.session.add(category)
-        db.session.commit()
-        
+        try:
+            db.session.add(category)
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('分类添加失败，请重试！', 'danger')
+            return redirect(url_for('product.new_category'))
+
         flash('分类添加成功！', 'success')
         return redirect(url_for('product.categories'))
     
@@ -267,8 +286,14 @@ def edit_category(id):
         category.name = form.name.data
         category.parent_id = form.parent_id.data if form.parent_id.data != 0 else None
         category.description = form.description.data
-        
-        db.session.commit()
+
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('分类修改失败，请重试！', 'danger')
+            return redirect(url_for('product.edit_category', id=category.id))
+
         flash('分类修改成功！', 'success')
         return redirect(url_for('product.categories'))
     
@@ -286,18 +311,23 @@ def delete_category(id):
         abort(404)
 
     # 检查是否有子分类
-    if len(category.children) > 0:
+    if db.session.query(Category).filter_by(parent_id=id).first() is not None:
         flash('该分类下有子分类，无法删除！', 'danger')
         return redirect(url_for('product.categories'))
-    
+
     # 检查是否有商品
-    if len(category.products) > 0:
+    if db.session.query(Product).filter_by(category_id=id).first() is not None:
         flash('该分类下有商品，无法删除！', 'danger')
         return redirect(url_for('product.categories'))
     
-    db.session.delete(category)
-    db.session.commit()
-    
+    try:
+        db.session.delete(category)
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('分类删除失败，请重试！', 'danger')
+        return redirect(url_for('product.categories'))
+
     flash('分类删除成功！', 'success')
     return redirect(url_for('product.categories'))
 
@@ -305,7 +335,9 @@ def delete_category(id):
 @bp.route('/api/products')
 @login_required
 def api_products():
-    products = Product.query.all()
+    limit = request.args.get('limit', 100, type=int)
+    limit = min(max(limit, 1), 1000)
+    products = Product.query.limit(limit).all()
     result = []
     for product in products:
         result.append({
@@ -345,10 +377,13 @@ def api_update_price():
         return jsonify({'success': False, 'message': '商品不存在'})
     
     try:
+        price_value = to_decimal(price)
+        if price_value < 0:
+            return jsonify({'success': False, 'message': '价格不能为负数'})
         if price_type == 'sale_price':
-            product.sale_price = to_decimal(price)
+            product.sale_price = price_value
         elif price_type == 'purchase_price':
-            product.purchase_price = to_decimal(price)
+            product.purchase_price = price_value
         else:
             return jsonify({'success': False, 'message': '价格类型无效'})
         

@@ -100,7 +100,11 @@ def stock_check():
             actual_quantities = request.form.getlist('actual_quantity[]')
             notes = request.form.get('notes', '')
             warehouse_id = int(request.form.get('warehouse_id') or 0)
-            
+
+            if len(actual_quantities) != len(product_ids):
+                flash('盘点数据不完整，请重新提交！', 'danger')
+                return redirect(url_for('inventory.stock_check'))
+
             # 校验仓库是否存在
             warehouse = db.session.get(Warehouse, warehouse_id)
             if not warehouse:
@@ -139,7 +143,7 @@ def stock_check():
             return redirect(url_for('inventory.stock_check'))
         except SQLAlchemyError as e:
             db.session.rollback()
-            flash(f'盘点失败: {str(e)}', 'danger')
+            flash('盘点失败，请重试', 'danger')
     
     products = Product.query.all()
     warehouses = Warehouse.query.all()
@@ -317,7 +321,7 @@ def stock_transfer():
             return redirect(url_for('inventory.stock_transfer'))
         except SQLAlchemyError as e:
             db.session.rollback()
-            flash(f'调拨失败: {str(e)}', 'danger')
+            flash('调拨失败，请重试', 'danger')
 
     # 验证失败时，从 form.items 构建 items_data 供 JS 回填
     if form.items.data:
@@ -484,8 +488,8 @@ def export_logs():
         elif log_type in VALID_LOG_TYPES:
             query = query.filter_by(change_type=log_type)
 
-    logs = query.order_by(StockLog.created_at.desc()).all()
-    
+    logs = query.order_by(StockLog.created_at.desc()).limit(10000).all()
+
     # 创建Excel工作簿
     wb = Workbook()
     ws = wb.active
@@ -560,7 +564,10 @@ def logs_statistics():
     
     stock_in_count = StockLog.query.filter_by(change_type='in').count()
     stock_out_count = StockLog.query.filter_by(change_type='out').count()
-    transfer_count = StockLog.query.filter(StockLog.change_type.in_(['transfer', 'check_in', 'check_out'])).count()
+    transfer_count = StockLog.query.filter(
+        StockLog.change_type.in_(['out', 'in']),
+        StockLog.reference_type == 'stock_transfer'
+    ).count()
     check_count = StockLog.query.filter(StockLog.change_type.like('check%')).count()
     
     return jsonify({
@@ -575,7 +582,6 @@ def logs_statistics():
 def api_stock_check():
     """库存盘点API"""
     try:
-        import json
         data = request.get_json()
         
         check_data = data.get('check_data', [])
@@ -586,7 +592,14 @@ def api_stock_check():
             actual_stock = item.get('actual_stock')
             remark = item.get('remark', '')
             warehouse_id = item.get('warehouse_id')
-            
+
+            try:
+                product_id = int(product_id)
+                actual_stock = float(actual_stock)
+                warehouse_id = int(warehouse_id)
+            except (TypeError, ValueError):
+                continue
+
             if product_id and actual_stock is not None and warehouse_id:
                 product = db.session.query(Product).filter(Product.id == product_id).with_for_update().first()
                 if product:

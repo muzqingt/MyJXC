@@ -1,7 +1,7 @@
 from flask import render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required
 from app import db
-from app.models import Supplier, Customer, Warehouse, PurchaseOrder, Payment, SalesOrder, Receipt
+from app.models import Supplier, Customer, Warehouse, PurchaseOrder, Payment, SalesOrder, Receipt, StockIn, StockOut, StockLog
 from app.forms import SupplierForm, CustomerForm, WarehouseForm
 from flask import Blueprint
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
@@ -109,7 +109,9 @@ def delete_supplier(id):
 
     has_orders = db.session.query(PurchaseOrder).filter_by(supplier_id=supplier.id).first() is not None
     has_payments = db.session.query(Payment).filter_by(supplier_id=supplier.id).first() is not None
-    if has_orders or has_payments:
+    has_stock_ins = db.session.query(StockIn).join(PurchaseOrder, StockIn.purchase_order_id == PurchaseOrder.id).filter(PurchaseOrder.supplier_id == supplier.id).first() is not None
+    has_stock_logs = db.session.query(StockLog).filter(StockLog.reference_type == 'purchase_order', StockLog.reference_id.in_(db.session.query(PurchaseOrder.id).filter_by(supplier_id=supplier.id))).first() is not None
+    if has_orders or has_payments or has_stock_ins or has_stock_logs:
         flash('该供应商已有采购或付款记录，无法删除！', 'danger')
         return redirect(url_for('partner.suppliers'))
 
@@ -223,7 +225,9 @@ def delete_customer(id):
         abort(404)
 
     # 检查是否有销售记录或收款记录
-    if len(customer.sales_orders) > 0 or len(customer.receipts) > 0:
+    has_sales = db.session.query(SalesOrder).filter_by(customer_id=customer.id).first() is not None
+    has_receipts = db.session.query(Receipt).filter_by(customer_id=customer.id).first() is not None
+    if has_sales or has_receipts:
         flash('该客户已有销售或收款记录，无法删除！', 'danger')
         return redirect(url_for('partner.customers'))
 
@@ -335,8 +339,10 @@ def delete_warehouse(id):
         abort(404)
 
     # 检查是否有库存记录
-    if (len(warehouse.stock_ins) > 0 or len(warehouse.stock_outs) > 0
-            or len(warehouse.stock_logs) > 0):
+    has_stock_ins = db.session.query(StockIn).filter_by(warehouse_id=warehouse.id).first() is not None
+    has_stock_outs = db.session.query(StockOut).filter_by(warehouse_id=warehouse.id).first() is not None
+    has_stock_logs = db.session.query(StockLog).filter_by(warehouse_id=warehouse.id).first() is not None
+    if has_stock_ins or has_stock_outs or has_stock_logs:
         flash('该仓库已有库存记录，无法删除！', 'danger')
         return redirect(url_for('partner.warehouses'))
 

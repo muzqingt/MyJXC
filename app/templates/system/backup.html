@@ -13,7 +13,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="row">
+<div class="row" id="backupPage" data-is-admin="{{ 'true' if current_user.role == 'admin' else 'false' }}">
     <div class="col-md-12">
         <!-- 备份操作卡片 -->
         <div class="card mb-4">
@@ -84,6 +84,7 @@
 
 {% block extra_js %}
 <script>
+var isAdmin = document.getElementById('backupPage').getAttribute('data-is-admin') === 'true';
 function escapeHtml(text) {
     if (text == null) return '';
     var div = document.createElement('div');
@@ -152,12 +153,12 @@ $(document).ready(function() {
                                     </a>
                                     <button type="button" class="btn btn-outline-danger restore-btn"
                                             data-filename="${safeFilename}"
-                                            {% if current_user.role != 'admin' %}disabled title="只有管理员可以恢复备份"{% endif %}>
+                                            ${!isAdmin ? 'disabled title="只有管理员可以恢复备份"' : ''}>
                                         <i class="bi bi-arrow-clockwise"></i>
                                     </button>
                                     <button type="button" class="btn btn-outline-dark delete-btn"
                                             data-filename="${safeFilename}"
-                                            ${isCurrentBackup ? 'disabled title="不能删除当前备份"' : '{% if current_user.role != "admin" %}disabled title="只有管理员可以删除备份"{% endif %}'}>
+                                            ${isCurrentBackup ? 'disabled title="不能删除当前备份"' : (!isAdmin ? 'disabled title="只有管理员可以删除备份"' : '')}>
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </div>

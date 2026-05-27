@@ -1,6 +1,10 @@
+import re
 from flask import render_template, redirect, url_for, flash, request, Blueprint
 from urllib.parse import urlparse
 from flask_login import login_user, logout_user, current_user, login_required
+from flask_wtf.csrf import validate_csrf
+from wtforms import ValidationError
+from sqlalchemy.exc import SQLAlchemyError
 from app import db
 from app.models import User, Log
 from app.forms import LoginForm, RegistrationForm
@@ -36,13 +40,17 @@ def login():
             ip_address=request.remote_addr
         )
         db.session.add(log)
-        db.session.commit()
-        
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+
         flash('登录成功！', 'success')
         next_page = request.args.get('next')
         if not next_page:
             next_page = url_for('main.index')
         else:
+            next_page = next_page.strip()
             parsed = urlparse(next_page)
             if parsed.netloc or parsed.scheme or next_page.startswith('//'):
                 next_page = url_for('main.index')
@@ -78,8 +86,11 @@ def logout():
         ip_address=request.remote_addr
     )
     db.session.add(log)
-    db.session.commit()
-    
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+
     logout_user()
     flash('您已成功登出。', 'info')
     return redirect(url_for('auth.login'))
@@ -92,6 +103,12 @@ def profile():
 @bp.route('/change-password', methods=['POST'])
 @login_required
 def change_password():
+    try:
+        validate_csrf(request.form.get('csrf_token'))
+    except ValidationError:
+        flash('请求无效，请重试。', 'danger')
+        return redirect(url_for('auth.profile'))
+
     old_password = request.form.get('old_password', '')
     new_password = request.form.get('new_password', '')
     confirm_password = request.form.get('confirm_password', '')
@@ -103,7 +120,11 @@ def change_password():
     if len(new_password) < 6:
         flash('新密码长度至少6位', 'danger')
         return redirect(url_for('auth.profile'))
-    
+
+    if len(new_password) > 128:
+        flash('新密码长度不能超过128位', 'danger')
+        return redirect(url_for('auth.profile'))
+
     if new_password != confirm_password:
         flash('两次输入的密码不一致', 'danger')
         return redirect(url_for('auth.profile'))
@@ -118,21 +139,30 @@ def change_password():
         ip_address=request.remote_addr
     )
     db.session.add(log)
-    db.session.commit()
-    
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+
     flash('密码修改成功', 'success')
     return redirect(url_for('auth.profile'))
 
 @bp.route('/change-email', methods=['POST'])
 @login_required
 def change_email():
+    try:
+        validate_csrf(request.form.get('csrf_token'))
+    except ValidationError:
+        flash('请求无效，请重试。', 'danger')
+        return redirect(url_for('auth.profile'))
+
     new_email = request.form.get('new_email', '').strip()
     
     if not new_email:
         flash('邮箱地址不能为空', 'danger')
         return redirect(url_for('auth.profile'))
     
-    if '@' not in new_email or '.' not in new_email.split('@')[1]:
+    if not re.match(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$', new_email):
         flash('请输入有效的邮箱地址', 'danger')
         return redirect(url_for('auth.profile'))
     
@@ -152,7 +182,10 @@ def change_email():
         ip_address=request.remote_addr
     )
     db.session.add(log)
-    db.session.commit()
-    
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+
     flash('邮箱修改成功', 'success')
     return redirect(url_for('auth.profile'))

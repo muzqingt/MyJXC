@@ -39,7 +39,7 @@ def add_balance(customer_or_supplier: Any, field_name: str, amount: Union[float,
     """
     from sqlalchemy import update
     from app.models import Customer, Supplier
-    Model = Customer if hasattr(customer_or_supplier, 'receivable_balance') else Supplier
+    Model = Customer if isinstance(customer_or_supplier, Customer) else Supplier
     delta = to_decimal(amount)
     # 构建 SET 表达式：column + delta（数据库层原子操作）
     set_expr = getattr(Model, field_name) + delta
@@ -62,7 +62,7 @@ def sub_balance(customer_or_supplier: Any, field_name: str, amount: Union[float,
     """
     from sqlalchemy import update
     from app.models import Customer, Supplier
-    Model = Customer if hasattr(customer_or_supplier, 'receivable_balance') else Supplier
+    Model = Customer if isinstance(customer_or_supplier, Customer) else Supplier
     delta = to_decimal(amount)
     set_expr = getattr(Model, field_name) - delta
     stmt = (
@@ -178,12 +178,14 @@ def update_stock_and_log(product: Any, warehouse_id: int, quantity: Union[float,
     """
     from app.models import StockLog
     
-    valid_change_types = ('in', 'out', 'adjust_in', 'adjust_out', 'check_in', 'check_out', 'return_in', 'return_out', 'stock_transfer')
-    if change_type not in valid_change_types:
+    from app.constants import VALID_CHANGE_TYPES
+    if change_type not in VALID_CHANGE_TYPES:
         raise ValueError(f"Invalid change_type: {change_type}")
 
     before_quantity = to_decimal(product.stock_quantity)
     delta = to_decimal(quantity)
+    if delta < 0:
+        raise ValueError('数量不能为负数')
 
     if change_type == 'in' or change_type.endswith('_in'):
         after_quantity = before_quantity + delta
@@ -279,11 +281,5 @@ def apply_excel_header_style(ws: Any, row: int, max_col: int) -> None:
         cell.alignment = EXCEL_HEADER_ALIGNMENT
 
 
-PAYMENT_METHOD_MAP = {
-    'cash': '现金',
-    'bank_transfer': '银行转账',
-    'check': '支票',
-    'wechat': '微信',
-    'alipay': '支付宝',
-    'other': '其他'
-}
+from app.constants import PaymentMethod
+PAYMENT_METHOD_MAP = PaymentMethod.LABELS

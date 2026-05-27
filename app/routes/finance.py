@@ -238,24 +238,27 @@ def add_expense():
     form = ExpenseForm()
 
     if form.validate_on_submit():
-        # 生成费用单号 EXYYYYMMDD001
-        expense_number = generate_order_number('EX', Expense)
+        try:
+            expense_number = generate_order_number('EX', Expense)
 
-        # 处理费用数据
-        expense = Expense(
-            expense_number=expense_number,
-            category=form.category.data,
-            amount=form.amount.data,
-            expense_date=form.expense_date.data,
-            payee=form.payee.data,
-            payment_method=form.payment_method.data,
-            notes=form.notes.data,
-            created_by=current_user.id
-        )
-        db.session.add(expense)
-        db.session.commit()
-        flash('费用记录已添加成功!', 'success')
-        return redirect(url_for('finance.expenses'))
+            expense = Expense(
+                expense_number=expense_number,
+                category=form.category.data,
+                amount=form.amount.data,
+                expense_date=form.expense_date.data,
+                payee=form.payee.data,
+                payment_method=form.payment_method.data,
+                notes=form.notes.data,
+                created_by=current_user.id
+            )
+            db.session.add(expense)
+            db.session.commit()
+            flash('费用记录已添加成功!', 'success')
+            return redirect(url_for('finance.expenses'))
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('添加失败，请重试', 'danger')
+            return redirect(url_for('finance.add_expense'))
 
     return render_template('finance/expense_edit.html', title='添加费用', form=form)
 
@@ -313,7 +316,10 @@ def view_receipt(receipt_id):
 @login_required
 def edit_receipt(receipt_id):
     """编辑收款"""
-    receipt = db.session.query(Receipt).filter(Receipt.id == receipt_id).with_for_update().first()
+    if request.method == 'POST':
+        receipt = db.session.query(Receipt).filter(Receipt.id == receipt_id).with_for_update().first()
+    else:
+        receipt = db.session.get(Receipt, receipt_id)
     if receipt is None:
         abort(404)
     form = ReceiptForm(obj=receipt)
@@ -407,7 +413,10 @@ def view_payment(payment_id):
 @login_required
 def edit_payment(payment_id):
     """编辑付款"""
-    payment = db.session.query(Payment).filter(Payment.id == payment_id).with_for_update().first()
+    if request.method == 'POST':
+        payment = db.session.query(Payment).filter(Payment.id == payment_id).with_for_update().first()
+    else:
+        payment = db.session.get(Payment, payment_id)
     if payment is None:
         abort(404)
     form = PaymentForm(obj=payment)
@@ -509,7 +518,7 @@ def financial_summary_api():
         'today_receipts': float(today_receipts),
         'today_payments': float(today_payments),
         'today_expenses': float(today_expenses),
-        'today_profit': float(today_receipts - today_payments - today_expenses)
+        'today_net_receipts': float(today_receipts - today_payments - today_expenses)
     })
 
 @bp.route('/ar-ap-search')
@@ -721,6 +730,7 @@ def supplier_ap_detail(supplier_id):
 @login_required
 def export_customer_ar(customer_id):
     """导出客户应收报表"""
+    from urllib.parse import quote
     # TODO: 添加业务级权限检查，例如检查当前用户是否有权访问该客户的数据
     customer = db.session.get(Customer, customer_id)
     if customer is None:
@@ -837,7 +847,8 @@ def export_customer_ar(customer_id):
 
     response = make_response(output.getvalue())
     response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    response.headers['Content-Disposition'] = f'attachment; filename=customer_ar_{customer.code}_{datetime.now().strftime("%Y%m%d")}.xlsx'
+    filename = f'customer_ar_{customer.code}_{datetime.now().strftime("%Y%m%d")}.xlsx'
+    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8\'\'{quote(filename)}'
     return response
 
 @bp.route('/export-receipts')
@@ -899,7 +910,7 @@ def export_receipts():
 
     response = make_response(output.getvalue())
     response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8\'{quote(filename)}'
+    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8\'\'{quote(filename)}'
     return response
 
 
@@ -962,7 +973,7 @@ def export_payments():
 
     response = make_response(output.getvalue())
     response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8\'{quote(filename)}'
+    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8\'\'{quote(filename)}'
     return response
 
 
@@ -1028,7 +1039,7 @@ def export_profit_analysis():
     filename = f'profit_analysis_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
     response = make_response(output.getvalue())
     response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8''{quote(filename)}'
+    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8\'\'{quote(filename)}'
     return response
 
 
@@ -1091,6 +1102,7 @@ def export_expenses():
 @login_required
 def export_supplier_ap(supplier_id):
     """导出供应商应付报表"""
+    from urllib.parse import quote
     # TODO: 添加业务级权限检查，例如检查当前用户是否有权访问该供应商的数据
     supplier = db.session.get(Supplier, supplier_id)
     if supplier is None:
@@ -1207,5 +1219,6 @@ def export_supplier_ap(supplier_id):
 
     response = make_response(output.getvalue())
     response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    response.headers['Content-Disposition'] = f'attachment; filename=supplier_ap_{supplier.code}_{datetime.now().strftime("%Y%m%d")}.xlsx'
+    filename = f'supplier_ap_{supplier.code}_{datetime.now().strftime("%Y%m%d")}.xlsx'
+    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8\'\'{quote(filename)}'
     return response
