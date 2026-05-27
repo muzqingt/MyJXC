@@ -88,11 +88,11 @@ def new_product():
             if filename:
                 file_ext = os.path.splitext(filename)[1].lower()
                 if file_ext in ['.jpg', '.jpeg', '.png', '.gif']:
-                    new_filename = f"product_{product.code}{file_ext}"
+                    new_filename = f"product_{secure_filename(product.code)}{file_ext}"
                     filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], new_filename)
                     file.save(filepath)
                     product.image_path = new_filename
-        
+
         db.session.add(product)
         db.session.commit()
         
@@ -163,11 +163,11 @@ def edit_product(id):
                         if os.path.exists(old_filepath):
                             os.remove(old_filepath)
                     
-                    new_filename = f"product_{product.code}{file_ext}"
+                    new_filename = f"product_{secure_filename(product.code)}{file_ext}"
                     filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], new_filename)
                     file.save(filepath)
                     product.image_path = new_filename
-        
+
         db.session.commit()
         
         # 记录日志
@@ -217,10 +217,15 @@ def delete_product(id):
         ip_address=request.remote_addr
     )
     db.session.add(log)
-    
-    db.session.delete(product)
-    db.session.commit()
-    
+
+    try:
+        db.session.delete(product)
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('删除商品失败，请重试！', 'danger')
+        return redirect(url_for('product.index'))
+
     flash('商品删除成功！', 'success')
     return redirect(url_for('product.index'))
 

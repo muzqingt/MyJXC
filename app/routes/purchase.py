@@ -457,7 +457,12 @@ def edit_order(id):
                                      submitted_notes=notes,
                                      order_items=order_items_list)
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            flash(f'采购订单修改失败: {str(e)}', 'danger')
+            return redirect(url_for('purchase.index'))
 
         flash('采购订单修改成功!', 'success')
         return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
@@ -994,11 +999,11 @@ def complete_stock_in(id):
             )
 
             if all_received:
-                order.status = 'completed'
-                # 更新供应商应付余额（使用订单总额，而非仅本次入库金额）
-                supplier = order.supplier
-                if supplier:
-                    add_balance(supplier, "payable_balance", order.total_amount)
+                if order.status != 'completed':
+                    order.status = 'completed'
+                    supplier = order.supplier
+                    if supplier:
+                        add_balance(supplier, "payable_balance", order.total_amount)
             else:
                 order.status = 'partial'
 

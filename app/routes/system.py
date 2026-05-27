@@ -84,9 +84,10 @@ def create_backup():
         if description:
             msg += f'（{description}）'
         flash(msg, 'success')
-    except Exception as e:
-        flash(f'备份创建失败: {str(e)}', 'danger')
-    
+    except (OSError, SQLAlchemyError):
+        db.session.rollback()
+        flash('备份创建失败，请稍后重试', 'danger')
+
     return redirect(url_for('system.backup'))
 
 @bp.route('/backup/list')
@@ -187,9 +188,10 @@ def restore_backup():
         db.session.commit()
         
         flash(f'数据恢复成功，当前数据库已备份为: {current_backup}', 'success')
-    except Exception as e:
-        flash(f'数据恢复失败: {str(e)}', 'danger')
-    
+    except (OSError, SQLAlchemyError):
+        db.session.rollback()
+        flash('数据恢复失败，请稍后重试', 'danger')
+
     return redirect(url_for('system.backup'))
 
 @bp.route('/backup/delete', methods=['POST'])
@@ -239,8 +241,9 @@ def delete_backup():
         db.session.commit()
         
         flash(f'备份文件已删除: {filename}', 'success')
-    except Exception as e:
-        flash(f'删除备份失败: {str(e)}', 'danger')
+    except (OSError, SQLAlchemyError):
+        db.session.rollback()
+        flash('删除备份失败，请稍后重试', 'danger')
     
     return redirect(url_for('system.backup'))
 
@@ -294,7 +297,9 @@ def add_user():
     password = request.form.get('password')
     email = request.form.get('email')
     role = request.form.get('role', 'user')
-    
+    if role not in ('admin', 'user'):
+        role = 'user'
+
     if not username or not password:
         flash('用户名和密码不能为空', 'danger')
         return redirect(url_for('system.user_management'))
@@ -328,7 +333,10 @@ def edit_user(user_id):
 
     if request.method == 'POST':
         user.email = request.form.get('email')
-        user.role = request.form.get('role')
+        role = request.form.get('role')
+        if role not in ('admin', 'user'):
+            role = 'user'
+        user.role = role
         user.is_active = request.form.get('is_active') == '1'
         
         password = request.form.get('password')

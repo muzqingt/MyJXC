@@ -309,7 +309,7 @@ def view_receipt(receipt_id):
 @login_required
 def edit_receipt(receipt_id):
     """编辑收款"""
-    receipt = db.session.get(Receipt, receipt_id)
+    receipt = db.session.query(Receipt).filter(Receipt.id == receipt_id).with_for_update().first()
     if receipt is None:
         abort(404)
     form = ReceiptForm(obj=receipt)
@@ -403,7 +403,7 @@ def view_payment(payment_id):
 @login_required
 def edit_payment(payment_id):
     """编辑付款"""
-    payment = db.session.get(Payment, payment_id)
+    payment = db.session.query(Payment).filter(Payment.id == payment_id).with_for_update().first()
     if payment is None:
         abort(404)
     form = PaymentForm(obj=payment)
