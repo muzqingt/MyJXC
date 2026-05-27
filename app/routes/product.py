@@ -1,12 +1,13 @@
-from flask import render_template, redirect, url_for, flash, request, jsonify, current_app
+from flask import render_template, redirect, url_for, flash, request, jsonify, current_app, abort
 from flask_login import login_required, current_user
-from app import db, csrf
+from app import db
 from app.models import Product, Category, Log
 from app.forms import ProductForm, CategoryForm, SearchForm
-from datetime import datetime, timezone
+from datetime import datetime
 import os
 from werkzeug.utils import secure_filename
 from flask import Blueprint
+from sqlalchemy.exc import SQLAlchemyError
 
 # 创建蓝图
 bp = Blueprint('product', __name__, url_prefix='/product')
@@ -115,7 +116,9 @@ def new_product():
 @bp.route('/products/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_product(id):
-    product = Product.query.get_or_404(id)
+    product = db.session.get(Product, id)
+    if product is None:
+        abort(404)
     form = ProductForm(obj=product)
     form.category_id.choices = [(0, '无分类')] + [(c.id, c.name) for c in Category.query.all()]
     
@@ -188,7 +191,9 @@ def edit_product(id):
 @bp.route('/products/<int:id>/delete', methods=['POST'])
 @login_required
 def delete_product(id):
-    product = Product.query.get_or_404(id)
+    product = db.session.get(Product, id)
+    if product is None:
+        abort(404)
 
     # 检查是否有相关记录
     if (len(product.purchase_order_items) > 0 or len(product.sales_order_items) > 0
@@ -221,8 +226,10 @@ def delete_product(id):
 @bp.route('/products/<int:id>')
 @login_required
 def view_product(id):
-    product = Product.query.get_or_404(id)
-    return render_template('product/view.html', 
+    product = db.session.get(Product, id)
+    if product is None:
+        abort(404)
+    return render_template('product/view.html',
                          title='商品详情',
                          product=product)
 
@@ -262,7 +269,9 @@ def new_category():
 @bp.route('/categories/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_category(id):
-    category = Category.query.get_or_404(id)
+    category = db.session.get(Category, id)
+    if category is None:
+        abort(404)
     form = CategoryForm(obj=category)
     form.parent_id.choices = [(0, '无父级')] + [(c.id, c.name) for c in Category.query.filter(Category.id != id).all()]
     
@@ -284,8 +293,10 @@ def edit_category(id):
 @bp.route('/categories/<int:id>/delete', methods=['POST'])
 @login_required
 def delete_category(id):
-    category = Category.query.get_or_404(id)
-    
+    category = db.session.get(Category, id)
+    if category is None:
+        abort(404)
+
     # 检查是否有子分类
     if len(category.children) > 0:
         flash('该分类下有子分类，无法删除！', 'danger')
@@ -341,7 +352,7 @@ def api_update_price():
     except (ValueError, TypeError):
         return jsonify({'success': False, 'message': '商品ID无效'})
     
-    product = Product.query.get(product_id)
+    product = db.session.get(Product, product_id)
     if not product:
         return jsonify({'success': False, 'message': '商品不存在'})
     
@@ -355,7 +366,7 @@ def api_update_price():
         
         db.session.commit()
         return jsonify({'success': True, 'message': '价格已更新'})
-    except Exception as e:
+    except SQLAlchemyError as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)})
 

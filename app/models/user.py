@@ -5,6 +5,7 @@ from app import db, login_manager
 
 
 class User(UserMixin, db.Model):
+    """系统用户"""
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False, index=True)
@@ -35,6 +36,7 @@ def load_user(user_id):
 
 
 class Log(db.Model):
+    """操作日志"""
     __tablename__ = 'logs'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)

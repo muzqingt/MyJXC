@@ -1,13 +1,13 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, make_response
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, make_response, abort
 from flask_login import login_required, current_user
-from datetime import datetime, timedelta
+from datetime import datetime
 import json
 from app import db
-from app.models import Product, Warehouse, StockLog, StockIn, StockOut, Category, PurchaseOrder, SalesOrder
+from app.models import Product, Warehouse, StockLog
 import io
-from decimal import Decimal
 from app.forms import StockAdjustForm, StockTransferForm
-from app.utils import to_decimal, apply_excel_header_style, EXCEL_HEADER_FONT, EXCEL_HEADER_FILL, EXCEL_THIN_BORDER, EXCEL_HEADER_ALIGNMENT
+from app.utils import to_decimal, apply_excel_header_style, EXCEL_THIN_BORDER
+from sqlalchemy.exc import SQLAlchemyError
 
 
 def get_product_stock_in_warehouse(product_id, warehouse_id):
@@ -72,7 +72,9 @@ def product_list():
 @login_required
 def warehouse_stock(warehouse_id):
     """仓库库存明细 - 显示指定仓库中所有产品的库存"""
-    warehouse = Warehouse.query.get_or_404(warehouse_id)
+    warehouse = db.session.get(Warehouse, warehouse_id)
+    if warehouse is None:
+        abort(404)
     products = Product.query.all()
     
     # Calculate per-product stock in this specific warehouse
@@ -99,18 +101,19 @@ def stock_check():
             warehouse_id = int(request.form.get('warehouse_id') or 0)
             
             # 校验仓库是否存在
-            warehouse = Warehouse.query.get(warehouse_id)
+            warehouse = db.session.get(Warehouse, warehouse_id)
             if not warehouse:
                 flash('仓库不存在！', 'danger')
                 return redirect(url_for('inventory.stock_check'))
             
             for i in range(len(product_ids)):
                 if product_ids[i] and actual_quantities[i]:
-                    product = Product.query.with_for_update().get(int(product_ids[i]))
+                    product = db.session.query(Product).filter(Product.id == int(product_ids[i])).with_for_update().first()
                     if product:
                         book_quantity = to_decimal(product.stock_quantity)
                         actual_quantity = to_decimal(actual_quantities[i])
                         
+                        # 计算差异：正值为盘盈(入库)，负值为盘亏(出库)
                         if book_quantity != actual_quantity:
                             diff = actual_quantity - book_quantity
                             change_type = 'check_in' if diff > 0 else 'check_out'
@@ -133,7 +136,7 @@ def stock_check():
             db.session.commit()
             flash('库存盘点完成！', 'success')
             return redirect(url_for('inventory.stock_check'))
-        except Exception as e:
+        except SQLAlchemyError as e:
             db.session.rollback()
             flash(f'盘点失败: {str(e)}', 'danger')
     
@@ -215,8 +218,8 @@ def stock_transfer():
                                      today=today,
                                      items_data=items_data)
 
-            to_warehouse = Warehouse.query.get(to_warehouse_id)
-            from_warehouse_obj = Warehouse.query.get(from_warehouse_id)
+            to_warehouse = db.session.get(Warehouse, to_warehouse_id)
+            from_warehouse_obj = db.session.get(Warehouse, from_warehouse_id)
             to_warehouse_name = to_warehouse.name if to_warehouse else '未知仓库'
             from_warehouse_name = from_warehouse_obj.name if from_warehouse_obj else '未知仓库'
 
@@ -227,7 +230,7 @@ def stock_transfer():
                 if item['product_id'] and item['quantity']:
                     pid = item['product_id']
                     if pid not in product_warehouse_stock:
-                        product = Product.query.get(pid)
+                        product = db.session.get(Product, pid)
                         if product:
                             # 全局库存减去各仓库的 StockLog 合计，得到"未记录"的起点
                             # 再加上源仓库的 StockLog，得到源仓库初始库存
@@ -249,7 +252,7 @@ def stock_transfer():
 
             for item in items:
                 if item['product_id'] and item['quantity']:
-                    product = Product.query.with_for_update().get(item['product_id'])
+                    product = db.session.query(Product).filter(Product.id == item['product_id']).with_for_update().first()
                     if product:
                         quantity = to_decimal(item['quantity'])
                         pid = product.id
@@ -273,7 +276,7 @@ def stock_transfer():
                                                  today=today,
                                                  items_data=items_data)
 
-                        # 减少源仓库库存（使用运行追踪值）
+                        # 步骤1：源仓库扣减库存，记录出库日志
                         product.stock_quantity -= quantity
                         before_out = actual_stock
                         after_out = actual_stock - quantity
@@ -291,7 +294,7 @@ def stock_transfer():
                         product_warehouse_stock[pid][from_warehouse_id] = after_out
                         db.session.add(log_out)
 
-                        # 增加目标仓库库存（使用运行追踪值）
+                        # 步骤2：目标仓库增加库存，记录入库日志
                         product.stock_quantity += quantity
                         actual_stock_to = product_warehouse_stock[pid][to_warehouse_id]
                         before_in = actual_stock_to
@@ -313,7 +316,7 @@ def stock_transfer():
             db.session.commit()
             flash('库存调拨完成！', 'success')
             return redirect(url_for('inventory.stock_transfer'))
-        except Exception as e:
+        except SQLAlchemyError as e:
             db.session.rollback()
             flash(f'调拨失败: {str(e)}', 'danger')
 
@@ -342,7 +345,9 @@ def export_warehouse_stock(warehouse_id):
     from urllib.parse import quote
     from openpyxl import Workbook
 
-    warehouse = Warehouse.query.get_or_404(warehouse_id)
+    warehouse = db.session.get(Warehouse, warehouse_id)
+    if warehouse is None:
+        abort(404)
     products = Product.query.all()
 
     wb = Workbook()
@@ -586,7 +591,7 @@ def api_stock_check():
             warehouse_id = item.get('warehouse_id')
             
             if product_id and actual_stock is not None and warehouse_id:
-                product = Product.query.with_for_update().get(product_id)
+                product = db.session.query(Product).filter(Product.id == product_id).with_for_update().first()
                 if product:
                     warehouse_id = int(warehouse_id)
                     system_stock = to_decimal(product.stock_quantity)
@@ -615,7 +620,7 @@ def api_stock_check():
         
         db.session.commit()
         return jsonify({'success': True, 'message': '盘点保存成功'})
-    except Exception as e:
+    except SQLAlchemyError as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
 
@@ -643,7 +648,9 @@ def stock_adjust():
 
     if form.validate_on_submit():
         try:
-            product = Product.query.with_for_update().get_or_404(form.product_id.data)
+            product = db.session.query(Product).filter(Product.id == form.product_id.data).with_for_update().first()
+            if product is None:
+                abort(404)
             before_quantity = to_decimal(product.stock_quantity)
             quantity = to_decimal(form.quantity.data)
 
@@ -684,7 +691,7 @@ def stock_adjust():
 
             flash('库存调整成功！', 'success')
             return redirect(url_for('inventory.product_list'))
-        except Exception as e:
+        except SQLAlchemyError as e:
             db.session.rollback()
             flash(f'调整失败: {str(e)}', 'danger')
 

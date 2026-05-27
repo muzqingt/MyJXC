@@ -1,8 +1,8 @@
 from flask import render_template, redirect, url_for, flash, request, jsonify, Blueprint, make_response
 from flask_login import login_required, current_user
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from app import db
-from app.models import Product, SalesOrder, PurchaseOrder, Customer, Supplier, StockIn, StockOut, Category, Receipt, PurchaseOrderItem, SalesOrderItem
+from app.models import Product, SalesOrder, PurchaseOrder, Customer, Supplier, Receipt, PurchaseOrderItem, SalesOrderItem
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from io import BytesIO
@@ -93,7 +93,7 @@ def inventory_report():
             'code': product.code,
             'name': product.name,
             'unit': product.unit,
-            # 注：期初 = 当前库存 - 本期入库 + 本月出库，假设当前库存为期末库存
+            # 期初库存 = 期末库存 - 本期采购入库 + 本期销售出库（反推法）
             'beginning_stock': float(Decimal(str(product.stock_quantity or 0)) - Decimal(str(purchase.purchase_quantity if purchase else 0)) + Decimal(str(sales.sales_quantity if sales else 0))),
             'purchase_quantity': purchase.purchase_quantity if purchase else 0,
             'purchase_amount': float(purchase.purchase_amount) if purchase else 0,
@@ -550,6 +550,7 @@ def export_supplier():
 @bp.route('/export-products')
 @login_required
 def export_products():
+    """导出商品数据"""
     from openpyxl import Workbook
     
     products = Product.query.order_by(Product.code).all()
@@ -659,9 +660,11 @@ def export_daily():
     ws.cell(row=row_idx, column=1, value='汇总')
     ws.cell(row=row_idx, column=1).font = Font(bold=True)
     row_idx += 1
+    # 毛利润 = 销售总额 - 采购总额
     ws.cell(row=row_idx, column=1, value='毛利润')
     ws.cell(row=row_idx, column=2, value=(daily_sales.total_sales or 0) - (daily_purchase.total_purchase or 0))
     row_idx += 1
+    # 毛利率 = 毛利润 / 采购总额 * 100
     ws.cell(row=row_idx, column=1, value='毛利率')
     ws.cell(row=row_idx, column=2, value=f'{((daily_sales.total_sales or 0) - (daily_purchase.total_purchase or 0)) / (daily_purchase.total_purchase or 1) * 100:.2f}%')
     

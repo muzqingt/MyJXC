@@ -3,6 +3,7 @@ from app import db
 
 
 class PurchaseOrder(db.Model):
+    """采购订单"""
     __tablename__ = 'purchase_orders'
     id = db.Column(db.Integer, primary_key=True)
     order_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
@@ -27,6 +28,7 @@ class PurchaseOrder(db.Model):
 
 
 class PurchaseOrderItem(db.Model):
+    """采购订单明细"""
     __tablename__ = 'purchase_order_items'
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey('purchase_orders.id'), nullable=False)
@@ -43,6 +45,7 @@ class PurchaseOrderItem(db.Model):
 
 
 class StockIn(db.Model):
+    """入库单"""
     __tablename__ = 'stock_ins'
     id = db.Column(db.Integer, primary_key=True)
     receipt_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
@@ -67,6 +70,7 @@ class StockIn(db.Model):
 
 
 class StockInItem(db.Model):
+    """入库单明细"""
     __tablename__ = 'stock_in_items'
     id = db.Column(db.Integer, primary_key=True)
     stock_in_id = db.Column(db.Integer, db.ForeignKey('stock_ins.id'), nullable=False)

@@ -3,6 +3,7 @@ from app import db
 
 
 class Category(db.Model):
+    """商品分类"""
     __tablename__ = 'categories'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -18,6 +19,7 @@ class Category(db.Model):
 
 
 class Product(db.Model):
+    """商品"""
     __tablename__ = 'products'
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(50), unique=True, nullable=False, index=True)

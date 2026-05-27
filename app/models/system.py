@@ -3,7 +3,7 @@ from app import db
 
 
 class SystemSetting(db.Model):
-    """系统设置模型"""
+    """系统配置项"""
     __tablename__ = 'system_settings'
     id = db.Column(db.Integer, primary_key=True)
     setting_key = db.Column('key', db.String(100), unique=True, nullable=False, index=True)

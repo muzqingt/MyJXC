@@ -1,12 +1,12 @@
-from flask import render_template, redirect, url_for, flash, request, jsonify, Blueprint
+from flask import render_template, redirect, url_for, flash, request, jsonify, Blueprint, abort
 from flask_login import login_required, current_user
 from app import db
 from sqlalchemy.orm import selectinload
-from app.models import PurchaseOrder, SystemSetting, PurchaseOrderItem, StockIn, StockInItem, Supplier, Warehouse, Product, StockLog, Log, PurchaseReturn, PurchaseReturnItem
+from app.models import PurchaseOrder, SystemSetting, PurchaseOrderItem, StockIn, StockInItem, Supplier, Warehouse, Product, StockLog, PurchaseReturn, PurchaseReturnItem
 from app.utils import to_decimal, add_balance, sub_balance, get_redirect_tab, build_products_data, build_partners_data, generate_order_number
-from app.forms import PurchaseOrderForm, PurchaseOrderItemForm, StockInForm
-from datetime import datetime, timezone
-import urllib.parse
+from app.forms import StockInForm
+from datetime import datetime
+from sqlalchemy.exc import SQLAlchemyError
 
 # 创建蓝图
 bp = Blueprint('purchase', __name__, url_prefix='/purchase')
@@ -16,6 +16,7 @@ bp = Blueprint('purchase', __name__, url_prefix='/purchase')
 @bp.route('/index')
 @login_required
 def index():
+    """采购管理首页，展示订单、入库单、退货单列表"""
     page = request.args.get('page', 1, type=int)
     per_page = 20
 
@@ -93,6 +94,7 @@ def index():
 @bp.route('/orders/new', methods=['GET', 'POST'])
 @login_required
 def new_order():
+    """创建采购订单，支持直接入库"""
     suppliers = Supplier.query.all()
     partners_data = build_partners_data(suppliers)
     warehouses = Warehouse.query.all()
@@ -127,7 +129,7 @@ def new_order():
             order_items_list = []
             for i in range(len(product_ids)):
                 if product_ids[i] and quantities[i] and unit_prices[i]:
-                    product = Product.query.get(int(product_ids[i]))
+                    product = db.session.get(Product, int(product_ids[i]))
                     if product:
                         order_items_list.append({
                             'product_id': product.id,
@@ -170,7 +172,7 @@ def new_order():
         order_items_list = []
         for i in range(len(product_ids)):
             if product_ids[i] and quantities[i] and unit_prices[i]:
-                product = Product.query.get(int(product_ids[i]))
+                product = db.session.get(Product, int(product_ids[i]))
                 if product:
                     quantity = to_decimal(quantities[i])
                     unit_price = to_decimal(unit_prices[i])
@@ -259,7 +261,7 @@ def new_order():
                     add_balance(supplier, "payable_balance", total_amount)
 
                 flash(f'采购订单创建并入库完成!入库单号: {receipt_number}', 'success')
-            except Exception as e:
+            except SQLAlchemyError as e:
                 db.session.rollback()
                 flash(f'直接入库失败: {str(e)}', 'danger')
                 return render_template('purchase/order_items.html',
@@ -292,7 +294,10 @@ def new_order():
 @bp.route('/orders/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_order(id):
-    order = PurchaseOrder.query.options(selectinload(PurchaseOrder.items).selectinload(PurchaseOrderItem.product)).get_or_404(id)
+    """编辑采购订单，支持调整供应商余额"""
+    order = db.session.query(PurchaseOrder).options(selectinload(PurchaseOrder.items).selectinload(PurchaseOrderItem.product)).filter(PurchaseOrder.id == id).first()
+    if order is None:
+        abort(404)
 
     if order.status == 'completed':
         flash('已完成的订单不能修改!', 'danger')
@@ -332,7 +337,7 @@ def edit_order(id):
             order_items_list = []
             for i in range(len(product_ids)):
                 if product_ids[i] and quantities[i] and unit_prices[i]:
-                    product = Product.query.get(int(product_ids[i]))
+                    product = db.session.get(Product, int(product_ids[i]))
                     if product:
                         order_items_list.append({
                             'product_id': product.id,
@@ -373,7 +378,7 @@ def edit_order(id):
             if product_ids[i] and quantities[i] and unit_prices[i]:
                 product_id = int(product_ids[i])
                 remaining_product_ids.add(product_id)
-                product = Product.query.get(product_id)
+                product = db.session.get(Product, product_id)
                 if product:
                     quantity = to_decimal(quantities[i])
                     unit_price = to_decimal(unit_prices[i])
@@ -410,7 +415,7 @@ def edit_order(id):
         if order.status == 'completed':
             if old_supplier and old_supplier.id != supplier_id:
                 # 换了供应商:先验证新供应商存在,再执行余额调整
-                new_supplier = Supplier.query.get(supplier_id)
+                new_supplier = db.session.get(Supplier, supplier_id)
                 if not new_supplier:
                     flash('供应商不存在', 'danger')
                     return redirect(url_for('purchase.edit_order', id=id))
@@ -429,7 +434,7 @@ def edit_order(id):
                 order_items_list = []
                 for i in range(len(product_ids)):
                     if product_ids[i] and quantities[i] and unit_prices[i]:
-                        product = Product.query.get(int(product_ids[i]))
+                        product = db.session.get(Product, int(product_ids[i]))
                         if product:
                             order_items_list.append({
                                 'product_id': product.id,
@@ -470,12 +475,16 @@ def edit_order(id):
 @bp.route('/orders/<int:id>/items')
 @login_required
 def edit_order_items(id):
+    """兼容旧路由，重定向到订单编辑页"""
     return redirect(url_for('purchase.edit_order', id=id))
 
 @bp.route('/orders/<int:id>/delete', methods=['POST'])
 @login_required
 def delete_order(id):
-    order = PurchaseOrder.query.get_or_404(id)
+    """删除采购订单，含关联数据校验"""
+    order = db.session.get(PurchaseOrder, id)
+    if order is None:
+        abort(404)
 
     # 检查是否有关联的入库单
     if order.stock_ins:
@@ -525,9 +534,11 @@ def delete_order(id):
 @login_required
 def quick_stock_in(id):
     """快捷入库:从采购订单直接入库(一次性完成)"""
-    order = PurchaseOrder.query.options(
+    order = db.session.query(PurchaseOrder).options(
         selectinload(PurchaseOrder.items).selectinload(PurchaseOrderItem.product)
-    ).with_for_update().get_or_404(id)
+    ).filter(PurchaseOrder.id == id).with_for_update().first()
+    if order is None:
+        abort(404)
 
     if order.status == 'completed':
         flash('此订单已入库完成!', 'danger')
@@ -577,7 +588,7 @@ def quick_stock_in(id):
             total_amount += amount
 
             # 锁定商品行，防止并发入库导致库存计算错误
-            product = Product.query.with_for_update().get(order_item.product_id)
+            product = db.session.query(Product).filter(Product.id == order_item.product_id).with_for_update().first()
             if not product:
                 continue
             product.purchase_price = unit_price
@@ -643,7 +654,7 @@ def quick_stock_in(id):
 
         db.session.commit()
         flash(f'入库单 {receipt_number} 创建成功,库存已更新', 'success')
-    except Exception as e:
+    except SQLAlchemyError as e:
         db.session.rollback()
         flash(f'入库失败: {str(e)}', 'danger')
 
@@ -653,7 +664,10 @@ def quick_stock_in(id):
 @bp.route('/orders/<int:id>')
 @login_required
 def view_order(id):
-    order = PurchaseOrder.query.get_or_404(id)
+    """查看采购订单详情及关联入库单"""
+    order = db.session.get(PurchaseOrder, id)
+    if order is None:
+        abort(404)
     related_stock_ins = StockIn.query.filter_by(purchase_order_id=id).order_by(StockIn.created_at.desc()).all()
 
     # 准备订单商品数据用于JavaScript确认框
@@ -677,7 +691,10 @@ def view_order(id):
 @bp.route('/orders/<int:id>/stock-in', methods=['GET', 'POST'])
 @login_required
 def new_stock_in_from_order(id):
-    order = PurchaseOrder.query.options(selectinload(PurchaseOrder.items).selectinload(PurchaseOrderItem.product)).get_or_404(id)
+    """从采购订单创建入库单（预填未入库商品）"""
+    order = db.session.query(PurchaseOrder).options(selectinload(PurchaseOrder.items).selectinload(PurchaseOrderItem.product)).filter(PurchaseOrder.id == id).first()
+    if order is None:
+        abort(404)
 
     if order.status not in ['confirmed', 'partial']:
         flash('只有已确认或部分入库的订单可以入库!', 'danger')
@@ -728,6 +745,7 @@ def new_stock_in_from_order(id):
 @bp.route('/stock-ins/new', methods=['GET', 'POST'])
 @login_required
 def new_stock_in():
+    """新建入库单，支持关联采购订单或直接入库"""
     form = StockInForm()
     form.purchase_order_id.choices = [(0, '直接入库')] + [(o.id, f"{o.order_number} - {o.supplier.name}")
                                                          for o in PurchaseOrder.query.filter_by(status='confirmed').all()]
@@ -767,7 +785,10 @@ def new_stock_in():
 @bp.route('/stock-ins/<int:id>/items', methods=['GET', 'POST'])
 @login_required
 def edit_stock_in_items(id):
-    stock_in = StockIn.query.get_or_404(id)
+    """编辑入库单商品明细"""
+    stock_in = db.session.get(StockIn, id)
+    if stock_in is None:
+        abort(404)
 
     if request.method == 'POST':
         # 处理商品明细
@@ -827,7 +848,7 @@ def edit_stock_in_items(id):
         total_amount = 0
         for i in range(len(product_ids)):
             if product_ids[i] and quantities[i] and unit_prices[i]:
-                product = Product.query.get(int(product_ids[i]))
+                product = db.session.get(Product, int(product_ids[i]))
                 if product:
                     quantity = to_decimal(quantities[i])
                     unit_price = to_decimal(unit_prices[i])
@@ -898,7 +919,10 @@ def edit_stock_in_items(id):
 @bp.route('/stock-ins/<int:id>/complete', methods=['POST'])
 @login_required
 def complete_stock_in(id):
-    stock_in = StockIn.query.options(selectinload(StockIn.items).selectinload(StockInItem.product)).with_for_update().get_or_404(id)
+    """确认入库，更新库存并同步订单状态和供应商余额"""
+    stock_in = db.session.query(StockIn).options(selectinload(StockIn.items).selectinload(StockInItem.product)).filter(StockIn.id == id).with_for_update().first()
+    if stock_in is None:
+        abort(404)
 
     # 检查是否已经完成
     if stock_in.status == 'completed':
@@ -920,7 +944,7 @@ def complete_stock_in(id):
         for item in stock_in.items:
             warehouse = stock_in.warehouse
             # 锁定商品行，防止并发入库导致库存计算错误
-            product = Product.query.with_for_update().get(item.product_id)
+            product = db.session.query(Product).filter(Product.id == item.product_id).with_for_update().first()
             if not product:
                 continue
 
@@ -981,7 +1005,7 @@ def complete_stock_in(id):
         db.session.commit()
         flash('入库单完成!库存已更新。', 'success')
 
-    except Exception as e:
+    except SQLAlchemyError as e:
         db.session.rollback()
         flash(f'入库失败: {str(e)}', 'danger')
 
@@ -990,7 +1014,10 @@ def complete_stock_in(id):
 @bp.route('/stock-ins/<int:id>/delete', methods=['POST'])
 @login_required
 def delete_stock_in(id):
-    stock_in = StockIn.query.get_or_404(id)
+    """删除未入库状态的入库单"""
+    stock_in = db.session.get(StockIn, id)
+    if stock_in is None:
+        abort(404)
 
     # 只有未入库状态的入库单可以删除
     if stock_in.status != 'pending':
@@ -1006,7 +1033,10 @@ def delete_stock_in(id):
 @bp.route('/stock-ins/<int:id>')
 @login_required
 def view_stock_in(id):
-    stock_in = StockIn.query.get_or_404(id)
+    """查看入库单详情"""
+    stock_in = db.session.get(StockIn, id)
+    if stock_in is None:
+        abort(404)
     return render_template('purchase/stock_in_view.html',
                          title='入库单详情',
                          stock_in=stock_in)
@@ -1018,9 +1048,11 @@ def view_stock_in(id):
 @login_required
 def quick_return(id):
     """快捷退货: 从采购订单直接退货(一次性完成)"""
-    order = PurchaseOrder.query.options(
+    order = db.session.query(PurchaseOrder).options(
         selectinload(PurchaseOrder.items).selectinload(PurchaseOrderItem.product)
-    ).get_or_404(id)
+    ).filter(PurchaseOrder.id == id).first()
+    if order is None:
+        abort(404)
 
     if order.status != 'completed':
         flash('只有已完成的采购订单可以退货！', 'danger')
@@ -1054,10 +1086,11 @@ def quick_return(id):
         total_amount = 0
         has_items = False
         for order_item in order.items:
-            product = Product.query.with_for_update().get(order_item.product_id)
+            product = db.session.query(Product).filter(Product.id == order_item.product_id).with_for_update().first()
             if not product or to_decimal(product.stock_quantity) <= 0:
                 continue
 
+            # 退货数量取"已入库数量"和"当前库存"的较小值，防止退货数超过实际库存
             return_qty = min(to_decimal(order_item.received_quantity or 0), to_decimal(product.stock_quantity))
             if return_qty <= 0:
                 continue
@@ -1108,7 +1141,7 @@ def quick_return(id):
 
         db.session.commit()
         flash(f'退货单 {return_number} 创建成功，库存已更新！', 'success')
-    except Exception as e:
+    except SQLAlchemyError as e:
         db.session.rollback()
         flash(f'退货失败: {str(e)}', 'danger')
 
@@ -1118,6 +1151,7 @@ def quick_return(id):
 @bp.route('/returns')
 @login_required
 def returns():
+    """采购退货单列表"""
     page = request.args.get('page', 1, type=int)
     per_page = 20
     start_date = request.args.get('start_date')
@@ -1140,7 +1174,10 @@ def returns():
 @bp.route('/returns/<int:id>')
 @login_required
 def view_return(id):
-    purchase_return = PurchaseReturn.query.get_or_404(id)
+    """查看退货单详情"""
+    purchase_return = db.session.get(PurchaseReturn, id)
+    if purchase_return is None:
+        abort(404)
     return render_template('purchase/return_view.html',
                          title='退货单详情',
                          purchase_return=purchase_return)
@@ -1149,7 +1186,10 @@ def view_return(id):
 @bp.route('/returns/<int:id>/delete', methods=['POST'])
 @login_required
 def delete_return(id):
-    purchase_return = PurchaseReturn.query.get_or_404(id)
+    """删除未完成的退货单"""
+    purchase_return = db.session.get(PurchaseReturn, id)
+    if purchase_return is None:
+        abort(404)
 
     if purchase_return.status != 'pending':
         flash('只有未完成的退货单可以删除！', 'danger')
@@ -1165,7 +1205,10 @@ def delete_return(id):
 @bp.route('/api/purchase-orders/<int:order_id>/items')
 @login_required
 def api_order_items(order_id):
-    order = PurchaseOrder.query.get_or_404(order_id)
+    """获取采购订单商品明细的JSON接口"""
+    order = db.session.get(PurchaseOrder, order_id)
+    if order is None:
+        abort(404)
     items = []
     for item in order.items:
         items.append({

@@ -4,7 +4,7 @@ from flask_login import login_user, logout_user, current_user, login_required
 from app import db
 from app.models import User, Log
 from app.forms import LoginForm, RegistrationForm
-from datetime import datetime, timezone
+from datetime import datetime
 
 # 创建蓝图
 bp = Blueprint('auth', __name__, url_prefix='/auth')
@@ -88,7 +88,6 @@ def logout():
 @bp.route('/profile')
 @login_required
 def profile():
-    from datetime import datetime, timezone
     return render_template('auth/profile.html', title='个人资料', now=datetime.now())
 
 @bp.route('/change-password', methods=['POST'])

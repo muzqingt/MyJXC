@@ -3,7 +3,7 @@ from app import db
 
 
 class PurchaseReturn(db.Model):
-    """采购退货单 - 退货给供应商"""
+    """采购退货单"""
     __tablename__ = 'purchase_returns'
     id = db.Column(db.Integer, primary_key=True)
     return_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
@@ -37,7 +37,7 @@ class PurchaseReturnItem(db.Model):
 
 
 class SalesReturn(db.Model):
-    """销售退货单 - 客户退货"""
+    """销售退货单"""
     __tablename__ = 'sales_returns'
     id = db.Column(db.Integer, primary_key=True)
     return_number = db.Column(db.String(50), unique=True, nullable=False, index=True)

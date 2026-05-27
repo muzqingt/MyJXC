@@ -1,11 +1,12 @@
-from flask import render_template, redirect, url_for, flash, request, jsonify, Blueprint
+from flask import render_template, redirect, url_for, flash, request, jsonify, Blueprint, abort
 from flask_login import login_required, current_user
 from app import db
 from sqlalchemy.orm import selectinload
-from app.models import SalesOrder, SystemSetting, SalesOrderItem, StockOut, StockOutItem, Customer, Warehouse, Product, StockLog, Log, SalesReturn, SalesReturnItem
+from app.models import SalesOrder, SystemSetting, SalesOrderItem, StockOut, StockOutItem, Customer, Warehouse, Product, StockLog, SalesReturn, SalesReturnItem
 from app.utils import to_decimal, add_balance, sub_balance, get_redirect_tab, build_products_data, build_partners_data, generate_order_number
-from app.forms import SalesOrderForm, SalesOrderItemForm, StockOutForm
-from datetime import datetime, timezone
+from app.forms import StockOutForm
+from datetime import datetime
+from sqlalchemy.exc import SQLAlchemyError
 
 # 创建蓝图
 bp = Blueprint('sales', __name__, url_prefix='/sales')
@@ -15,6 +16,7 @@ bp = Blueprint('sales', __name__, url_prefix='/sales')
 @bp.route('/index')
 @login_required
 def index():
+    """销售管理首页，展示订单、出库单、退货单列表"""
     page = request.args.get('page', 1, type=int)
     per_page = 20
 
@@ -93,6 +95,7 @@ def index():
 @bp.route('/orders/new', methods=['GET', 'POST'])
 @login_required
 def new_order():
+    """创建销售订单，支持直接出库"""
     customers = Customer.query.all()
     customers_data = build_partners_data(customers)
     warehouses = Warehouse.query.all()
@@ -126,7 +129,7 @@ def new_order():
             order_items_list = []
             for i in range(len(product_ids)):
                 if product_ids[i] and quantities[i] and unit_prices[i]:
-                    product = Product.query.get(int(product_ids[i]))
+                    product = db.session.get(Product, int(product_ids[i]))
                     if product:
                         order_items_list.append({
                             'product_id': product.id,
@@ -169,7 +172,7 @@ def new_order():
         order_items_list = []
         for i in range(len(product_ids)):
             if product_ids[i] and quantities[i] and unit_prices[i]:
-                product = Product.query.get(int(product_ids[i]))
+                product = db.session.get(Product, int(product_ids[i]))
                 if product:
                     quantity = to_decimal(quantities[i])
                     unit_price = to_decimal(unit_prices[i])
@@ -280,7 +283,7 @@ def new_order():
                     add_balance(customer, "receivable_balance", total_amount)
 
                 flash(f'销售订单创建并出库完成！出库单号: {delivery_number}', 'success')
-            except Exception as e:
+            except SQLAlchemyError as e:
                 db.session.rollback()
                 flash(f'直接出库失败: {str(e)}', 'danger')
                 return render_template('sales/order_items.html',
@@ -314,8 +317,11 @@ def new_order():
 @bp.route('/orders/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_order(id):
-    order = SalesOrder.query.options(selectinload(SalesOrder.items).selectinload(SalesOrderItem.product)).get_or_404(id)
-    
+    """编辑销售订单，支持调整客户应收余额"""
+    order = db.session.query(SalesOrder).options(selectinload(SalesOrder.items).selectinload(SalesOrderItem.product)).filter(SalesOrder.id == id).first()
+    if order is None:
+        abort(404)
+
     if order.status == 'completed':
         flash('已完成的订单不能修改！', 'danger')
         return redirect(url_for('sales.index', tab=get_redirect_tab(order.status)))
@@ -354,7 +360,7 @@ def edit_order(id):
             order_items_list = []
             for i in range(len(product_ids)):
                 if product_ids[i] and quantities[i] and unit_prices[i]:
-                    product = Product.query.get(int(product_ids[i]))
+                    product = db.session.get(Product, int(product_ids[i]))
                     if product:
                         order_items_list.append({
                             'product_id': product.id,
@@ -395,7 +401,7 @@ def edit_order(id):
             if product_ids[i] and quantities[i] and unit_prices[i]:
                 product_id = int(product_ids[i])
                 remaining_product_ids.add(product_id)
-                product = Product.query.get(product_id)
+                product = db.session.get(Product, product_id)
                 if product:
                     quantity = to_decimal(quantities[i])
                     unit_price = to_decimal(unit_prices[i])
@@ -433,7 +439,7 @@ def edit_order(id):
             if old_customer and old_customer.id != customer_id:
                 # 换了客户：回滚旧客户余额，增加新客户余额
                 sub_balance(old_customer, "receivable_balance", original_total)
-                new_customer = Customer.query.get(customer_id)
+                new_customer = db.session.get(Customer, customer_id)
                 if new_customer:
                     add_balance(new_customer, "receivable_balance", total_amount)
             elif order.customer:
@@ -457,14 +463,18 @@ def edit_order(id):
 @bp.route('/orders/<int:id>/items')
 @login_required
 def edit_order_items(id):
+    """兼容旧路由，重定向到订单编辑页"""
     return redirect(url_for('sales.edit_order', id=id))
 
 # 删除订单
 @bp.route('/orders/<int:id>/delete', methods=['POST'])
 @login_required
 def delete_order(id):
-    order = SalesOrder.query.get_or_404(id)
-    
+    """删除销售订单，含关联数据校验"""
+    order = db.session.get(SalesOrder, id)
+    if order is None:
+        abort(404)
+
     # 检查是否有关联的发货单
     if order.stock_outs:
         flash('此订单有关联的发货单，无法删除！', 'danger')
@@ -513,9 +523,11 @@ def delete_order(id):
 @login_required
 def quick_stock_out(id):
     """快捷出库：从销售订单直接出库（一次性完成）"""
-    order = SalesOrder.query.options(
+    order = db.session.query(SalesOrder).options(
         selectinload(SalesOrder.items).selectinload(SalesOrderItem.product)
-    ).with_for_update().get_or_404(id)
+    ).filter(SalesOrder.id == id).with_for_update().first()
+    if order is None:
+        abort(404)
     
     if order.status == 'completed':
         flash('已完成的订单不能快捷出库！', 'danger')
@@ -549,7 +561,7 @@ def quick_stock_out(id):
                 continue
 
             # 锁定商品行，防止并发出库导致库存计算错误
-            product = Product.query.with_for_update().get(item.product_id)
+            product = db.session.query(Product).filter(Product.id == item.product_id).with_for_update().first()
             if not product:
                 continue
             if to_decimal(product.stock_quantity) < remaining_qty:
@@ -629,7 +641,7 @@ def quick_stock_out(id):
         db.session.commit()
         flash(f'快捷出库完成！出库单号: {delivery_number}', 'success')
         
-    except Exception as e:
+    except SQLAlchemyError as e:
         db.session.rollback()
         flash(f'出库失败: {str(e)}', 'danger')
     
@@ -640,7 +652,10 @@ def quick_stock_out(id):
 @bp.route('/orders/<int:id>')
 @login_required
 def view_order(id):
-    order = SalesOrder.query.options(selectinload(SalesOrder.items).selectinload(SalesOrderItem.product)).get_or_404(id)
+    """查看销售订单详情及关联出库单"""
+    order = db.session.query(SalesOrder).options(selectinload(SalesOrder.items).selectinload(SalesOrderItem.product)).filter(SalesOrder.id == id).first()
+    if order is None:
+        abort(404)
     related_stock_outs = StockOut.query.filter_by(sales_order_id=id).order_by(StockOut.created_at.desc()).all()
     
     # 准备订单商品数据用于JavaScript确认框
@@ -664,8 +679,11 @@ def view_order(id):
 @bp.route('/orders/<int:id>/stock-out', methods=['GET', 'POST'])
 @login_required
 def new_stock_out_from_order(id):
-    order = SalesOrder.query.options(selectinload(SalesOrder.items).selectinload(SalesOrderItem.product)).get_or_404(id)
-    
+    """从销售订单创建出库单（预填未出库商品）"""
+    order = db.session.query(SalesOrder).options(selectinload(SalesOrder.items).selectinload(SalesOrderItem.product)).filter(SalesOrder.id == id).first()
+    if order is None:
+        abort(404)
+
     if order.status not in ['confirmed', 'partial']:
         flash('只有已确认或部分出库的订单可以创建出库单！', 'danger')
         return redirect(url_for('sales.view_order', id=id))
@@ -716,6 +734,7 @@ def new_stock_out_from_order(id):
 @bp.route('/stock-outs/new', methods=['GET', 'POST'])
 @login_required
 def new_stock_out():
+    """新建出库单，支持关联销售订单或直接出库"""
     form = StockOutForm()
     form.sales_order_id.choices = [(0, '直接出库')] + [(o.id, f"{o.order_number} - {o.customer.name}") 
                                                       for o in SalesOrder.query.filter_by(status='confirmed').all()]
@@ -755,8 +774,11 @@ def new_stock_out():
 @bp.route('/stock-outs/<int:id>/items', methods=['GET', 'POST'])
 @login_required
 def edit_stock_out_items(id):
-    stock_out = StockOut.query.get_or_404(id)
-    
+    """编辑出库单商品明细"""
+    stock_out = db.session.get(StockOut, id)
+    if stock_out is None:
+        abort(404)
+
     if request.method == 'POST':
         # 处理商品明细
         product_ids = request.form.getlist('product_id[]')
@@ -814,12 +836,12 @@ def edit_stock_out_items(id):
         total_amount = 0
         for i in range(len(product_ids)):
             if product_ids[i] and quantities[i] and unit_prices[i]:
-                product = Product.query.get(int(product_ids[i]))
+                product = db.session.get(Product, int(product_ids[i]))
                 if product:
                     quantity = to_decimal(quantities[i])
                     unit_price = to_decimal(unit_prices[i])
                     amount = quantity * unit_price
-                    
+
                     item = StockOutItem(
                         stock_out_id=stock_out.id,
                         product_id=product.id,
@@ -850,7 +872,10 @@ def edit_stock_out_items(id):
 @bp.route('/stock-outs/<int:id>/complete', methods=['POST'])
 @login_required
 def complete_stock_out(id):
-    stock_out = StockOut.query.options(selectinload(StockOut.items).selectinload(StockOutItem.product)).with_for_update().get_or_404(id)
+    """确认出库，更新库存并同步订单状态和客户应收余额"""
+    stock_out = db.session.query(StockOut).options(selectinload(StockOut.items).selectinload(StockOutItem.product)).filter(StockOut.id == id).with_for_update().first()
+    if stock_out is None:
+        abort(404)
     
     # 检查是否已经完成
     if stock_out.status == 'completed':
@@ -874,7 +899,7 @@ def complete_stock_out(id):
 
         for item in stock_out.items:
             # 锁定商品行，防止并发出库导致库存计算错误
-            product = Product.query.with_for_update().get(item.product_id)
+            product = db.session.query(Product).filter(Product.id == item.product_id).with_for_update().first()
             if not product:
                 continue
             locked_products[item.id] = product
@@ -949,7 +974,7 @@ def complete_stock_out(id):
         db.session.commit()
         flash('出库单完成！库存已更新。', 'success')
         
-    except Exception as e:
+    except SQLAlchemyError as e:
         db.session.rollback()
         flash(f'出库失败: {str(e)}', 'danger')
     
@@ -959,8 +984,11 @@ def complete_stock_out(id):
 @bp.route('/stock-outs/<int:id>/delete', methods=['POST'])
 @login_required
 def delete_stock_out(id):
-    stock_out = StockOut.query.get_or_404(id)
-    
+    """删除未出库状态的出库单"""
+    stock_out = db.session.get(StockOut, id)
+    if stock_out is None:
+        abort(404)
+
     # 只有未出库状态的出库单可以删除
     if stock_out.status != 'pending':
         flash('只有未出库状态的出库单可以删除！', 'danger')
@@ -976,7 +1004,10 @@ def delete_stock_out(id):
 @bp.route('/stock-outs/<int:id>')
 @login_required
 def view_stock_out(id):
-    stock_out = StockOut.query.get_or_404(id)
+    """查看出库单详情"""
+    stock_out = db.session.get(StockOut, id)
+    if stock_out is None:
+        abort(404)
     return render_template('sales/stock_out_view.html',
                          title='出库单详情',
                          stock_out=stock_out)
@@ -988,9 +1019,11 @@ def view_stock_out(id):
 @login_required
 def quick_return(id):
     """快捷退货: 从销售订单直接退货(一次性完成)"""
-    order = SalesOrder.query.options(
+    order = db.session.query(SalesOrder).options(
         selectinload(SalesOrder.items).selectinload(SalesOrderItem.product)
-    ).get_or_404(id)
+    ).filter(SalesOrder.id == id).first()
+    if order is None:
+        abort(404)
 
     if order.status != 'completed':
         flash('只有已完成的销售订单可以退货！', 'danger')
@@ -1024,10 +1057,11 @@ def quick_return(id):
         total_amount = 0
         has_items = False
         for order_item in order.items:
-            product = Product.query.with_for_update().get(order_item.product_id)
+            product = db.session.query(Product).filter(Product.id == order_item.product_id).with_for_update().first()
             if not product:
                 continue
 
+            # 退货数量等于已出库数量（销售退货是入库操作，不受库存上限限制）
             return_qty = to_decimal(order_item.delivered_quantity or 0)
             if return_qty <= 0:
                 continue
@@ -1078,7 +1112,7 @@ def quick_return(id):
 
         db.session.commit()
         flash(f'退货单 {return_number} 创建成功，库存已更新！', 'success')
-    except Exception as e:
+    except SQLAlchemyError as e:
         db.session.rollback()
         flash(f'退货失败: {str(e)}', 'danger')
 
@@ -1088,6 +1122,7 @@ def quick_return(id):
 @bp.route('/returns')
 @login_required
 def returns():
+    """销售退货单列表"""
     page = request.args.get('page', 1, type=int)
     per_page = 20
     start_date = request.args.get('start_date')
@@ -1110,7 +1145,10 @@ def returns():
 @bp.route('/returns/<int:id>')
 @login_required
 def view_return(id):
-    sales_return = SalesReturn.query.get_or_404(id)
+    """查看退货单详情"""
+    sales_return = db.session.get(SalesReturn, id)
+    if sales_return is None:
+        abort(404)
     return render_template('sales/return_view.html',
                          title='退货单详情',
                          sales_return=sales_return)
@@ -1119,7 +1157,10 @@ def view_return(id):
 @bp.route('/returns/<int:id>/delete', methods=['POST'])
 @login_required
 def delete_return(id):
-    sales_return = SalesReturn.query.get_or_404(id)
+    """删除未完成的退货单"""
+    sales_return = db.session.get(SalesReturn, id)
+    if sales_return is None:
+        abort(404)
 
     if sales_return.status != 'pending':
         flash('只有未完成的退货单可以删除！', 'danger')
@@ -1135,7 +1176,10 @@ def delete_return(id):
 @bp.route('/api/sales-orders/<int:order_id>/items')
 @login_required
 def api_order_items(order_id):
-    order = SalesOrder.query.get_or_404(order_id)
+    """获取销售订单商品明细的JSON接口"""
+    order = db.session.get(SalesOrder, order_id)
+    if order is None:
+        abort(404)
     items = []
     for item in order.items:
         items.append({

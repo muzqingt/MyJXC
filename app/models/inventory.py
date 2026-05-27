@@ -3,6 +3,7 @@ from app import db
 
 
 class StockLog(db.Model):
+    """库存变动流水"""
     __tablename__ = 'stock_logs'
     id = db.Column(db.Integer, primary_key=True)
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
