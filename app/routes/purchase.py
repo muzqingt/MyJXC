@@ -281,7 +281,7 @@ def new_order():
             flash('采购订单创建成功!', 'success')
 
         db.session.commit()
-        return redirect(url_for('purchase.index', tab=get_redirect_tab()))
+        return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
 
     return render_template('purchase/order_items.html',
                          title='新建采购订单',
@@ -301,7 +301,7 @@ def edit_order(id):
 
     if order.status == 'completed':
         flash('已完成的订单不能修改!', 'danger')
-        return redirect(url_for('purchase.index', tab=get_redirect_tab()))
+        return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
 
     suppliers = Supplier.query.all()
     partners_data = build_partners_data(suppliers)
@@ -369,7 +369,7 @@ def edit_order(id):
         order.notes = notes
 
         # 更新商品明细（保留已入库数量，只删除本次移除的商品）
-        original_total = float(order.total_amount)
+        original_total = to_decimal(order.total_amount)
         existing_items = {item.product_id: item for item in order.items}
         remaining_product_ids = set()
         total_amount = 0
@@ -460,7 +460,7 @@ def edit_order(id):
         db.session.commit()
 
         flash('采购订单修改成功!', 'success')
-        return redirect(url_for('purchase.index', tab=get_redirect_tab()))
+        return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
 
     return render_template('purchase/order_items.html',
                          title='编辑采购订单',
@@ -489,7 +489,7 @@ def delete_order(id):
     # 检查是否有关联的入库单
     if order.stock_ins:
         flash('此订单有关联的入库单,无法删除!', 'danger')
-        return redirect(url_for('purchase.index', tab=get_redirect_tab()))
+        return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
 
     # 检查是否有付款记录（reference_id 为逗号分隔的字符串，需模糊匹配）
     from app.models import Payment
@@ -506,18 +506,18 @@ def delete_order(id):
         )
     ).first():
         flash('此订单已有付款记录，无法删除！', 'danger')
-        return redirect(url_for('purchase.index', tab=get_redirect_tab()))
+        return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
 
     # 检查是否有库存流水记录
     from app.models import StockLog
     if StockLog.query.filter_by(reference_type='purchase_order', reference_id=order.id).first():
         flash('此订单已有库存操作记录，无法删除！', 'danger')
-        return redirect(url_for('purchase.index', tab=get_redirect_tab()))
+        return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
 
     # 检查是否已退货
     if PurchaseReturn.query.filter_by(purchase_order_id=id, status='completed').first():
         flash('此订单已退货，无法删除！', 'danger')
-        return redirect(url_for('purchase.index', tab=get_redirect_tab()))
+        return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
 
     # 只有已完成的订单才需要回滚供应商应付余额（confirmed/partial 未实际入库，无余额记录）
     supplier = order.supplier
@@ -527,7 +527,7 @@ def delete_order(id):
     db.session.delete(order)
     db.session.commit()
     flash('采购订单删除成功!', 'success')
-    return redirect(url_for('purchase.index', tab=get_redirect_tab()))
+    return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
 
 
 @bp.route('/orders/<int:id>/quick-stock-in', methods=['POST'])
@@ -542,11 +542,11 @@ def quick_stock_in(id):
 
     if order.status == 'completed':
         flash('此订单已入库完成!', 'danger')
-        return redirect(url_for('purchase.index', tab=get_redirect_tab()))
+        return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
 
     if len(order.items) == 0:
         flash('此订单没有商品明细,无法入库!', 'danger')
-        return redirect(url_for('purchase.index', tab=get_redirect_tab()))
+        return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
 
     try:
         receipt_number = generate_order_number('SI', StockIn)
@@ -626,14 +626,14 @@ def quick_stock_in(id):
                 order.status = 'completed'
                 supplier = order.supplier
                 if supplier:
-                    add_balance(supplier, 'payable_balance', float(order.total_amount))
+                    add_balance(supplier, 'payable_balance', order.total_amount)
                 db.session.commit()
             elif order.status == 'completed':
                 db.session.commit()  # 已完成，无需操作
             else:
                 db.session.rollback()
             flash('此订单所有商品都已入库！', 'warning')
-            return redirect(url_for('purchase.index', tab=get_redirect_tab()))
+            return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
 
         stock_in.total_amount = total_amount
 
@@ -648,7 +648,7 @@ def quick_stock_in(id):
             # 更新供应商应付余额
             supplier = order.supplier
             if supplier:
-                add_balance(supplier, "payable_balance", float(order.total_amount))
+                add_balance(supplier, "payable_balance", order.total_amount)
         else:
             order.status = 'partial'
 
@@ -658,7 +658,7 @@ def quick_stock_in(id):
         db.session.rollback()
         flash(f'入库失败: {str(e)}', 'danger')
 
-    return redirect(url_for('purchase.index', tab=get_redirect_tab()))
+    return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
 
 
 @bp.route('/orders/<int:id>')
@@ -998,7 +998,7 @@ def complete_stock_in(id):
                 # 更新供应商应付余额（使用订单总额，而非仅本次入库金额）
                 supplier = order.supplier
                 if supplier:
-                    add_balance(supplier, "payable_balance", float(order.total_amount))
+                    add_balance(supplier, "payable_balance", order.total_amount)
             else:
                 order.status = 'partial'
 

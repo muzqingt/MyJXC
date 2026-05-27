@@ -567,7 +567,7 @@ def quick_stock_out(id):
             if to_decimal(product.stock_quantity) < remaining_qty:
                 db.session.rollback()
                 flash(f'商品 {product.name} 库存不足，当前库存: {to_decimal(product.stock_quantity)}，需要: {remaining_qty}', 'danger')
-                return redirect(url_for('sales.order_view', id=order.id))
+                return redirect(url_for('sales.view_order', id=order.id))
             unit_price = to_decimal(item.unit_price)
             product.sale_price = unit_price
 

@@ -8,6 +8,7 @@ import os
 from werkzeug.utils import secure_filename
 from flask import Blueprint
 from sqlalchemy.exc import SQLAlchemyError
+from app.utils import to_decimal
 
 # 创建蓝图
 bp = Blueprint('product', __name__, url_prefix='/product')
@@ -358,9 +359,9 @@ def api_update_price():
     
     try:
         if price_type == 'sale_price':
-            product.sale_price = float(price)
+            product.sale_price = to_decimal(price)
         elif price_type == 'purchase_price':
-            product.purchase_price = float(price)
+            product.purchase_price = to_decimal(price)
         else:
             return jsonify({'success': False, 'message': '价格类型无效'})
         
