@@ -101,74 +101,6 @@ def generate_order_number(prefix, model_class, date_field_name='created_at'):
     return f'{prefix}{today}001'
 
 
-def generate_purchase_order_number():
-    """生成采购订单编号"""
-    today = datetime.now().strftime('%Y%m%d')
-    like_pattern = f'PO{today}%'
-    last_order = PurchaseOrder.query.filter(
-        PurchaseOrder.order_number.like(like_pattern)
-    ).order_by(PurchaseOrder.id.desc()).first()
-    
-    if last_order and len(last_order.order_number) > 10:
-        try:
-            last_num = int(last_order.order_number[10:])
-            return f'PO{today}{last_num + 1:03d}'
-        except (ValueError, IndexError):
-            pass
-    return f'PO{today}001'
-
-
-def generate_sales_order_number():
-    """生成销售订单编号"""
-    today = datetime.now().strftime('%Y%m%d')
-    like_pattern = f'SO{today}%'
-    last_order = SalesOrder.query.filter(
-        SalesOrder.order_number.like(like_pattern)
-    ).order_by(SalesOrder.id.desc()).first()
-    
-    if last_order and len(last_order.order_number) > 10:
-        try:
-            last_num = int(last_order.order_number[10:])
-            return f'SO{today}{last_num + 1:03d}'
-        except (ValueError, IndexError):
-            pass
-    return f'SO{today}001'
-
-
-def generate_stock_in_number():
-    """生成入库单编号"""
-    today = datetime.now().strftime('%Y%m%d')
-    like_pattern = f'SI{today}%'
-    last_order = StockIn.query.filter(
-        StockIn.receipt_number.like(like_pattern)
-    ).order_by(StockIn.id.desc()).first()
-    
-    if last_order and len(last_order.receipt_number) > 10:
-        try:
-            last_num = int(last_order.receipt_number[10:])
-            return f'SI{today}{last_num + 1:03d}'
-        except (ValueError, IndexError):
-            pass
-    return f'SI{today}001'
-
-
-def generate_stock_out_number():
-    """生成出库单编号"""
-    today = datetime.now().strftime('%Y%m%d')
-    like_pattern = f'OUT{today}%'
-    last_order = StockOut.query.filter(
-        StockOut.delivery_number.like(like_pattern)
-    ).order_by(StockOut.id.desc()).first()
-    
-    if last_order and len(last_order.delivery_number) > 11:
-        try:
-            last_num = int(last_order.delivery_number[11:])
-            return f'OUT{today}{last_num + 1:03d}'
-        except (ValueError, IndexError):
-            pass
-    return f'OUT{today}001'
-
-
 def build_products_data(products, include_purchase_price=True, include_sale_price=True):
     """构建商品下拉数据"""
     result = []
@@ -234,12 +166,13 @@ def update_stock_and_log(product, warehouse_id, quantity, change_type,
     """
     from app.models import StockLog
     
-    before_quantity = float(product.stock_quantity)
-    
+    before_quantity = to_decimal(product.stock_quantity)
+    delta = to_decimal(quantity)
+
     if change_type == 'in':
-        after_quantity = before_quantity + quantity
+        after_quantity = before_quantity + delta
     else:  # out
-        after_quantity = before_quantity - quantity
+        after_quantity = before_quantity - delta
     
     product.stock_quantity = after_quantity
     
@@ -288,5 +221,3 @@ def format_local_dt(dt, fmt='%Y-%m-%d %H:%M:%S'):
     return local.strftime(fmt)
 
 
-# 延迟导入避免循环引用
-from app.models import PurchaseOrder, SalesOrder, StockIn, StockOut
