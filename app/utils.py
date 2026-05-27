@@ -3,8 +3,9 @@
 """
 from flask import flash, redirect, url_for
 from datetime import datetime
-
 from decimal import Decimal, ROUND_HALF_UP
+
+from app import db
 
 
 def to_decimal(value, default=Decimal('0')):
@@ -59,8 +60,6 @@ def sub_balance(customer_or_supplier, field_name, amount):
     db.session.execute(stmt)
     # 刷新 ORM 对象，防止后续 commit() 用脏数据覆盖刚写入的数据库值
     db.session.refresh(customer_or_supplier)
-
-from app import db
 
 
 def generate_order_number(prefix, model_class, date_field_name='created_at'):
