@@ -1,10 +1,11 @@
-from flask import render_template, redirect, url_for, flash, request, jsonify, Blueprint, send_file
+from flask import render_template, redirect, url_for, flash, request, jsonify, Blueprint, send_file, abort
 from flask_login import login_required, current_user
 import os
 import shutil
-from datetime import datetime, timezone
+from datetime import datetime
 from app import db
 from app.models import Log, User
+from sqlalchemy.exc import SQLAlchemyError
 
 # 创建蓝图
 bp = Blueprint('system', __name__, url_prefix='/system')
@@ -321,8 +322,10 @@ def edit_user(user_id):
         flash('只有管理员可以编辑用户', 'danger')
         return redirect(url_for('system.users'))
     
-    user = User.query.get_or_404(user_id)
-    
+    user = db.session.get(User, user_id)
+    if user is None:
+        abort(404)
+
     if request.method == 'POST':
         user.email = request.form.get('email')
         user.role = request.form.get('role')
@@ -351,8 +354,10 @@ def delete_user(user_id):
         flash('不能删除当前登录用户', 'danger')
         return redirect(url_for('system.user_management'))
     
-    user = User.query.get_or_404(user_id)
-    
+    user = db.session.get(User, user_id)
+    if user is None:
+        abort(404)
+
     # 先删除该用户的所有日志
     Log.query.filter_by(user_id=user_id).delete()
     
@@ -413,7 +418,7 @@ def optimize_db():
         db.session.execute(db.text('VACUUM'))
         db.session.commit()
         return jsonify({'success': True, 'message': '数据库优化完成'})
-    except Exception as e:
+    except SQLAlchemyError as e:
         return jsonify({'success': False, 'message': f'优化失败: {str(e)}'}), 500
 
 @bp.route('/api/system/clean-logs', methods=['POST'])
@@ -429,7 +434,7 @@ def clean_logs():
         deleted = Log.query.filter(Log.created_at < cutoff_date).delete()
         db.session.commit()
         return jsonify({'success': True, 'deleted_count': deleted})
-    except Exception as e:
+    except SQLAlchemyError as e:
         return jsonify({'success': False, 'message': f'清理失败: {str(e)}'}), 500
 
 @bp.route('/api/system/export-db')
@@ -476,6 +481,6 @@ def save_settings():
                 db.session.add(setting)
         db.session.commit()
         return jsonify({'success': True, 'message': '设置已保存'})
-    except Exception as e:
+    except SQLAlchemyError as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'保存失败: {str(e)}'}), 500

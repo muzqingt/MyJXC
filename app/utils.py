@@ -4,11 +4,13 @@
 from flask import flash, redirect, url_for
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
+from typing import Any, Optional, Tuple, Union
 
 from app import db
+from sqlalchemy.exc import SQLAlchemyError
 
 
-def to_decimal(value, default=Decimal('0')):
+def to_decimal(value: Any, default: Decimal = Decimal('0')) -> Decimal:
     """将任意值安全转换为 Decimal。保持便捷数据库切换（SQLAlchemy 会自动处理）。"""
     if value is None:
         return default
@@ -27,8 +29,14 @@ def to_decimal(value, default=Decimal('0')):
         return default
 
 
-def add_balance(customer_or_supplier, field_name, amount):
-    """原子增加余额（使用 SQL 表达式防止并发丢更新）。支持所有主流数据库。"""
+def add_balance(customer_or_supplier: Any, field_name: str, amount: Union[float, Decimal, str]) -> None:
+    """
+    原子增加余额（使用 SQL 表达式防止并发丢更新）。
+
+    使用 UPDATE ... SET field = field + delta 的 SQL 表达式在数据库层完成加法运算，
+    而非先读后写。这样即使多个请求并发修改同一行，也不会出现"丢失更新"问题。
+    最后调用 session.refresh() 刷新 ORM 对象，确保后续代码读到的是数据库最新值。
+    """
     from sqlalchemy import update
     from app.models import Customer, Supplier
     Model = Customer if hasattr(customer_or_supplier, 'receivable_balance') else Supplier
@@ -45,8 +53,13 @@ def add_balance(customer_or_supplier, field_name, amount):
     db.session.refresh(customer_or_supplier)
 
 
-def sub_balance(customer_or_supplier, field_name, amount):
-    """原子减少余额（使用 SQL 表达式防止并发丢更新）。支持所有主流数据库。"""
+def sub_balance(customer_or_supplier: Any, field_name: str, amount: Union[float, Decimal, str]) -> None:
+    """
+    原子减少余额（使用 SQL 表达式防止并发丢更新）。
+
+    与 add_balance 原理相同，使用 UPDATE ... SET field = field - delta 在数据库层
+    完成减法运算，避免并发场景下的"丢失更新"问题。
+    """
     from sqlalchemy import update
     from app.models import Customer, Supplier
     Model = Customer if hasattr(customer_or_supplier, 'receivable_balance') else Supplier
@@ -62,14 +75,16 @@ def sub_balance(customer_or_supplier, field_name, amount):
     db.session.refresh(customer_or_supplier)
 
 
-def generate_order_number(prefix, model_class, date_field_name='created_at'):
+def generate_order_number(prefix: str, model_class: type, date_field_name: str = 'created_at') -> str:
     """
-    生成订单编号，如 PO20240101001
-    
-    Args:
-        prefix: 订单前缀，如 'PO', 'SI', 'SO', 'OUT'
-        model_class: 模型类
-        date_field_name: 日期字段名（用于构建like查询）
+    生成订单编号。
+
+    编号格式：{前缀}{日期}{序号}，例如 PO20240101001、SI20240115003。
+    - 前缀：PO（采购）、SI（采购入库）、SO（销售）、OUT（出库）等
+    - 日期：8 位年月日，如 20240101
+    - 序号：3 位数字，从 001 开始，同一天自动递增
+
+    通过 LIKE 查询当日最大编号，提取序号部分并 +1 实现自增。
     """
     today = datetime.now().strftime('%Y%m%d')
     like_pattern = f'{prefix}{today}%'
@@ -101,7 +116,7 @@ def generate_order_number(prefix, model_class, date_field_name='created_at'):
     return f'{prefix}{today}001'
 
 
-def build_products_data(products, include_purchase_price=True, include_sale_price=True):
+def build_products_data(products: list, include_purchase_price: bool = True, include_sale_price: bool = True) -> list[dict]:
     """构建商品下拉数据"""
     result = []
     for p in products:
@@ -121,7 +136,7 @@ def build_products_data(products, include_purchase_price=True, include_sale_pric
     return result
 
 
-def build_partners_data(partners):
+def build_partners_data(partners: list) -> list[dict]:
     """构建合作伙伴（供应商/客户）下拉数据"""
     return [{
         'id': p.id,
@@ -130,7 +145,7 @@ def build_partners_data(partners):
     } for p in partners]
 
 
-def flash_success(message, endpoint=None, **kwargs):
+def flash_success(message: str, endpoint: Optional[str] = None, **kwargs: Any) -> Optional[Any]:
     """成功消息并重定向"""
     flash(message, 'success')
     if endpoint:
@@ -138,7 +153,7 @@ def flash_success(message, endpoint=None, **kwargs):
     return None
 
 
-def flash_error(message, endpoint=None, **kwargs):
+def flash_error(message: str, endpoint: Optional[str] = None, **kwargs: Any) -> Optional[Any]:
     """错误消息并重定向"""
     flash(message, 'danger')
     if endpoint:
@@ -146,23 +161,20 @@ def flash_error(message, endpoint=None, **kwargs):
     return None
 
 
-def update_stock_and_log(product, warehouse_id, quantity, change_type, 
-                         reference_id, reference_type, notes, user_id):
+def update_stock_and_log(product: Any, warehouse_id: int, quantity: Union[float, Decimal, str],
+                         change_type: str, reference_id: int, reference_type: str,
+                         notes: str, user_id: int) -> Tuple[Decimal, Decimal]:
     """
-    更新库存并记录库存流水
-    
-    Args:
-        product: 商品对象
-        warehouse_id: 仓库ID
-        quantity: 变动数量
-        change_type: 'in' 或 'out'
-        reference_id: 相关单据ID
-        reference_type: 相关单据类型
-        notes: 备注
-        user_id: 用户ID
-    
+    更新商品库存数量并记录一条库存变动流水。
+
+    before_quantity 取自 product.stock_quantity 当前值（即数据库中该商品的库存），
+    after_quantity 通过 before_quantity +/- quantity 计算得出：
+      - change_type='in'  时：after = before + delta（入库）
+      - change_type='out' 时：after = before - delta（出库）
+    计算完成后将新值写回 product.stock_quantity，并创建 StockLog 记录完整快照。
+
     Returns:
-        (before_quantity, after_quantity)
+        (before_quantity, after_quantity) - 变动前后的库存数量
     """
     from app.models import StockLog
     
@@ -193,17 +205,24 @@ def update_stock_and_log(product, warehouse_id, quantity, change_type,
     return before_quantity, after_quantity
 
 
-def safe_commit():
-    """安全提交事务"""
+def safe_commit() -> Tuple[bool, Optional[str]]:
+    """
+    安全提交数据库事务。
+
+    Returns:
+        (success, error_message)：
+        - 成功时返回 (True, None)
+        - 失败时自动回滚事务并返回 (False, 错误信息字符串)
+    """
     try:
         db.session.commit()
         return True, None
-    except Exception as e:
+    except SQLAlchemyError as e:
         db.session.rollback()
         return False, str(e)
 
 
-def localize_dt(dt):
+def localize_dt(dt: Any) -> Any:
     """将存储的UTC时间转换为本地时间（亚洲/上海）"""
     from datetime import timezone, timedelta
     if dt is None:
@@ -213,7 +232,7 @@ def localize_dt(dt):
     return dt.astimezone(timezone(timedelta(hours=8)))
 
 
-def format_local_dt(dt, fmt='%Y-%m-%d %H:%M:%S'):
+def format_local_dt(dt: Any, fmt: str = '%Y-%m-%d %H:%M:%S') -> str:
     """格式化本地时间，默认格式：2024-01-01 12:00:00"""
     if dt is None:
         return ''
@@ -221,7 +240,7 @@ def format_local_dt(dt, fmt='%Y-%m-%d %H:%M:%S'):
     return local.strftime(fmt)
 
 
-def get_redirect_tab(status=None):
+def get_redirect_tab(status: Optional[str] = None) -> str:
     """根据订单状态确定跳转的标签页"""
     if status == 'draft':
         return 'draft'
@@ -246,7 +265,7 @@ EXCEL_THIN_BORDER = Border(
 EXCEL_HEADER_ALIGNMENT = Alignment(horizontal='center', vertical='center')
 
 
-def apply_excel_header_style(ws, row, max_col):
+def apply_excel_header_style(ws: Any, row: int, max_col: int) -> None:
     """为 Excel 表头行应用统一样式"""
     for col in range(1, max_col + 1):
         cell = ws.cell(row=row, column=col)

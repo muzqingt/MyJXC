@@ -1,4 +1,4 @@
-from flask import render_template, redirect, url_for, flash, request
+from flask import render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required
 from app import db
 from app.models import Supplier, Customer, Warehouse
@@ -51,7 +51,9 @@ def add_supplier():
 @bp.route('/suppliers/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_supplier(id):
-    supplier = Supplier.query.get_or_404(id)
+    supplier = db.session.get(Supplier, id)
+    if supplier is None:
+        abort(404)
     form = SupplierForm(obj=supplier)
 
     if form.validate_on_submit():
@@ -81,7 +83,9 @@ def edit_supplier(id):
 @bp.route('/suppliers/<int:id>/delete', methods=['POST'])
 @login_required
 def delete_supplier(id):
-    supplier = Supplier.query.get_or_404(id)
+    supplier = db.session.get(Supplier, id)
+    if supplier is None:
+        abort(404)
 
     # 检查是否有采购记录或付款记录
     if len(supplier.purchase_orders) > 0 or len(supplier.payments) > 0:
@@ -137,7 +141,9 @@ def add_customer():
 @bp.route('/customers/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_customer(id):
-    customer = Customer.query.get_or_404(id)
+    customer = db.session.get(Customer, id)
+    if customer is None:
+        abort(404)
     form = CustomerForm(obj=customer)
 
     if form.validate_on_submit():
@@ -167,7 +173,9 @@ def edit_customer(id):
 @bp.route('/customers/<int:id>/delete', methods=['POST'])
 @login_required
 def delete_customer(id):
-    customer = Customer.query.get_or_404(id)
+    customer = db.session.get(Customer, id)
+    if customer is None:
+        abort(404)
 
     # 检查是否有销售记录或收款记录
     if len(customer.sales_orders) > 0 or len(customer.receipts) > 0:
@@ -222,7 +230,9 @@ def add_warehouse():
 @bp.route('/warehouses/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_warehouse(id):
-    warehouse = Warehouse.query.get_or_404(id)
+    warehouse = db.session.get(Warehouse, id)
+    if warehouse is None:
+        abort(404)
     form = WarehouseForm(obj=warehouse)
 
     if form.validate_on_submit():
@@ -251,7 +261,9 @@ def edit_warehouse(id):
 @bp.route('/warehouses/<int:id>/delete', methods=['POST'])
 @login_required
 def delete_warehouse(id):
-    warehouse = Warehouse.query.get_or_404(id)
+    warehouse = db.session.get(Warehouse, id)
+    if warehouse is None:
+        abort(404)
 
     # 检查是否有库存记录
     if (len(warehouse.stock_ins) > 0 or len(warehouse.stock_outs) > 0

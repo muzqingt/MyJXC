@@ -3,6 +3,7 @@ from app import db
 
 
 class Receipt(db.Model):
+    """收款单"""
     __tablename__ = 'receipts'
     id = db.Column(db.Integer, primary_key=True)
     receipt_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
@@ -24,6 +25,7 @@ class Receipt(db.Model):
 
 
 class Payment(db.Model):
+    """付款单"""
     __tablename__ = 'payments'
     id = db.Column(db.Integer, primary_key=True)
     payment_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
@@ -45,6 +47,7 @@ class Payment(db.Model):
 
 
 class Expense(db.Model):
+    """费用单"""
     __tablename__ = 'expenses'
     id = db.Column(db.Integer, primary_key=True)
     expense_number = db.Column(db.String(50), unique=True, nullable=False, index=True)

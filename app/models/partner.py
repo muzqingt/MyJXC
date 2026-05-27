@@ -3,6 +3,7 @@ from app import db
 
 
 class Supplier(db.Model):
+    """供应商"""
     __tablename__ = 'suppliers'
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(50), unique=True, nullable=False, index=True)
@@ -19,6 +20,7 @@ class Supplier(db.Model):
 
 
 class Customer(db.Model):
+    """客户"""
     __tablename__ = 'customers'
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(50), unique=True, nullable=False, index=True)
@@ -35,6 +37,7 @@ class Customer(db.Model):
 
 
 class Warehouse(db.Model):
+    """仓库"""
     __tablename__ = 'warehouses'
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(50), unique=True, nullable=False, index=True)

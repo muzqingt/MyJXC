@@ -1,14 +1,13 @@
 """
 main - 首页路由
 """
-from flask import Blueprint, render_template, redirect, url_for
+from flask import Blueprint, render_template
 from flask_login import login_required, current_user
 from datetime import datetime, timedelta
 from app import db
 from app.models import (
-    Product, PurchaseOrder, SalesOrder, 
-    StockIn, StockOut, Supplier, Customer,
-    PurchaseOrderItem, SalesOrderItem
+    Product, PurchaseOrder, SalesOrder,
+    StockIn, StockOut, Supplier, Customer
 )
 
 bp = Blueprint('main', __name__)

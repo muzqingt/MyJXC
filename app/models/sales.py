@@ -3,6 +3,7 @@ from app import db
 
 
 class SalesOrder(db.Model):
+    """销售订单"""
     __tablename__ = 'sales_orders'
     id = db.Column(db.Integer, primary_key=True)
     order_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
@@ -27,6 +28,7 @@ class SalesOrder(db.Model):
 
 
 class SalesOrderItem(db.Model):
+    """销售订单明细"""
     __tablename__ = 'sales_order_items'
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey('sales_orders.id'), nullable=False)
@@ -43,6 +45,7 @@ class SalesOrderItem(db.Model):
 
 
 class StockOut(db.Model):
+    """出库单"""
     __tablename__ = 'stock_outs'
     id = db.Column(db.Integer, primary_key=True)
     delivery_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
@@ -67,6 +70,7 @@ class StockOut(db.Model):
 
 
 class StockOutItem(db.Model):
+    """出库单明细"""
     __tablename__ = 'stock_out_items'
     id = db.Column(db.Integer, primary_key=True)
     stock_out_id = db.Column(db.Integer, db.ForeignKey('stock_outs.id'), nullable=False)

@@ -1,13 +1,13 @@
-from flask import render_template, redirect, url_for, flash, request, jsonify, Blueprint, make_response
+from flask import render_template, redirect, url_for, flash, request, jsonify, Blueprint, make_response, abort
 from flask_login import login_required, current_user
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from app import db
 from app.models import Receipt, Payment, Expense, Customer, Supplier, SalesOrder, PurchaseOrder, SalesOrderItem, PurchaseOrderItem, SalesReturn, PurchaseReturn
 from app.forms import ReceiptForm, PaymentForm, ExpenseForm
 from sqlalchemy import or_
-from decimal import Decimal, ROUND_HALF_UP
+from sqlalchemy.exc import SQLAlchemyError
 from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from openpyxl.styles import Font, PatternFill
 from app.utils import to_decimal, add_balance, sub_balance, generate_order_number, PAYMENT_METHOD_MAP, apply_excel_header_style, EXCEL_HEADER_FONT, EXCEL_HEADER_FILL, EXCEL_THIN_BORDER, EXCEL_HEADER_ALIGNMENT
 import io
 
@@ -125,7 +125,7 @@ def add_receipt():
         db.session.add(receipt)
 
         # 更新客户应收余额(收款减少应收)
-        customer = Customer.query.get(form.customer_id.data)
+        customer = db.session.get(Customer, form.customer_id.data)
         if customer:
             sub_balance(customer, "receivable_balance", form.amount.data)
 
@@ -191,7 +191,7 @@ def add_payment():
         db.session.add(payment)
 
         # 更新供应商应付余额(付款减少应付)
-        supplier = Supplier.query.get(form.supplier_id.data)
+        supplier = db.session.get(Supplier, form.supplier_id.data)
         if supplier:
             sub_balance(supplier, "payable_balance", form.amount.data)
 
@@ -259,12 +259,14 @@ def add_expense():
 @login_required
 def delete_expense(expense_id):
     """删除费用记录"""
-    expense = Expense.query.get_or_404(expense_id)
+    expense = db.session.get(Expense, expense_id)
+    if expense is None:
+        abort(404)
     try:
         db.session.delete(expense)
         db.session.commit()
         flash('费用记录已删除！', 'success')
-    except Exception as e:
+    except SQLAlchemyError as e:
         db.session.rollback()
         flash(f'删除失败: {str(e)}', 'danger')
     return redirect(url_for('finance.expenses'))
@@ -273,13 +275,13 @@ def delete_expense(expense_id):
 @login_required
 def profit_analysis():
     """利润分析"""
-    # 获取销售数据
+    # 按月汇总已完成订单的销售金额和采购金额
+    # 利润 = 销售金额 - 采购成本（毛利口径，不含费用）
     sales_data = db.session.query(
         db.func.strftime('%Y-%m', SalesOrder.order_date).label('month'),
         db.func.sum(SalesOrder.total_amount).label('sales_amount')
     ).filter(SalesOrder.status == 'completed').group_by('month').all()
 
-    # 获取采购数据
     purchase_data = db.session.query(
         db.func.strftime('%Y-%m', PurchaseOrder.order_date).label('month'),
         db.func.sum(PurchaseOrder.total_amount).label('purchase_amount')
@@ -294,7 +296,9 @@ def profit_analysis():
 @login_required
 def view_receipt(receipt_id):
     """查看收款详情"""
-    receipt = Receipt.query.get_or_404(receipt_id)
+    receipt = db.session.get(Receipt, receipt_id)
+    if receipt is None:
+        abort(404)
     return render_template('finance/receipt_view.html',
                          title='收款详情',
                          receipt=receipt,
@@ -305,7 +309,9 @@ def view_receipt(receipt_id):
 @login_required
 def edit_receipt(receipt_id):
     """编辑收款"""
-    receipt = Receipt.query.get_or_404(receipt_id)
+    receipt = db.session.get(Receipt, receipt_id)
+    if receipt is None:
+        abort(404)
     form = ReceiptForm(obj=receipt)
     form.customer_id.choices = [(0, '请选择客户')] + [(c.id, c.name) for c in Customer.query.all()]
 
@@ -320,18 +326,18 @@ def edit_receipt(receipt_id):
         receipt.reference_id = form.reference_id.data.strip() if form.reference_id.data else None
         receipt.notes = form.notes.data
 
-        # 更新客户应收余额
+        # 更新客户应收余额（收款减少应收）
         if original_customer_id != receipt.customer_id:
-            # 换了客户：回滚旧客户的余额，增加新客户的应收
-            old_customer = Customer.query.get(original_customer_id)
+            # 客户变更：回滚旧客户应收，扣减新客户应收
+            old_customer = db.session.get(Customer, original_customer_id)
             if old_customer:
                 add_balance(old_customer, "receivable_balance", original_amount)
-            new_customer = Customer.query.get(receipt.customer_id)
+            new_customer = db.session.get(Customer, receipt.customer_id)
             if new_customer:
                 sub_balance(new_customer, "receivable_balance", receipt.amount)
         elif original_amount != receipt.amount:
-            # 金额变化：调整当前客户余额（新收款-旧收款）
-            customer = Customer.query.get(receipt.customer_id)
+            # 金额变更：先回滚旧金额，再扣减新金额
+            customer = db.session.get(Customer, receipt.customer_id)
             if customer:
                 add_balance(customer, "receivable_balance", original_amount)
                 sub_balance(customer, "receivable_balance", receipt.amount)
@@ -364,7 +370,9 @@ def edit_receipt(receipt_id):
 @login_required
 def delete_receipt(receipt_id):
     """删除收款记录，同时回滚客户应收余额"""
-    receipt = Receipt.query.get_or_404(receipt_id)
+    receipt = db.session.get(Receipt, receipt_id)
+    if receipt is None:
+        abort(404)
     try:
         # 回滚客户应收余额（收款时减应收，删除时加回应收）
         customer = receipt.customer
@@ -373,7 +381,7 @@ def delete_receipt(receipt_id):
         db.session.delete(receipt)
         db.session.commit()
         flash('收款记录已删除！', 'success')
-    except Exception as e:
+    except SQLAlchemyError as e:
         db.session.rollback()
         flash(f'删除失败: {str(e)}', 'danger')
     return redirect(url_for('finance.receipts'))
@@ -382,7 +390,9 @@ def delete_receipt(receipt_id):
 @login_required
 def view_payment(payment_id):
     """查看付款详情"""
-    payment = Payment.query.get_or_404(payment_id)
+    payment = db.session.get(Payment, payment_id)
+    if payment is None:
+        abort(404)
     return render_template('finance/payment_view.html',
                          title='付款详情',
                          payment=payment,
@@ -393,7 +403,9 @@ def view_payment(payment_id):
 @login_required
 def edit_payment(payment_id):
     """编辑付款"""
-    payment = Payment.query.get_or_404(payment_id)
+    payment = db.session.get(Payment, payment_id)
+    if payment is None:
+        abort(404)
     form = PaymentForm(obj=payment)
     form.supplier_id.choices = [(0, '请选择供应商')] + [(s.id, s.name) for s in Supplier.query.all()]
 
@@ -408,18 +420,18 @@ def edit_payment(payment_id):
         payment.reference_id = form.reference_id.data.strip() if form.reference_id.data else None
         payment.notes = form.notes.data
 
-        # 更新供应商应付余额
+        # 更新供应商应付余额（付款减少应付）
         if original_supplier_id != payment.supplier_id:
-            # 换了供应商：回滚旧供应商的余额，增加新供应商的应付
-            old_supplier = Supplier.query.get(original_supplier_id)
+            # 供应商变更：回滚旧供应商应付，扣减新供应商应付
+            old_supplier = db.session.get(Supplier, original_supplier_id)
             if old_supplier:
                 add_balance(old_supplier, "payable_balance", original_amount)
-            new_supplier = Supplier.query.get(payment.supplier_id)
+            new_supplier = db.session.get(Supplier, payment.supplier_id)
             if new_supplier:
                 sub_balance(new_supplier, "payable_balance", payment.amount)
         elif original_amount != payment.amount:
-            # 金额变化：调整当前供应商余额（回滚旧金额，记录新金额）
-            supplier = Supplier.query.get(payment.supplier_id)
+            # 金额变更：先回滚旧金额，再扣减新金额
+            supplier = db.session.get(Supplier, payment.supplier_id)
             if supplier:
                 add_balance(supplier, "payable_balance", original_amount)
                 sub_balance(supplier, "payable_balance", payment.amount)
@@ -452,7 +464,9 @@ def edit_payment(payment_id):
 @login_required
 def delete_payment(payment_id):
     """删除付款记录，同时回滚供应商应付余额"""
-    payment = Payment.query.get_or_404(payment_id)
+    payment = db.session.get(Payment, payment_id)
+    if payment is None:
+        abort(404)
     try:
         # 回滚供应商应付余额（付款减少应付，删除时加回）
         supplier = payment.supplier
@@ -461,7 +475,7 @@ def delete_payment(payment_id):
         db.session.delete(payment)
         db.session.commit()
         flash('付款记录已删除！', 'success')
-    except Exception as e:
+    except SQLAlchemyError as e:
         db.session.rollback()
         flash(f'删除失败: {str(e)}', 'danger')
     return redirect(url_for('finance.payments'))
@@ -521,9 +535,11 @@ def ar_ap_search():
     supplier_payments = []
     supplier_orders = []
 
-    # 按客户检索应收
+    # 按客户检索应收：关联查询销售订单、收款记录、退货记录
     if customer_id:
-        customer_info = Customer.query.get_or_404(customer_id)
+        customer_info = db.session.get(Customer, customer_id)
+        if customer_info is None:
+            abort(404)
         # 获取该客户的所有销售订单(非草稿、非取消状态)
         customer_orders = SalesOrder.query.filter(
             SalesOrder.customer_id == customer_id,
@@ -553,12 +569,14 @@ def ar_ap_search():
             SalesReturn.status == 'completed'
         ).order_by(SalesReturn.return_date.desc()).all() if customer_order_ids else []
         customer_return_amount = sum(to_decimal(r.total_amount) for r in customer_returns)
-        # 计算应收余额 = 订单总额 - 已收款 - 退货金额
+        # 应收余额 = 订单总额 - 已收款总额 - 退货金额
         customer_ar_balance = customer_total_amount - customer_received_amount - customer_return_amount
 
-    # 按供应商检索应付
+    # 按供应商检索应付：关联查询采购订单、付款记录、退货记录
     if supplier_id:
-        supplier_info = Supplier.query.get_or_404(supplier_id)
+        supplier_info = db.session.get(Supplier, supplier_id)
+        if supplier_info is None:
+            abort(404)
         # 获取该供应商的所有采购订单(非草稿、非取消状态)
         supplier_orders = PurchaseOrder.query.filter(
             PurchaseOrder.supplier_id == supplier_id,
@@ -588,7 +606,7 @@ def ar_ap_search():
             PurchaseReturn.status == 'completed'
         ).order_by(PurchaseReturn.return_date.desc()).all() if supplier_order_ids else []
         supplier_return_amount = sum(to_decimal(r.total_amount) for r in supplier_returns)
-        # 计算应付余额 = 订单总额 - 已付款 - 退货金额
+        # 应付余额 = 订单总额 - 已付款总额 - 退货金额
         supplier_ap_balance = supplier_total_amount - supplier_paid_amount - supplier_return_amount
 
     return render_template('finance/ar_ap_search.html',
@@ -616,7 +634,9 @@ def ar_ap_search():
 @login_required
 def customer_ar_detail(customer_id):
     """获取客户应收详情API"""
-    customer = Customer.query.get_or_404(customer_id)
+    customer = db.session.get(Customer, customer_id)
+    if customer is None:
+        abort(404)
     receipts = Receipt.query.filter_by(customer_id=customer_id).order_by(Receipt.receipt_date.desc()).all()
     orders = SalesOrder.query.filter_by(customer_id=customer_id).order_by(SalesOrder.order_date.desc()).all()
 
@@ -653,7 +673,9 @@ def customer_ar_detail(customer_id):
 @login_required
 def supplier_ap_detail(supplier_id):
     """获取供应商应付详情API"""
-    supplier = Supplier.query.get_or_404(supplier_id)
+    supplier = db.session.get(Supplier, supplier_id)
+    if supplier is None:
+        abort(404)
     payments = Payment.query.filter_by(supplier_id=supplier_id).order_by(Payment.payment_date.desc()).all()
     orders = PurchaseOrder.query.filter_by(supplier_id=supplier_id).order_by(PurchaseOrder.order_date.desc()).all()
 
@@ -691,7 +713,9 @@ def supplier_ap_detail(supplier_id):
 def export_customer_ar(customer_id):
     """导出客户应收报表"""
     # TODO: 添加业务级权限检查，例如检查当前用户是否有权访问该客户的数据
-    customer = Customer.query.get_or_404(customer_id)
+    customer = db.session.get(Customer, customer_id)
+    if customer is None:
+        abort(404)
 
     # 获取销售订单
     orders = SalesOrder.query.filter(
@@ -1059,7 +1083,9 @@ def export_expenses():
 def export_supplier_ap(supplier_id):
     """导出供应商应付报表"""
     # TODO: 添加业务级权限检查，例如检查当前用户是否有权访问该供应商的数据
-    supplier = Supplier.query.get_or_404(supplier_id)
+    supplier = db.session.get(Supplier, supplier_id)
+    if supplier is None:
+        abort(404)
 
     # 获取采购订单
     orders = PurchaseOrder.query.filter(
