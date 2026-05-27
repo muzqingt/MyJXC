@@ -384,7 +384,7 @@ def export_warehouse_stock(warehouse_id):
         ws.cell(row=row_idx, column=6).number_format = '#,##0.00'
         ws.cell(row=row_idx, column=7, value=float(product.purchase_price or 0)).border = thin_border
         ws.cell(row=row_idx, column=7).number_format = '#,##0.02'
-        ws.cell(row=row_idx, column=8, value=float(product.sales_price or 0)).border = thin_border
+        ws.cell(row=row_idx, column=8, value=float(product.sale_price or 0)).border = thin_border
         ws.cell(row=row_idx, column=8).number_format = '#,##0.02'
         ws.cell(row=row_idx, column=9, value=status).border = thin_border
 

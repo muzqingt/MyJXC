@@ -523,9 +523,20 @@ def delete_order(id):
         flash('此订单有关联的入库单,无法删除!', 'danger')
         return redirect(url_for('purchase.index', tab=get_redirect_tab()))
 
-    # 检查是否有付款记录（通过 reference_type=order.id 关联）
+    # 检查是否有付款记录（reference_id 为逗号分隔的字符串，需模糊匹配）
     from app.models import Payment
-    if Payment.query.filter_by(reference_type='purchase_order', reference_id=order.id).first():
+    from sqlalchemy import or_
+    oid = str(order.id)
+    if Payment.query.filter(
+        Payment.reference_type == 'purchase_order',
+        Payment.reference_id.isnot(None),
+        or_(
+            Payment.reference_id == oid,
+            Payment.reference_id.like(f'{oid},%'),
+            Payment.reference_id.like(f'%,{oid},%'),
+            Payment.reference_id.like(f'%,{oid}'),
+        )
+    ).first():
         flash('此订单已有付款记录，无法删除！', 'danger')
         return redirect(url_for('purchase.index', tab=get_redirect_tab()))
 
@@ -533,6 +544,11 @@ def delete_order(id):
     from app.models import StockLog
     if StockLog.query.filter_by(reference_type='purchase_order', reference_id=order.id).first():
         flash('此订单已有库存操作记录，无法删除！', 'danger')
+        return redirect(url_for('purchase.index', tab=get_redirect_tab()))
+
+    # 检查是否已退货
+    if PurchaseReturn.query.filter_by(purchase_order_id=id, status='completed').first():
+        flash('此订单已退货，无法删除！', 'danger')
         return redirect(url_for('purchase.index', tab=get_redirect_tab()))
 
     # 只有已完成的订单才需要回滚供应商应付余额（confirmed/partial 未实际入库，无余额记录）
@@ -668,7 +684,7 @@ def quick_stock_in(id):
             # 更新供应商应付余额
             supplier = order.supplier
             if supplier:
-                add_balance(supplier, "payable_balance", total_amount)
+                add_balance(supplier, "payable_balance", float(order.total_amount))
         else:
             order.status = 'partial'
 
@@ -1007,6 +1023,10 @@ def complete_stock_in(id):
             )
             db.session.add(log)
 
+        # 先更新入库单状态为已完成（必须在前，receive_quantity 只统计已完成的单）
+        stock_in.status = 'completed'
+        stock_in.updated_at = datetime.now()
+
         # 如果有关联采购订单,重新计算已入库数量(基于所有已完成入库单)
         if stock_in.purchase_order:
             order = stock_in.purchase_order
@@ -1028,16 +1048,12 @@ def complete_stock_in(id):
 
             if all_received:
                 order.status = 'completed'
-                # 更新供应商应付余额
+                # 更新供应商应付余额（使用订单总额，而非仅本次入库金额）
                 supplier = order.supplier
                 if supplier:
-                    add_balance(supplier, "payable_balance", stock_in.total_amount)
+                    add_balance(supplier, "payable_balance", float(order.total_amount))
             else:
                 order.status = 'partial'
-
-        # 更新入库单状态为已完成
-        stock_in.status = 'completed'
-        stock_in.updated_at = datetime.now()
 
         db.session.commit()
         flash('入库单完成!库存已更新。', 'success')

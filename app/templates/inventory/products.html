@@ -6,16 +6,14 @@
 
 {% block actions %}
 <div class="btn-group">
-    <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
-        <i class="bi bi-filter"></i> 筛选
+    <button type="button" class="btn btn-outline-primary dropdown-toggle" id="filterDropdown" data-bs-toggle="dropdown">
+        <i class="bi bi-filter"></i> <span id="filterLabel">全部商品</span>
     </button>
     <ul class="dropdown-menu">
-        <li><a class="dropdown-item" href="#">全部商品</a></li>
-        <li><a class="dropdown-item" href="#">低库存商品</a></li>
-        <li><a class="dropdown-item" href="#">零库存商品</a></li>
-        <li><hr class="dropdown-divider"></li>
-        <li><a class="dropdown-item" href="#">按分类筛选</a></li>
-        <li><a class="dropdown-item" href="#">按分类筛选</a></li>
+        <li><a class="dropdown-item" href="#" data-filter="all">全部商品</a></li>
+        <li><a class="dropdown-item" href="#" data-filter="normal">正常库存</a></li>
+        <li><a class="dropdown-item" href="#" data-filter="warning">低库存商品</a></li>
+        <li><a class="dropdown-item" href="#" data-filter="danger">缺货商品</a></li>
     </ul>
     <button type="button" class="btn btn-outline-primary" onclick="exportProducts()">
         <i class="bi bi-download"></i> 导出
@@ -237,8 +235,50 @@ function exportProducts() {
     window.location.href = '{{ url_for("report.export_products") }}';
 }
 
+function filterProducts(filter) {
+    // 只筛选第一个表格（商品库存表格）
+    var table = document.querySelector('.table-responsive .table tbody');
+    if (!table) return;
+    var rows = table.querySelectorAll('tr');
+    var visibleCount = 0;
+
+    rows.forEach(function(row) {
+        var statusBadge = row.querySelector('td:nth-child(9) .badge');
+        // 跳过"暂无数据"行
+        if (!statusBadge) {
+            if (row.querySelector('td[colspan]')) {
+                row.style.display = filter === 'all' ? '' : 'none';
+            }
+            return;
+        }
+        var status = statusBadge.textContent.trim();
+
+        if (filter === 'all' ||
+            (filter === 'normal' && status === '正常') ||
+            (filter === 'warning' && status === '低库存') ||
+            (filter === 'danger' && status === '缺货') ||
+            (filter === 'unknown' && status === '未知')) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
 $(document).ready(function() {
-    console.log('商品库存页面加载完成');
+    // 下拉筛选点击事件
+    document.querySelectorAll('.dropdown-menu .dropdown-item').forEach(function(item) {
+        item.addEventListener('click', function(e) {
+            e.preventDefault();
+            var filter = this.getAttribute('data-filter');
+            if (filter) {
+                filterProducts(filter);
+                // 更新按钮文字
+                document.getElementById('filterLabel').textContent = this.textContent;
+            }
+        });
+    });
 });
 </script>
 {% endblock %}

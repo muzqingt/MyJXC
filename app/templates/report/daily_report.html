@@ -133,7 +133,7 @@
 
 <!-- 趋势分析 -->
 <div class="row mt-4">
-    <div class="col-md-12">
+    <div class="col-md-6">
         <div class="card">
             <div class="card-header">
                 <h5 class="card-title mb-0">近7天趋势</h5>
@@ -143,7 +143,22 @@
                     <canvas id="trendChart"></canvas>
                 </div>
                 <div id="trendChartLoading" class="text-center text-muted py-3">
-                    <i class="fas fa-spinner fa-spin"></i> 加载中...
+                    加载中...
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">近12个月趋势</h5>
+            </div>
+            <div class="card-body">
+                <div style="height: 300px; position: relative;">
+                    <canvas id="monthlyChart"></canvas>
+                </div>
+                <div id="monthlyChartLoading" class="text-center text-muted py-3">
+                    加载中...
                 </div>
             </div>
         </div>
@@ -169,9 +184,18 @@
                             </tr>
                         </thead>
                         <tbody>
+                            {% for order in daily_sales_orders %}
+                            <tr>
+                                <td>{{ format_local_dt(order.created_at) }}</td>
+                                <td><a href="{{ url_for('sales.view_order', id=order.id) }}">{{ order.order_number }}</a></td>
+                                <td>{{ order.customer.name if order.customer else '-' }}</td>
+                                <td class="text-end">¥{{ "%.2f"|format(order.total_amount) }}</td>
+                            </tr>
+                            {% else %}
                             <tr>
                                 <td colspan="4" class="text-center text-muted">暂无当日销售明细数据</td>
                             </tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
@@ -195,9 +219,18 @@
                             </tr>
                         </thead>
                         <tbody>
+                            {% for order in daily_purchase_orders %}
+                            <tr>
+                                <td>{{ format_local_dt(order.created_at) }}</td>
+                                <td><a href="{{ url_for('purchase.view_order', id=order.id) }}">{{ order.order_number }}</a></td>
+                                <td>{{ order.supplier.name if order.supplier else '-' }}</td>
+                                <td class="text-end">¥{{ "%.2f"|format(order.total_amount) }}</td>
+                            </tr>
+                            {% else %}
                             <tr>
                                 <td colspan="4" class="text-center text-muted">暂无当日采购明细数据</td>
                             </tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
@@ -215,40 +248,17 @@ function loadDailyReport() {
     window.location.href = "{{ url_for('report.daily_report') }}?date=" + date;
 }
 
-$(document).ready(function() {
-    // 设置日期选择器的最大值为今天
-    var today = new Date().toISOString().split('T')[0];
-    document.getElementById('reportDate').max = today;
-    
-    // 加载趋势图表
-    loadTrendChart();
-});
-
-function loadTrendChart() {
-    $.ajax({
-        url: "{{ url_for('report.sales_trend_api') }}",
-        type: 'GET',
-        data: { days: 7 },
-        success: function(data) {
-            drawTrendChart(data);
-            $('#trendChartLoading').hide();
-        },
-        error: function() {
-            $('#trendChartLoading').html('<span class="text-danger">加载失败</span>');
-        }
-    });
-}
-
-function drawTrendChart(data) {
-    var ctx = document.getElementById('trendChart').getContext('2d');
-    var labels = data.map(function(item) { return item.month; });
+function createLineChart(canvasId, data, loadingId) {
+    var ctx = document.getElementById(canvasId).getContext('2d');
+    var labels = data.map(function(item) { return item.label; });
     var salesData = data.map(function(item) { return item.amount; });
-    
+
     if (salesData.length === 0 || salesData.every(function(a) { return a === 0; })) {
-        $('#trendChartLoading').html('<span class="text-muted">暂无趋势数据</span>');
+        $('#' + loadingId).html('<span class="text-muted">暂无趋势数据</span>');
         return;
     }
-    
+    $('#' + loadingId).hide();
+
     new Chart(ctx, {
         type: 'line',
         data: {
@@ -288,5 +298,35 @@ function drawTrendChart(data) {
         }
     });
 }
+
+$(document).ready(function() {
+    var today = new Date().toISOString().split('T')[0];
+    document.getElementById('reportDate').max = today;
+
+    // 加载近7天趋势
+    $.ajax({
+        url: "{{ url_for('report.sales_trend_api') }}",
+        type: 'GET',
+        data: { days: 7 },
+        success: function(data) {
+            createLineChart('trendChart', data, 'trendChartLoading');
+        },
+        error: function() {
+            $('#trendChartLoading').html('<span class="text-danger">加载失败</span>');
+        }
+    });
+
+    // 加载近12个月趋势
+    $.ajax({
+        url: "{{ url_for('report.sales_trend_api') }}",
+        type: 'GET',
+        success: function(data) {
+            createLineChart('monthlyChart', data, 'monthlyChartLoading');
+        },
+        error: function() {
+            $('#monthlyChartLoading').html('<span class="text-danger">加载失败</span>');
+        }
+    });
+});
 </script>
 {% endblock %}

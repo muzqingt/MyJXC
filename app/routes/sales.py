@@ -517,9 +517,20 @@ def delete_order(id):
         flash('此订单有关联的发货单，无法删除！', 'danger')
         return redirect(url_for('sales.index'))
 
-    # 检查是否有收款记录（通过 reference_type=order.id 关联）
+    # 检查是否有收款记录（reference_id 为逗号分隔的字符串，需模糊匹配）
     from app.models import Receipt
-    if Receipt.query.filter_by(reference_type='sales_order', reference_id=order.id).first():
+    from sqlalchemy import or_
+    oid = str(order.id)
+    if Receipt.query.filter(
+        Receipt.reference_type == 'sales_order',
+        Receipt.reference_id.isnot(None),
+        or_(
+            Receipt.reference_id == oid,
+            Receipt.reference_id.like(f'{oid},%'),
+            Receipt.reference_id.like(f'%,{oid},%'),
+            Receipt.reference_id.like(f'%,{oid}'),
+        )
+    ).first():
         flash('此订单已有收款记录，无法删除！', 'danger')
         return redirect(url_for('sales.index'))
 
@@ -527,7 +538,12 @@ def delete_order(id):
     if StockLog.query.filter_by(reference_type='sales_order', reference_id=order.id).first():
         flash('此订单已有库存操作记录，无法删除！', 'danger')
         return redirect(url_for('sales.index'))
-    
+
+    # 检查是否已退货
+    if SalesReturn.query.filter_by(sales_order_id=id, status='completed').first():
+        flash('此订单已退货，无法删除！', 'danger')
+        return redirect(url_for('sales.index'))
+
     # 回滚客户应收余额（订单创建时已累加）
     customer = order.customer
     # 只有已完成的订单才需要回滚应收余额（confirmed/partial 未实际出库，无余额记录）
@@ -665,9 +681,9 @@ def quick_stock_out(id):
         )
         
         if all_delivered:
-            # confirmed → completed：补记应收余额（confirmed时尚未记应收）
-            if order.status == 'confirmed' and order.customer:
-                add_balance(order.customer, "receivable_balance", order.total_amount)
+            # 订单首次完成时补记应收余额（非completed→completed不重复记）
+            if order.customer:
+                add_balance(order.customer, "receivable_balance", float(order.total_amount))
             order.status = 'completed'
         else:
             order.status = 'partial'
@@ -989,6 +1005,10 @@ def complete_stock_out(id):
             )
             db.session.add(log)
         
+        # 先更新出库单状态为已完成（必须在前，delivered_quantity 只统计已完成的单）
+        stock_out.status = 'completed'
+        stock_out.updated_at = datetime.now()
+
         # 如果有关联销售订单，重新计算已出库数量（基于所有已完成出库单）
         if stock_out.sales_order:
             order = stock_out.sales_order
@@ -1010,16 +1030,13 @@ def complete_stock_out(id):
             
             if all_delivered:
                 order.status = 'completed'
-                # 更新客户应收余额
+                # 更新客户应收余额（使用订单总额，而非仅本次出库金额）
                 customer = order.customer
                 if customer:
-                    add_balance(customer, "receivable_balance", stock_out.total_amount)
+                    add_balance(customer, "receivable_balance", float(order.total_amount))
             else:
                 order.status = 'partial'
-        
-        # 更新出库单状态为已完成
-        stock_out.status = 'completed'
-        stock_out.updated_at = datetime.now()
+
         
         db.session.commit()
         flash('出库单完成！库存已更新。', 'success')
@@ -1130,7 +1147,6 @@ def quick_return(id):
             before_quantity = float(product.stock_quantity)
             after_quantity = before_quantity + return_qty
             product.stock_quantity = after_quantity
-            product.sale_price = unit_price
 
             log = StockLog(
                 product_id=product.id,

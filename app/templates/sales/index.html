@@ -32,7 +32,7 @@
                         <label class="form-label">订单状态</label>
                         <select class="form-select" name="status">
                             <option value="">全部状态</option>
-                            <option value="pending" {% if status == 'pending' %}selected{% endif %}>未出库</option>
+                            <option value="confirmed" {% if status == 'confirmed' %}selected{% endif %}>未出库</option>
                             <option value="partial" {% if status == 'partial' %}selected{% endif %}>部分出库</option>
                             <option value="completed" {% if status == 'completed' %}selected{% endif %}>已完成</option>
                         </select>

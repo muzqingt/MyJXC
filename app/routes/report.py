@@ -212,22 +212,61 @@ def daily_report():
     daily_receipts = db.session.query(
         db.func.sum(Receipt.amount).label('total_receipts')
     ).filter(db.func.date(Receipt.receipt_date) == report_date).first()
+
+    # 当日销售订单明细
+    daily_sales_orders = SalesOrder.query.filter(
+        db.func.date(SalesOrder.order_date) == report_date,
+        SalesOrder.status == 'completed'
+    ).order_by(SalesOrder.created_at.desc()).all()
+
+    # 当日采购订单明细
+    daily_purchase_orders = PurchaseOrder.query.filter(
+        db.func.date(PurchaseOrder.order_date) == report_date,
+        PurchaseOrder.status == 'completed'
+    ).order_by(PurchaseOrder.created_at.desc()).all()
     
     return render_template('report/daily_report.html',
                          title='经营日报',
                          report_date=report_date,
                          daily_sales=daily_sales,
                          daily_purchase=daily_purchase,
-                         daily_receipts=daily_receipts)
+                         daily_receipts=daily_receipts,
+                         daily_sales_orders=daily_sales_orders,
+                         daily_purchase_orders=daily_purchase_orders)
 
 @bp.route('/api/sales-trend')
 @login_required
 def sales_trend_api():
-    """销售趋势API"""
-    # 获取最近12个月的销售数据
+    """销售趋势API，支持按天(days=N)或按月(默认最近12个月)"""
+    days = request.args.get('days', type=int)
+
+    if days:
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=days - 1)
+        # 按天聚合
+        sales_trend = db.session.query(
+            db.func.date(SalesOrder.order_date).label('day'),
+            db.func.sum(SalesOrder.total_amount).label('amount')
+        ).filter(SalesOrder.order_date.between(start_date, end_date))\
+         .filter(SalesOrder.status == 'completed')\
+         .group_by('day')\
+         .order_by('day').all()
+        # 补全无数据的日期
+        result_data = {}
+        for item in sales_trend:
+            result_data[str(item.day)] = float(item.amount or 0)
+        result = []
+        current = start_date
+        while current <= end_date:
+            key = current.strftime('%Y-%m-%d')
+            result.append({'label': current.strftime('%m-%d'), 'amount': result_data.get(key, 0)})
+            current += timedelta(days=1)
+        return jsonify(result)
+
+    # 默认按月聚合，最近12个月
     end_date = datetime.now().date()
     start_date = end_date - timedelta(days=365)
-    
+
     sales_trend = db.session.query(
         db.func.strftime('%Y-%m', SalesOrder.order_date).label('month'),
         db.func.sum(SalesOrder.total_amount).label('amount')
@@ -235,8 +274,8 @@ def sales_trend_api():
      .filter(SalesOrder.status == 'completed')\
      .group_by('month')\
      .order_by('month').all()
-    
-    result = [{'month': item.month, 'amount': float(item.amount or 0)} for item in sales_trend]
+
+    result = [{'label': item.month, 'amount': float(item.amount or 0)} for item in sales_trend]
     return jsonify(result)
 
 # ==================== 导出功能 ====================

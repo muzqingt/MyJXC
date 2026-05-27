@@ -348,10 +348,11 @@ def edit_receipt(receipt_id):
             if new_customer:
                 sub_balance(new_customer, "receivable_balance", receipt.amount)
         elif original_amount != receipt.amount:
-            # 金额变化：调整当前客户余额
+            # 金额变化：调整当前客户余额（新收款-旧收款）
             customer = Customer.query.get(receipt.customer_id)
             if customer:
-                sub_balance(customer, "receivable_balance", receipt.amount - original_amount)
+                add_balance(customer, "receivable_balance", original_amount)
+                sub_balance(customer, "receivable_balance", receipt.amount)
 
         db.session.commit()
         flash('收款记录已更新成功!', 'success')
@@ -435,10 +436,11 @@ def edit_payment(payment_id):
             if new_supplier:
                 sub_balance(new_supplier, "payable_balance", payment.amount)
         elif original_amount != payment.amount:
-            # 金额变化：调整当前供应商余额
+            # 金额变化：调整当前供应商余额（回滚旧金额，记录新金额）
             supplier = Supplier.query.get(payment.supplier_id)
             if supplier:
-                sub_balance(supplier, "payable_balance", payment.amount - original_amount)
+                add_balance(supplier, "payable_balance", original_amount)
+                sub_balance(supplier, "payable_balance", payment.amount)
 
         db.session.commit()
         flash('付款记录已更新成功!', 'success')
@@ -718,10 +720,18 @@ def export_customer_ar(customer_id):
     # 获取收款记录
     receipts = Receipt.query.filter_by(customer_id=customer_id).order_by(Receipt.receipt_date.desc()).all()
 
+    # 计算退货金额
+    customer_order_ids = [o.id for o in orders]
+    return_records = SalesReturn.query.filter(
+        SalesReturn.sales_order_id.in_(customer_order_ids),
+        SalesReturn.status == 'completed'
+    ).all() if customer_order_ids else []
+    return_amount = sum(to_decimal(r.total_amount) for r in return_records)
+
     # 计算金额
     total_amount = sum(to_decimal(o.total_amount) for o in orders)
     received_amount = sum(to_decimal(r.amount) for r in receipts)
-    balance = total_amount - received_amount
+    balance = total_amount - received_amount - return_amount
 
     # 创建工作簿
     wb = Workbook()
@@ -748,9 +758,12 @@ def export_customer_ar(customer_id):
     ws['A6'] = '已收金额'
     ws['B6'] = received_amount
     ws['B6'].number_format = money_format
-    ws['A7'] = '应收余额'
-    ws['B7'] = balance
+    ws['A7'] = '退货金额'
+    ws['B7'] = return_amount
     ws['B7'].number_format = money_format
+    ws['A8'] = '应收余额'
+    ws['B8'] = balance
+    ws['B8'].number_format = money_format
 
     # 销售订单
     ws.append([])
@@ -1152,10 +1165,18 @@ def export_supplier_ap(supplier_id):
     # 获取付款记录
     payments = Payment.query.filter_by(supplier_id=supplier_id).order_by(Payment.payment_date.desc()).all()
 
+    # 计算退货金额
+    supplier_order_ids = [o.id for o in orders]
+    return_records = PurchaseReturn.query.filter(
+        PurchaseReturn.purchase_order_id.in_(supplier_order_ids),
+        PurchaseReturn.status == 'completed'
+    ).all() if supplier_order_ids else []
+    return_amount = sum(float(r.total_amount) for r in return_records)
+
     # 计算金额
     total_amount = sum(float(o.total_amount) for o in orders)
     paid_amount = sum(float(p.amount) for p in payments)
-    balance = total_amount - paid_amount
+    balance = total_amount - paid_amount - return_amount
 
     # 创建工作簿
     wb = Workbook()
@@ -1182,9 +1203,12 @@ def export_supplier_ap(supplier_id):
     ws['A6'] = '已付金额'
     ws['B6'] = paid_amount
     ws['B6'].number_format = money_format
-    ws['A7'] = '应付余额'
-    ws['B7'] = balance
+    ws['A7'] = '退货金额'
+    ws['B7'] = return_amount
     ws['B7'].number_format = money_format
+    ws['A8'] = '应付余额'
+    ws['B8'] = balance
+    ws['B8'].number_format = money_format
 
     # 采购订单
     ws.append([])
