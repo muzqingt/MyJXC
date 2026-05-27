@@ -2,7 +2,7 @@ from flask import render_template, redirect, url_for, flash, request, jsonify, B
 from flask_login import login_required, current_user
 from datetime import datetime, timedelta
 from app import db
-from app.models import Product, SalesOrder, PurchaseOrder, Customer, Supplier, Receipt, PurchaseOrderItem, SalesOrderItem
+from app.models import Product, SalesOrder, PurchaseOrder, Customer, Supplier, Receipt, PurchaseOrderItem, SalesOrderItem, StockLog
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment
 from app.utils import EXCEL_HEADER_FONT, EXCEL_HEADER_FILL, EXCEL_THIN_BORDER, EXCEL_HEADER_ALIGNMENT
@@ -75,19 +75,35 @@ def inventory_report():
      .filter(SalesOrder.status == 'completed')\
      .group_by(Product.id).all()
     
-    # 合并数据
+    stock_in_types = ('in', 'check_in', 'adjust_in', 'return_in')
+    stock_out_types = ('out', 'check_out', 'adjust_out', 'stock_transfer', 'return_out')
+    net_changes_raw = db.session.query(
+        StockLog.product_id,
+        db.func.sum(
+            db.case(
+                (StockLog.change_type.in_(stock_in_types), StockLog.quantity),
+                else_=-StockLog.quantity
+            )
+        ).label('net_change')
+    ).filter(
+        StockLog.created_at >= datetime.combine(start_date, datetime.min.time()),
+        StockLog.created_at < datetime.combine(end_date + timedelta(days=1), datetime.min.time())
+    ).group_by(StockLog.product_id).all()
+    net_changes = {row.product_id: float(row.net_change or 0) for row in net_changes_raw}
+
     report_data = []
     for product in Product.query.all():
         purchase = next((p for p in purchase_data if p.id == product.id), None)
         sales = next((s for s in sales_data if s.id == product.id), None)
-        
+        net_change = net_changes.get(product.id, 0)
+        current_stock = float(product.stock_quantity or 0)
+
         report_data.append({
             'id': product.id,
             'code': product.code,
             'name': product.name,
             'unit': product.unit,
-            # 期初库存 = 期末库存 - 本期采购入库 + 本期销售出库（反推法）
-            'beginning_stock': float(Decimal(str(product.stock_quantity or 0)) - Decimal(str(purchase.purchase_quantity if purchase else 0)) + Decimal(str(sales.sales_quantity if sales else 0))),
+            'beginning_stock': current_stock - net_change,
             'purchase_quantity': purchase.purchase_quantity if purchase else 0,
             'purchase_amount': float(purchase.purchase_amount) if purchase else 0,
             'sales_quantity': sales.sales_quantity if sales else 0,

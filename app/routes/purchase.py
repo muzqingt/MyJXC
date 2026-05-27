@@ -159,15 +159,25 @@ def new_order():
         # 生成订单号
         order_number = generate_order_number('PO', PurchaseOrder)
 
+        try:
+            parsed_order_date = datetime.strptime(order_date, '%Y-%m-%d').date()
+            parsed_expected_date = datetime.strptime(expected_date, '%Y-%m-%d').date() if expected_date else None
+        except ValueError:
+            flash('日期格式无效!', 'danger')
+            return redirect(url_for('purchase.new_order'))
+
+        if order_status not in ('draft', 'confirmed', 'completed'):
+            order_status = 'draft'
+
         order = PurchaseOrder(
             order_number=order_number,
             supplier_id=supplier_id,
             warehouse_id=warehouse_id,
-            order_date=datetime.strptime(order_date, '%Y-%m-%d').date(),
-            expected_date=datetime.strptime(expected_date, '%Y-%m-%d').date() if expected_date else None,
+            order_date=parsed_order_date,
+            expected_date=parsed_expected_date,
             notes=notes,
             created_by=current_user.id,
-            status='confirmed'
+            status='confirmed' if order_status == 'completed' else order_status
         )
 
         db.session.add(order)
@@ -275,19 +285,7 @@ def new_order():
             except SQLAlchemyError as e:
                 db.session.rollback()
                 flash(f'直接入库失败: {str(e)}', 'danger')
-                return render_template('purchase/order_items.html',
-                                     title='新建采购订单',
-                                     suppliers=partners_data,
-                                     warehouses=warehouses,
-                                     products=products_data,
-                                     action='new',
-                                     submitted_supplier_id=supplier_id,
-                                     submitted_warehouse_id=warehouse_id,
-                                     submitted_order_date=order_date,
-                                     submitted_expected_date=expected_date,
-                                     submitted_notes=notes,
-                                     order_items=order_items_list,
-                                     default_warehouse_id=default_warehouse_id)
+                return redirect(url_for('purchase.new_order'))
         else:
             flash('采购订单创建成功!', 'success')
 
@@ -380,8 +378,12 @@ def edit_order(id):
         old_supplier = order.supplier
         order.supplier_id = supplier_id
         order.warehouse_id = warehouse_id
-        order.order_date = datetime.strptime(order_date, '%Y-%m-%d').date()
-        order.expected_date = datetime.strptime(expected_date, '%Y-%m-%d').date() if expected_date else None
+        try:
+            order.order_date = datetime.strptime(order_date, '%Y-%m-%d').date()
+            order.expected_date = datetime.strptime(expected_date, '%Y-%m-%d').date() if expected_date else None
+        except ValueError:
+            flash('日期格式无效!', 'danger')
+            return redirect(url_for('purchase.edit_order', id=id))
         order.notes = notes
 
         # 更新商品明细（保留已入库数量，只删除本次移除的商品）
@@ -439,13 +441,22 @@ def edit_order(id):
                 if not new_supplier:
                     flash('供应商不存在', 'danger')
                     return redirect(url_for('purchase.edit_order', id=id))
+                if to_decimal(old_supplier.payable_balance) < original_total:
+                    flash('原供应商应付余额不足，无法完成此修改!', 'danger')
+                    return redirect(url_for('purchase.edit_order', id=id))
                 sub_balance(old_supplier, "payable_balance", original_total)
                 add_balance(new_supplier, "payable_balance", total_amount)
             elif old_supplier and old_supplier.id == supplier_id:
                 # 同供应商:调整差额
                 if original_total != total_amount:
                     diff = total_amount - original_total
-                    add_balance(old_supplier, "payable_balance", diff)
+                    if diff > 0:
+                        add_balance(old_supplier, "payable_balance", diff)
+                    else:
+                        if to_decimal(old_supplier.payable_balance) < abs(diff):
+                            flash('供应商应付余额不足，无法完成此修改!', 'danger')
+                            return redirect(url_for('purchase.edit_order', id=id))
+                        sub_balance(old_supplier, "payable_balance", abs(diff))
 
         if action == 'confirm':
             if len(product_ids) == 0 or total_amount == 0:

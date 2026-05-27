@@ -100,7 +100,11 @@ def stock_check():
             actual_quantities = request.form.getlist('actual_quantity[]')
             notes = request.form.get('notes', '')
             warehouse_id = int(request.form.get('warehouse_id') or 0)
-            
+
+            if len(actual_quantities) != len(product_ids):
+                flash('盘点数据不完整，请重新提交！', 'danger')
+                return redirect(url_for('inventory.stock_check'))
+
             # 校验仓库是否存在
             warehouse = db.session.get(Warehouse, warehouse_id)
             if not warehouse:

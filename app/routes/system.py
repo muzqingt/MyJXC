@@ -5,10 +5,14 @@ import shutil
 from datetime import datetime
 from app import db
 from app.models import Log, User
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
 # 创建蓝图
 bp = Blueprint('system', __name__, url_prefix='/system')
+
+def _require_admin():
+    if current_user.role != 'admin':
+        abort(403)
 
 def _safe_filename(filename):
     """确保文件名不包含路径遍历字符"""
@@ -47,10 +51,8 @@ def backup():
 @login_required
 def create_backup():
     """创建数据备份"""
-    if current_user.role != 'admin':
-        flash('只有管理员可以创建备份', 'danger')
-        return redirect(url_for('system.backup'))
-    
+    _require_admin()
+
     # 创建备份目录
     backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../backups')
     os.makedirs(backup_dir, exist_ok=True)
@@ -94,9 +96,8 @@ def create_backup():
 @login_required
 def list_backups():
     """列出所有备份文件"""
-    if current_user.role != 'admin':
-        return jsonify({'error': '权限不足'}), 403
-    
+    _require_admin()
+
     backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../backups')
     os.makedirs(backup_dir, exist_ok=True)
     
@@ -118,10 +119,8 @@ def list_backups():
 @login_required
 def download_backup(filename):
     """下载备份文件"""
-    if current_user.role != 'admin':
-        flash('只有管理员可以下载备份', 'danger')
-        return redirect(url_for('system.backup'))
-    
+    _require_admin()
+
     filename = _safe_filename(filename)
     if not filename:
         flash('无效的文件名', 'danger')
@@ -143,10 +142,8 @@ def download_backup(filename):
 @login_required
 def restore_backup():
     """恢复数据备份"""
-    if current_user.role != 'admin':
-        flash('只有管理员可以恢复备份', 'danger')
-        return redirect(url_for('system.backup'))
-    
+    _require_admin()
+
     filename = request.form.get('filename')
     if not filename:
         flash('请选择要恢复的备份文件', 'danger')
@@ -172,38 +169,26 @@ def restore_backup():
     try:
         current_backup = f'current_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db'
         shutil.copy2(db_path, os.path.join(backup_dir, current_backup))
-
-        db.session.remove()
-        try:
-            shutil.copy2(backup_path, db_path)
-        except OSError:
-            flash('数据恢复失败，请稍后重试', 'danger')
-            return redirect(url_for('system.backup'))
-
-        log = Log(
-            user_id=current_user.id,
-            action='恢复数据备份',
-            details=f'从备份文件恢复: {filename}',
-            ip_address=request.remote_addr
-        )
-        db.session.add(log)
-        db.session.commit()
-
-        flash(f'数据恢复成功，当前数据库已备份为: {current_backup}', 'success')
-    except (OSError, SQLAlchemyError):
-        db.session.rollback()
+    except OSError:
         flash('数据恢复失败，请稍后重试', 'danger')
+        return redirect(url_for('system.backup'))
 
+    db.session.remove()
+    try:
+        shutil.copy2(backup_path, db_path)
+    except OSError:
+        flash('数据恢复失败，请稍后重试', 'danger')
+        return redirect(url_for('system.backup'))
+
+    flash(f'数据恢复成功，当前数据库已备份为: {current_backup}', 'success')
     return redirect(url_for('system.backup'))
 
 @bp.route('/backup/delete', methods=['POST'])
 @login_required
 def delete_backup():
     """删除备份文件"""
-    if current_user.role != 'admin':
-        flash('只有管理员可以删除备份', 'danger')
-        return redirect(url_for('system.backup'))
-    
+    _require_admin()
+
     filename = request.form.get('filename')
     if not filename:
         flash('请选择要删除的备份文件', 'danger')
@@ -253,10 +238,8 @@ def delete_backup():
 @login_required
 def settings():
     """系统设置"""
-    if current_user.role != 'admin':
-        flash('只有管理员可以访问系统设置', 'danger')
-        return redirect(url_for('system.index'))
-    
+    _require_admin()
+
     from app.models import SystemSetting
     # 从数据库加载设置
     from app.models import Warehouse
@@ -278,10 +261,8 @@ def settings():
 @login_required
 def user_management():
     """用户管理"""
-    if current_user.role != 'admin':
-        flash('只有管理员可以管理用户', 'danger')
-        return redirect(url_for('system.index'))
-    
+    _require_admin()
+
     users = User.query.all()
     return render_template('system/users.html',
                          title='用户管理',
@@ -291,10 +272,8 @@ def user_management():
 @login_required
 def add_user():
     """添加用户"""
-    if current_user.role != 'admin':
-        flash('只有管理员可以添加用户', 'danger')
-        return redirect(url_for('system.users'))
-    
+    _require_admin()
+
     username = request.form.get('username')
     password = request.form.get('password')
     email = request.form.get('email')
@@ -314,21 +293,26 @@ def add_user():
     # 创建新用户
     user = User(username=username, email=email, role=role)
     user.set_password(password)
-    
-    db.session.add(user)
-    db.session.commit()
-    
-    flash('用户添加成功', 'success')
+
+    try:
+        db.session.add(user)
+        db.session.commit()
+        flash('用户添加成功', 'success')
+    except IntegrityError:
+        db.session.rollback()
+        flash('用户名或邮箱已存在', 'danger')
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('添加用户失败，请稍后重试', 'danger')
+
     return redirect(url_for('system.user_management'))
 
 @bp.route('/user/edit/<int:user_id>', methods=['GET', 'POST'])
 @login_required
 def edit_user(user_id):
     """编辑用户"""
-    if current_user.role != 'admin':
-        flash('只有管理员可以编辑用户', 'danger')
-        return redirect(url_for('system.users'))
-    
+    _require_admin()
+
     user = db.session.get(User, user_id)
     if user is None:
         abort(404)
@@ -355,10 +339,8 @@ def edit_user(user_id):
 @login_required
 def delete_user(user_id):
     """删除用户"""
-    if current_user.role != 'admin':
-        flash('只有管理员可以删除用户', 'danger')
-        return redirect(url_for('system.users'))
-    
+    _require_admin()
+
     if user_id == current_user.id:
         flash('不能删除当前登录用户', 'danger')
         return redirect(url_for('system.user_management'))
@@ -379,9 +361,8 @@ def delete_user(user_id):
 @login_required
 def system_info_api():
     """系统信息API"""
-    if current_user.role != 'admin':
-        return jsonify({'error': '权限不足'}), 403
-    
+    _require_admin()
+
     # 获取数据库大小
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../instance/store.db')
     db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
@@ -403,9 +384,8 @@ def system_info_api():
 @login_required
 def recent_logs():
     """获取最近系统日志"""
-    if current_user.role != 'admin':
-        return jsonify({'error': '权限不足'}), 403
-    
+    _require_admin()
+
     logs = Log.query.order_by(Log.created_at.desc()).limit(10).all()
     return jsonify([{
         'id': log.id,
@@ -419,9 +399,8 @@ def recent_logs():
 @login_required
 def optimize_db():
     """优化数据库"""
-    if current_user.role != 'admin':
-        return jsonify({'success': False, 'message': '权限不足'}), 403
-    
+    _require_admin()
+
     try:
         # VACUUM 命令优化 SQLite 数据库
         db.session.execute(db.text('VACUUM'))
@@ -434,9 +413,8 @@ def optimize_db():
 @login_required
 def clean_logs():
     """清理旧日志"""
-    if current_user.role != 'admin':
-        return jsonify({'success': False, 'message': '权限不足'}), 403
-    
+    _require_admin()
+
     try:
         from datetime import timedelta
         cutoff_date = datetime.now() - timedelta(days=90)
@@ -453,10 +431,8 @@ def clean_logs():
 @login_required
 def export_db():
     """导出数据库"""
-    if current_user.role != 'admin':
-        flash('只有管理员可以导出数据库', 'danger')
-        return redirect(url_for('system.settings'))
-    
+    _require_admin()
+
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../instance/store.db')
     export_filename = f'export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db'
     
@@ -471,9 +447,8 @@ def export_db():
 @login_required
 def save_settings():
     """保存系统设置"""
-    if current_user.role != 'admin':
-        return jsonify({'success': False, 'message': '权限不足'}), 403
-    
+    _require_admin()
+
     from app.models import SystemSetting
     
     # 保存所有设置项
