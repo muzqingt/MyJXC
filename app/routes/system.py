@@ -463,7 +463,8 @@ def export_db():
     if not os.path.exists(db_path):
         flash('数据库文件不存在', 'danger')
         return redirect(url_for('system.settings'))
-    
+
+    db.session.remove()
     return send_file(db_path, as_attachment=True, download_name=export_filename)
 
 @bp.route('/api/system/settings', methods=['POST'])

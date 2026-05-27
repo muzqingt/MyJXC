@@ -109,11 +109,11 @@ def generate_order_number(prefix: str, model_class: type, date_field_name: str =
         if len(order_str) > prefix_len:
             try:
                 last_num = int(order_str[prefix_len:])
-                return f'{prefix}{today}{last_num + 1:03d}'
+                return f'{prefix}{today}{last_num + 1:04d}'
             except (ValueError, IndexError):
                 pass
-        return f'{prefix}{today}001'
-    return f'{prefix}{today}001'
+        return f'{prefix}{today}0001'
+    return f'{prefix}{today}0001'
 
 
 def build_products_data(products: list, include_purchase_price: bool = True, include_sale_price: bool = True) -> list[dict]:

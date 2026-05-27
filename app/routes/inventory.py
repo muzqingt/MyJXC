@@ -419,11 +419,7 @@ def stock_logs():
     if start_date:
         query = query.filter(StockLog.created_at >= start_date)
     if end_date:
-        # 如果有开始日期，则结束日期加一天；否则只比较日期部分
-        if start_date:
-            query = query.filter(StockLog.created_at <= end_date + ' 23:59:59')
-        else:
-            query = query.filter(StockLog.created_at <= end_date + ' 23:59:59')
+        query = query.filter(StockLog.created_at <= end_date + ' 23:59:59')
     VALID_LOG_TYPES = {'in', 'out', 'check_in', 'check_out', 'adjust_in', 'adjust_out', 'return_in', 'return_out', 'stock_transfer'}
     if log_type:
         if log_type == 'check':

@@ -1,7 +1,7 @@
 from flask import render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required
 from app import db
-from app.models import Supplier, Customer, Warehouse
+from app.models import Supplier, Customer, Warehouse, PurchaseOrder, Payment, SalesOrder, Receipt
 from app.forms import SupplierForm, CustomerForm, WarehouseForm
 from flask import Blueprint
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
@@ -107,8 +107,9 @@ def delete_supplier(id):
     if supplier is None:
         abort(404)
 
-    # 检查是否有采购记录或付款记录
-    if len(supplier.purchase_orders) > 0 or len(supplier.payments) > 0:
+    has_orders = db.session.query(PurchaseOrder).filter_by(supplier_id=supplier.id).first() is not None
+    has_payments = db.session.query(Payment).filter_by(supplier_id=supplier.id).first() is not None
+    if has_orders or has_payments:
         flash('该供应商已有采购或付款记录，无法删除！', 'danger')
         return redirect(url_for('partner.suppliers'))
 

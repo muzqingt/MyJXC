@@ -10,6 +10,29 @@ from flask import Blueprint
 from sqlalchemy.exc import SQLAlchemyError
 from app.utils import to_decimal
 
+def _save_product_image(file, product):
+    if file.content_type not in ['image/jpeg', 'image/png', 'image/gif', 'image/jpg']:
+        return '只能上传 JPG/PNG/GIF 格式图片'
+    file.seek(0, 2)
+    size = file.tell()
+    file.seek(0)
+    if size > 2 * 1024 * 1024:
+        return '图片大小不能超过 2MB'
+    filename = secure_filename(file.filename)
+    if filename:
+        file_ext = os.path.splitext(filename)[1].lower()
+        if file_ext in ['.jpg', '.jpeg', '.png', '.gif']:
+            if product.image_path:
+                old_filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], product.image_path)
+                if os.path.exists(old_filepath):
+                    os.remove(old_filepath)
+            new_filename = f"product_{secure_filename(product.code)}{file_ext}"
+            filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], new_filename)
+            file.save(filepath)
+            product.image_path = new_filename
+    return None
+
+
 # 创建蓝图
 bp = Blueprint('product', __name__, url_prefix='/product')
 
@@ -72,26 +95,11 @@ def new_product():
             description=form.description.data
         )
         
-        # 处理图片上传
         if form.image.data:
-            file = form.image.data
-            if file.content_type not in ['image/jpeg', 'image/png', 'image/gif', 'image/jpg']:
-                flash('只能上传 JPG/PNG/GIF 格式图片', 'danger')
+            error = _save_product_image(form.image.data, product)
+            if error:
+                flash(error, 'danger')
                 return redirect(url_for('product.new_product'))
-            file.seek(0, 2)  # seek to end
-            size = file.tell()
-            file.seek(0)  # reset
-            if size > 2 * 1024 * 1024:  # 2MB limit
-                flash('图片大小不能超过 2MB', 'danger')
-                return redirect(url_for('product.new_product'))
-            filename = secure_filename(file.filename)
-            if filename:
-                file_ext = os.path.splitext(filename)[1].lower()
-                if file_ext in ['.jpg', '.jpeg', '.png', '.gif']:
-                    new_filename = f"product_{secure_filename(product.code)}{file_ext}"
-                    filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], new_filename)
-                    file.save(filepath)
-                    product.image_path = new_filename
 
         db.session.add(product)
 
@@ -139,32 +147,11 @@ def edit_product(id):
         product.description = form.description.data
         product.updated_at = datetime.now()
         
-        # 处理图片上传
         if form.image.data:
-            file = form.image.data
-            if file.content_type not in ['image/jpeg', 'image/png', 'image/gif', 'image/jpg']:
-                flash('只能上传 JPG/PNG/GIF 格式图片', 'danger')
+            error = _save_product_image(form.image.data, product)
+            if error:
+                flash(error, 'danger')
                 return redirect(url_for('product.edit_product', id=product.id))
-            file.seek(0, 2)  # seek to end
-            size = file.tell()
-            file.seek(0)  # reset
-            if size > 2 * 1024 * 1024:  # 2MB limit
-                flash('图片大小不能超过 2MB', 'danger')
-                return redirect(url_for('product.edit_product', id=product.id))
-            filename = secure_filename(file.filename)
-            if filename:
-                file_ext = os.path.splitext(filename)[1].lower()
-                if file_ext in ['.jpg', '.jpeg', '.png', '.gif']:
-                    # 删除旧图片
-                    if product.image_path:
-                        old_filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], product.image_path)
-                        if os.path.exists(old_filepath):
-                            os.remove(old_filepath)
-                    
-                    new_filename = f"product_{secure_filename(product.code)}{file_ext}"
-                    filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], new_filename)
-                    file.save(filepath)
-                    product.image_path = new_filename
 
         log = Log(
             user_id=current_user.id,
