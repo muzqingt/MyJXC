@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 from datetime import datetime
 import json
+from decimal import Decimal
 from app import db
 from app.models import Product, Warehouse, StockLog
 import io
@@ -20,12 +21,12 @@ def get_product_stock_in_warehouse(product_id, warehouse_id):
         StockLog.product_id == product_id,
         StockLog.warehouse_id == warehouse_id
     ).all()
-    stock = 0
+    stock = Decimal('0')
     for log in logs:
         if log.change_type in ('in', 'check_in', 'adjust_in', 'return_in'):
-            stock += float(log.quantity)
+            stock += to_decimal(log.quantity)
         elif log.change_type in ('out', 'check_out', 'adjust_out', 'stock_transfer', 'return_out'):
-            stock -= float(log.quantity)
+            stock -= to_decimal(log.quantity)
     return stock
 
 # 创建蓝图
@@ -53,14 +54,14 @@ def product_list():
     products = Product.query.all()
     
     # 计算总库存价值和潜在销售价值
-    total_stock_value = 0
-    total_potential_value = 0
+    total_stock_value = Decimal('0')
+    total_potential_value = Decimal('0')
     for product in products:
         stock_qty = Decimal(str(product.stock_quantity or 0))
         purchase_price = Decimal(str(product.purchase_price or 0))
         sale_price = Decimal(str(product.sale_price or 0))
-        total_stock_value += float(stock_qty * purchase_price)
-        total_potential_value += float(stock_qty * sale_price)
+        total_stock_value += stock_qty * purchase_price
+        total_potential_value += stock_qty * sale_price
     
     return render_template('inventory/products.html', 
                          title='商品库存',
@@ -234,16 +235,16 @@ def stock_transfer():
                         if product:
                             # 全局库存减去各仓库的 StockLog 合计，得到"未记录"的起点
                             # 再加上源仓库的 StockLog，得到源仓库初始库存
-                            global_stock = float(product.stock_quantity) if product.stock_quantity else 0
+                            global_stock = to_decimal(product.stock_quantity)
                             from_log = get_product_stock_in_warehouse(pid, from_warehouse_id)
                             to_log = get_product_stock_in_warehouse(pid, to_warehouse_id)
                             # 各仓库 StockLog 总和
-                            all_log = db.session.query(db.func.sum(
+                            all_log = to_decimal(db.session.query(db.func.sum(
                                 db.case(
                                     (StockLog.change_type.in_(['in', 'check_in', 'adjust_in', 'return_in']), StockLog.quantity),
                                     else_=0 - StockLog.quantity
                                 )
-                            )).filter(StockLog.product_id == pid).scalar() or 0
+                            )).filter(StockLog.product_id == pid).scalar())
                             # 仓库粒度的初始库存
                             product_warehouse_stock[pid] = {
                                 from_warehouse_id: global_stock - all_log + from_log,
