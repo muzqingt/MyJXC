@@ -168,13 +168,13 @@ def customer_statistics():
         Customer.code,
         Customer.name,
         db.func.count(SalesOrder.id).label('order_count'),
-        db.func.sum(SalesOrder.total_amount).label('total_amount'),
-        db.func.avg(SalesOrder.total_amount).label('avg_amount')
+        db.func.coalesce(db.func.sum(SalesOrder.total_amount), 0).label('total_amount'),
+        db.func.coalesce(db.func.avg(SalesOrder.total_amount), 0).label('avg_amount')
     ).outerjoin(SalesOrder, db.and_(Customer.id == SalesOrder.customer_id, SalesOrder.status == 'completed'))\
      .group_by(Customer.id)\
-     .order_by(db.func.sum(SalesOrder.total_amount).desc())\
+     .order_by(db.func.sum(SalesOrder.total_amount).desc().nullslast())\
      .all()
-    
+
     return render_template('report/customer_statistics.html',
                          title='客户统计',
                          customer_stats=customer_stats)
@@ -189,13 +189,13 @@ def supplier_statistics():
         Supplier.code,
         Supplier.name,
         db.func.count(PurchaseOrder.id).label('order_count'),
-        db.func.sum(PurchaseOrder.total_amount).label('total_amount'),
-        db.func.avg(PurchaseOrder.total_amount).label('avg_amount')
+        db.func.coalesce(db.func.sum(PurchaseOrder.total_amount), 0).label('total_amount'),
+        db.func.coalesce(db.func.avg(PurchaseOrder.total_amount), 0).label('avg_amount')
     ).outerjoin(PurchaseOrder, db.and_(Supplier.id == PurchaseOrder.supplier_id, PurchaseOrder.status == 'completed'))\
      .group_by(Supplier.id)\
-     .order_by(db.func.sum(PurchaseOrder.total_amount).desc())\
+     .order_by(db.func.sum(PurchaseOrder.total_amount).desc().nullslast())\
      .all()
-    
+
     return render_template('report/supplier_statistics.html',
                          title='供应商统计',
                          supplier_stats=supplier_stats)
