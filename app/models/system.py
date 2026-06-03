@@ -12,13 +12,13 @@ class SystemSetting(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
 
     @classmethod
-    def get_value(cls, key, default=None):
+    def get_value(cls, key: str, default: str | None = None) -> str | None:
         """获取设置值"""
         setting = cls.query.filter_by(setting_key=key).first()
         return setting.value if setting else default
 
     @classmethod
-    def set_value(cls, key, value):
+    def set_value(cls, key: str, value: str | None) -> None:
         """设置值"""
         setting = cls.query.filter_by(setting_key=key).first()
         if setting:

@@ -17,13 +17,13 @@ class User(UserMixin, db.Model):
     last_login = db.Column(db.DateTime)
 
     @property
-    def is_authenticated(self):
+    def is_authenticated(self) -> bool:
         return True
 
-    def set_password(self, password):
+    def set_password(self, password: str) -> None:
         self.password_hash = generate_password_hash(password)
 
-    def check_password(self, password):
+    def check_password(self, password: str) -> bool:
         return check_password_hash(self.password_hash, password)
 
     def __repr__(self):
@@ -31,7 +31,7 @@ class User(UserMixin, db.Model):
 
 
 @login_manager.user_loader
-def load_user(user_id):
+def load_user(user_id: str) -> User | None:
     return db.session.get(User, int(user_id))
 
 

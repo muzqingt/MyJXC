@@ -24,21 +24,21 @@ class StockLog(db.Model):
 
     # 动态关联关系 - 使用延迟导入避免循环导入
     @property
-    def stock_in(self):
+    def stock_in(self) -> 'StockIn | None':
         if self.reference_type == 'stock_in' and self.reference_id:
             from app.models import StockIn
             return StockIn.query.get(self.reference_id)
         return None
 
     @property
-    def stock_out(self):
+    def stock_out(self) -> 'StockOut | None':
         if self.reference_type == 'stock_out' and self.reference_id:
             from app.models import StockOut
             return StockOut.query.get(self.reference_id)
         return None
 
     @property
-    def reference_number(self):
+    def reference_number(self) -> str:
         """获取关联单号"""
         if not self.reference_id or not self.reference_type:
             return ''
