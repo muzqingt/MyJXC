@@ -2,6 +2,7 @@
 冒烟测试 — 验证测试基础设施可用
 """
 import pytest
+from tests.helpers import get_page, post_page, assert_redirects_to_login
 
 
 def test_app_creation(app):
@@ -12,21 +13,16 @@ def test_app_creation(app):
 
 def test_home_redirect(client):
     """未登录访问首页重定向到登录页"""
-    resp = client.get('/', follow_redirects=False)
-    assert resp.status_code == 302
-    assert '/auth/login' in resp.headers.get('Location', '')
+    assert_redirects_to_login(client, '/')
 
 
 def test_login_logout(client):
     """登录/登出流程正常"""
-    resp = client.post('/auth/login', data={
+    post_page(client, '/auth/login', {
         'username': 'admin',
         'password': 'admin123',
-    }, follow_redirects=True)
-    assert resp.status_code == 200
-
-    resp = client.post('/auth/logout', follow_redirects=True)
-    assert resp.status_code == 200
+    })
+    post_page(client, '/auth/logout', {})
 
 
 def test_factory_user(app, db_session):
@@ -52,5 +48,4 @@ def test_factory_product(app, db_session, sample_category):
 
 def test_authenticated_access(authenticated_client):
     """登录后可访问首页"""
-    resp = authenticated_client.get('/', follow_redirects=True)
-    assert resp.status_code == 200
+    get_page(authenticated_client, '/')
