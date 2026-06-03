@@ -90,6 +90,24 @@ python run.py
 
 ---
 
+## 🧪 运行测试
+
+```bash
+# 安装测试依赖
+pip install pytest pytest-cov
+
+# 运行所有测试
+python -m pytest tests/ -v
+
+# 运行测试并查看覆盖率
+python -m pytest tests/ --cov=app --cov-report=term
+
+# 运行单个模块测试
+python -m pytest tests/test_purchase.py -v
+```
+
+---
+
 ## 🛠 技术栈
 
 - **后端**: Flask + SQLAlchemy + Flask-Login + Flask-WTF
