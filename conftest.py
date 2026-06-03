@@ -4,55 +4,53 @@
 import os
 import sys
 import tempfile
-import pytest
 
 # 确保项目根目录在 sys.path 中
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# 必须在 import app 之前设置 DATABASE_URL，否则引擎缓存生产数据库
+_test_db_dir = tempfile.mkdtemp()
+_test_db_path = os.path.join(_test_db_dir, 'test.db')
+os.environ['DATABASE_URL'] = f'sqlite:///{_test_db_path}'
+
+import pytest
 
 
 @pytest.fixture(scope='session')
 def app():
     """创建测试用 Flask 应用（整个测试会话共享）"""
+    import shutil
     from app import create_app, db
-
-    # 使用临时目录存放测试数据库
-    db_dir = tempfile.mkdtemp()
-    db_path = os.path.join(db_dir, 'test.db')
 
     app = create_app()
     app.config['TESTING'] = True
     app.config['WTF_CSRF_ENABLED'] = False
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
     app.config['SERVER_NAME'] = 'localhost.localdomain'
     app.config['REMEMBER_COOKIE_DURATION'] = 0
 
     with app.app_context():
         db.create_all()
 
-        # 创建默认数据（检查是否已存在）
+        # 创建默认数据
         from app.models import User, Warehouse, Category
         from app import db as _db
 
-        if not User.query.filter_by(username='admin').first():
-            admin = User(username='admin', email='admin@example.com', role='admin')
-            admin.set_password('admin123')
-            _db.session.add(admin)
+        admin = User(username='admin', email='admin@example.com', role='admin')
+        admin.set_password('admin123')
+        _db.session.add(admin)
 
-        if not Warehouse.query.filter_by(code='WH001').first():
-            warehouse = Warehouse(code='WH001', name='默认仓库')
-            _db.session.add(warehouse)
+        warehouse = Warehouse(code='WH001', name='默认仓库')
+        _db.session.add(warehouse)
 
-        if not Category.query.filter_by(name='默认分类').first():
-            category = Category(name='默认分类')
-            _db.session.add(category)
+        category = Category(name='默认分类')
+        _db.session.add(category)
 
         _db.session.commit()
 
     yield app
 
     # 清理临时文件
-    import shutil
-    shutil.rmtree(db_dir, ignore_errors=True)
+    shutil.rmtree(_test_db_dir, ignore_errors=True)
 
 
 @pytest.fixture(scope='function')

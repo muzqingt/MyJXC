@@ -121,7 +121,7 @@ def create_purchase_order(supplier_id, warehouse_id, created_by=None,
     from app.utils import generate_order_number
 
     order = PurchaseOrder(
-        order_number=generate_order_number('PO'),
+        order_number=generate_order_number('PO', PurchaseOrder),
         supplier_id=supplier_id,
         warehouse_id=warehouse_id,
         order_date=date.today(),
@@ -162,7 +162,7 @@ def create_sales_order(customer_id, warehouse_id, created_by=None,
     from app.utils import generate_order_number
 
     order = SalesOrder(
-        order_number=generate_order_number('SO'),
+        order_number=generate_order_number('SO', SalesOrder),
         customer_id=customer_id,
         warehouse_id=warehouse_id,
         order_date=date.today(),

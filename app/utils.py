@@ -103,8 +103,8 @@ def generate_order_number(prefix: str, model_class: type, date_field_name: str =
         last_order = None
     
     if last_order:
-        # 尝试从订单号提取序号
-        order_str = str(last_order.order_number or last_order.receipt_number or last_order.delivery_number or last_order.return_number)
+        # 从订单号提取序号（使用 filter_field 获取正确的字段值）
+        order_str = str(getattr(last_order, filter_field.key) if filter_field else '')
         prefix_len = len(prefix) + len(today)
         if len(order_str) > prefix_len:
             try:
