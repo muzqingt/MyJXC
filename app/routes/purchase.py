@@ -2,8 +2,9 @@ from flask import render_template, redirect, url_for, flash, request, jsonify, B
 from flask_login import login_required, current_user
 from app import db
 from sqlalchemy.orm import selectinload
-from app.models import PurchaseOrder, SystemSetting, PurchaseOrderItem, StockIn, StockInItem, Supplier, Warehouse, Product, StockLog, PurchaseReturn, PurchaseReturnItem
+from app.models import PurchaseOrder, SystemSetting, PurchaseOrderItem, StockIn, StockInItem, Supplier, Warehouse, Product, StockLog, PurchaseReturn, PurchaseReturnItem, Payment
 from app.utils import to_decimal, add_balance, sub_balance, get_redirect_tab, build_products_data, build_partners_data, generate_order_number
+from app.utils_order import match_reference_id_filter, rebuild_items_on_error, create_stock_log
 from app.forms import StockInForm
 from datetime import datetime
 from sqlalchemy.exc import SQLAlchemyError
@@ -125,24 +126,7 @@ def new_order():
 
         if not supplier_id or not warehouse_id or not order_date:
             flash('请填写必填字段!', 'danger')
-            # 重建商品明细数据(用于回填)
-            order_items_list = []
-            for i in range(len(product_ids)):
-                if product_ids[i] and quantities[i] and unit_prices[i]:
-                    try:
-                        pid = int(product_ids[i])
-                    except ValueError:
-                        flash('商品ID无效!', 'danger')
-                        return redirect(url_for('purchase.new_order'))
-                    product = db.session.get(Product, pid)
-                    if product:
-                        order_items_list.append({
-                            'product_id': product.id,
-                            'product_name': product.name,
-                            'product_code': product.code,
-                            'quantity': quantities[i],
-                            'unit_price': unit_prices[i]
-                        })
+            order_items_list = rebuild_items_on_error(product_ids, quantities, unit_prices)
             return render_template('purchase/order_items.html',
                                  title='新建采购订单',
                                  suppliers=partners_data,
@@ -259,24 +243,17 @@ def new_order():
                     )
                     db.session.add(stock_in_item)
 
-                    before_quantity = to_decimal(product.stock_quantity)
-                    after_quantity = before_quantity + quantity
-                    product.stock_quantity = after_quantity
-                    product.purchase_price = unit_price
-
-                    log = StockLog(
-                        product_id=product.id,
+                    create_stock_log(
+                        product=product,
                         warehouse_id=warehouse_id,
                         change_type='in',
                         quantity=quantity,
-                        before_quantity=before_quantity,
-                        after_quantity=after_quantity,
                         reference_id=stock_in.id,
                         reference_type='stock_in',
                         notes=f'创建订单时直接入库: {receipt_number}',
-                        created_by=current_user.id
+                        user_id=current_user.id
                     )
-                    db.session.add(log)
+                    product.purchase_price = unit_price
 
                     for order_item in order.items:
                         if order_item.product_id == product.id:
@@ -354,24 +331,7 @@ def edit_order(id):
 
         if not supplier_id or not warehouse_id or not order_date:
             flash('请填写必填字段!', 'danger')
-            # 重建商品明细数据(用于回填)
-            order_items_list = []
-            for i in range(len(product_ids)):
-                if product_ids[i] and quantities[i] and unit_prices[i]:
-                    try:
-                        pid = int(product_ids[i])
-                    except ValueError:
-                        flash('商品ID无效!', 'danger')
-                        return redirect(url_for('purchase.edit_order', id=id))
-                    product = db.session.get(Product, pid)
-                    if product:
-                        order_items_list.append({
-                            'product_id': product.id,
-                            'product_name': product.name,
-                            'product_code': product.code,
-                            'quantity': quantities[i],
-                            'unit_price': unit_prices[i]
-                        })
+            order_items_list = rebuild_items_on_error(product_ids, quantities, unit_prices)
             return render_template('purchase/order_items.html',
                                  title='编辑采购订单',
                                  order=order,
@@ -539,24 +499,15 @@ def delete_order(id):
         return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
 
     # 检查是否有付款记录（reference_id 为逗号分隔的字符串，需模糊匹配）
-    from app.models import Payment
-    from sqlalchemy import or_
-    oid = str(order.id)
     if Payment.query.filter(
         Payment.reference_type == 'purchase_order',
         Payment.reference_id.isnot(None),
-        or_(
-            Payment.reference_id == oid,
-            Payment.reference_id.like(f'{oid},%'),
-            Payment.reference_id.like(f'%,{oid},%'),
-            Payment.reference_id.like(f'%,{oid}'),
-        )
+        match_reference_id_filter(Payment, order.id)
     ).first():
         flash('此订单已有付款记录，无法删除！', 'danger')
         return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
 
     # 检查是否有库存流水记录
-    from app.models import StockLog
     if StockLog.query.filter_by(reference_type='purchase_order', reference_id=order.id).first():
         flash('此订单已有库存操作记录，无法删除！', 'danger')
         return redirect(url_for('purchase.index', tab=get_redirect_tab(order.status)))
@@ -642,23 +593,17 @@ def quick_stock_in(id):
             if not product:
                 continue
             product.purchase_price = unit_price
-            before_quantity = to_decimal(product.stock_quantity)
-            after_quantity = before_quantity + remaining_qty
-            product.stock_quantity = after_quantity
 
-            log = StockLog(
-                product_id=product.id,
+            create_stock_log(
+                product=product,
                 warehouse_id=order.warehouse_id,
                 change_type='in',
                 quantity=remaining_qty,
-                before_quantity=before_quantity,
-                after_quantity=after_quantity,
                 reference_id=stock_in.id,
                 reference_type='stock_in',
                 notes=f'快捷入库: {receipt_number}',
-                created_by=current_user.id
+                user_id=current_user.id
             )
-            db.session.add(log)
 
             order_item.received_quantity = order_item.quantity
 
@@ -1025,27 +970,17 @@ def complete_stock_in(id):
             if not product:
                 continue
 
-            # 记录当前库存(更新前)
-            before_quantity = to_decimal(product.stock_quantity)
-
-            # 更新商品库存
-            after_quantity = before_quantity + to_decimal(item.quantity)
-            product.stock_quantity = after_quantity
-
-            # 记录库存流水
-            log = StockLog(
-                product_id=product.id,
+            # 记录库存流水（create_stock_log 内部会更新 product.stock_quantity）
+            create_stock_log(
+                product=product,
                 warehouse_id=warehouse.id,
                 change_type='in',
                 quantity=item.quantity,
-                before_quantity=before_quantity,
-                after_quantity=product.stock_quantity,
                 reference_id=stock_in.id,
                 reference_type='stock_in',
                 notes=f'采购入库: {stock_in.receipt_number}',
-                created_by=current_user.id
+                user_id=current_user.id
             )
-            db.session.add(log)
 
         # 先更新入库单状态为已完成（必须在前，receive_quantity 只统计已完成的单）
         stock_in.status = 'completed'
@@ -1192,23 +1127,16 @@ def quick_return(id):
             db.session.add(item)
             total_amount += amount
 
-            before_quantity = to_decimal(product.stock_quantity)
-            after_quantity = before_quantity - return_qty
-            product.stock_quantity = after_quantity
-
-            log = StockLog(
-                product_id=product.id,
+            create_stock_log(
+                product=product,
                 warehouse_id=order.warehouse_id,
                 change_type='return_out',
                 quantity=return_qty,
-                before_quantity=before_quantity,
-                after_quantity=after_quantity,
                 reference_id=purchase_return.id,
                 reference_type='purchase_return',
                 notes=f'采购退货: {return_number}',
-                created_by=current_user.id
+                user_id=current_user.id
             )
-            db.session.add(log)
 
         if not has_items:
             db.session.rollback()
