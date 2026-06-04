@@ -77,7 +77,7 @@ def test_sales_returns_list(authenticated_client):
 
 def test_product_view(app, authenticated_client, db_session):
     """查看商品详情"""
-    product = create_product(code='PV_PROD01', name='查看商品')
+    product = create_product(name='查看商品')
     get_page(authenticated_client, f'/product/products/{product.id}')
 
 

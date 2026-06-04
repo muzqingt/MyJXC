@@ -119,8 +119,8 @@ def test_delete_return(app, authenticated_client, db_session):
     """删除退货单"""
     from app.models import PurchaseReturn
 
-    supplier = create_supplier(code='DR_SUP01', name='退货删除供应商')
-    warehouse = create_warehouse(code='DR_WH01', name='退货删除仓库')
+    supplier = create_supplier(name='退货删除供应商')
+    warehouse = create_warehouse(name='退货删除仓库')
 
     ret = PurchaseReturn(
         return_number='DR_TEST001',
@@ -179,8 +179,8 @@ def test_delete_stock_in(app, authenticated_client, db_session):
 
 def test_order_filter_combined(app, authenticated_client, db_session):
     """组合筛选"""
-    supplier = create_supplier(code='FC_SUP01', name='组合筛选供应商')
-    warehouse = create_warehouse(code='FC_WH01', name='组合筛选仓库')
+    supplier = create_supplier(name='组合筛选供应商')
+    warehouse = create_warehouse(name='组合筛选仓库')
 
     create_purchase_order(
         supplier_id=supplier.id,
