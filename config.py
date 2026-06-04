@@ -3,7 +3,7 @@ import secrets
 
 
 class Config:
-    """基础配置"""
+    """基础配置 — 所有环境共享"""
     BASEDIR = os.path.abspath(os.path.dirname(__file__))
 
     # SECRET_KEY: 优先从环境变量读取，否则从文件读取/生成
@@ -47,19 +47,36 @@ class Config:
 
 
 class DevelopmentConfig(Config):
-    """开发环境配置"""
+    """开发环境 — 本地开发，HTTP 访问"""
     DEBUG = True
     SESSION_COOKIE_SECURE = False
     REMEMBER_COOKIE_SECURE = False
 
 
 class ProductionConfig(Config):
-    """生产环境配置"""
+    """生产环境 — 局域网部署，HTTP 访问
+
+    注意: SESSION_COOKIE_SECURE 设为 False 以支持 HTTP 访问。
+    如需 HTTPS，设置环境变量 SECURE_COOKIES=1 覆盖。
+    """
     DEBUG = False
+    SESSION_COOKIE_SECURE = os.environ.get('SECURE_COOKIES', '0') == '1'
+    REMEMBER_COOKIE_SECURE = os.environ.get('SECURE_COOKIES', '0') == '1'
+
+
+class TestConfig(Config):
+    """测试环境 — 自动化测试"""
+    TESTING = True
+    DEBUG = False
+    WTF_CSRF_ENABLED = False
+    SESSION_COOKIE_SECURE = False
+    REMEMBER_COOKIE_SECURE = False
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
 
 
 config = {
     'development': DevelopmentConfig,
     'production': ProductionConfig,
+    'test': TestConfig,
     'default': ProductionConfig
 }
