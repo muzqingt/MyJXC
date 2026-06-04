@@ -40,3 +40,13 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+# Test and coverage
+.coverage
+.pytest_cache/
+htmlcov/
+
+# Build scripts (use scripts/ directory)
+# build_linux.sh
+# build_windows.bat
+# jxc.spec

@@ -2,8 +2,9 @@ from flask import render_template, redirect, url_for, flash, request, jsonify, B
 from flask_login import login_required, current_user
 from app import db
 from sqlalchemy.orm import selectinload
-from app.models import SalesOrder, SystemSetting, SalesOrderItem, StockOut, StockOutItem, Customer, Warehouse, Product, StockLog, SalesReturn, SalesReturnItem
+from app.models import SalesOrder, SystemSetting, SalesOrderItem, StockOut, StockOutItem, Customer, Warehouse, Product, StockLog, SalesReturn, SalesReturnItem, Receipt
 from app.utils import to_decimal, add_balance, sub_balance, get_redirect_tab, build_products_data, build_partners_data, generate_order_number
+from app.utils_order import match_reference_id_filter, rebuild_items_on_error, create_stock_log
 from app.forms import StockOutForm
 from datetime import datetime
 from sqlalchemy.exc import SQLAlchemyError
@@ -129,23 +130,7 @@ def new_order():
         
         if not customer_id or not warehouse_id or not order_date:
             flash('请填写必填字段！', 'danger')
-            # 重建商品明细数据（用于回填）
-            order_items_list = []
-            for i in range(len(product_ids)):
-                if product_ids[i] and quantities[i] and unit_prices[i]:
-                    try:
-                        pid = int(product_ids[i])
-                    except ValueError:
-                        continue
-                    product = db.session.get(Product, pid)
-                    if product:
-                        order_items_list.append({
-                            'product_id': product.id,
-                            'product_name': product.name,
-                            'product_code': product.code,
-                            'quantity': quantities[i],
-                            'unit_price': unit_prices[i]
-                        })
+            order_items_list = rebuild_items_on_error(product_ids, quantities, unit_prices)
             return render_template('sales/order_items.html',
                                  title='新建销售订单',
                                  customers=customers_data,
@@ -290,24 +275,17 @@ def new_order():
                     )
                     db.session.add(stock_out_item)
 
-                    before_quantity = to_decimal(product.stock_quantity)
-                    after_quantity = before_quantity - to_decimal(quantity)
-                    product.stock_quantity = after_quantity
-                    product.sale_price = unit_price
-
-                    log = StockLog(
-                        product_id=product.id,
+                    create_stock_log(
+                        product=product,
                         warehouse_id=warehouse_id,
                         change_type='out',
                         quantity=quantity,
-                        before_quantity=before_quantity,
-                        after_quantity=after_quantity,
                         reference_id=stock_out.id,
                         reference_type='stock_out',
                         notes=f'创建订单时直接出库: {delivery_number}',
-                        created_by=current_user.id
+                        user_id=current_user.id
                     )
-                    db.session.add(log)
+                    product.sale_price = unit_price
 
                     for order_item in order.items:
                         if order_item.product_id == product.id:
@@ -410,23 +388,7 @@ def edit_order(id):
         
         if not customer_id or not warehouse_id or not order_date:
             flash('请填写必填字段！', 'danger')
-            # 重建商品明细数据（用于回填）
-            order_items_list = []
-            for i in range(len(product_ids)):
-                if product_ids[i] and quantities[i] and unit_prices[i]:
-                    try:
-                        pid = int(product_ids[i])
-                    except ValueError:
-                        continue
-                    product = db.session.get(Product, pid)
-                    if product:
-                        order_items_list.append({
-                            'product_id': product.id,
-                            'product_name': product.name,
-                            'product_code': product.code,
-                            'quantity': quantities[i],
-                            'unit_price': unit_prices[i]
-                        })
+            order_items_list = rebuild_items_on_error(product_ids, quantities, unit_prices)
             return render_template('sales/order_items.html',
                                  title='编辑销售订单',
                                  order=order,
@@ -564,18 +526,10 @@ def delete_order(id):
         return redirect(url_for('sales.index'))
 
     # 检查是否有收款记录（reference_id 为逗号分隔的字符串，需模糊匹配）
-    from app.models import Receipt
-    from sqlalchemy import or_
-    oid = str(order.id)
     if Receipt.query.filter(
         Receipt.reference_type == 'sales_order',
         Receipt.reference_id.isnot(None),
-        or_(
-            Receipt.reference_id == oid,
-            Receipt.reference_id.like(f'{oid},%'),
-            Receipt.reference_id.like(f'%,{oid},%'),
-            Receipt.reference_id.like(f'%,{oid}'),
-        )
+        match_reference_id_filter(Receipt, order.id)
     ).first():
         flash('此订单已有收款记录，无法删除！', 'danger')
         return redirect(url_for('sales.index'))
@@ -668,24 +622,17 @@ def quick_stock_out(id):
             )
             db.session.add(stock_out_item)
 
-            before_quantity = to_decimal(product.stock_quantity)
-            after_quantity = before_quantity - remaining_qty
-            product.stock_quantity = after_quantity
-
-            log = StockLog(
-                product_id=product.id,
+            create_stock_log(
+                product=product,
                 warehouse_id=order.warehouse_id,
                 change_type='out',
                 quantity=remaining_qty,
-                before_quantity=before_quantity,
-                after_quantity=after_quantity,
                 reference_id=stock_out.id,
                 reference_type='stock_out',
                 notes=f'快捷出库: {delivery_number}',
-                created_by=current_user.id
+                user_id=current_user.id
             )
-            db.session.add(log)
-            
+
             item.delivered_quantity = to_decimal(item.delivered_quantity) + remaining_qty
         
         stock_out.total_amount = total_amount
@@ -1012,24 +959,17 @@ def complete_stock_out(id):
             if not product:
                 continue
 
-            before_quantity = to_decimal(product.stock_quantity)
-            after_quantity = before_quantity - to_decimal(item.quantity)
-            product.stock_quantity = after_quantity
-
             # 记录库存流水
-            log = StockLog(
-                product_id=product.id,
+            create_stock_log(
+                product=product,
                 warehouse_id=warehouse.id,
                 change_type='out',
                 quantity=item.quantity,
-                before_quantity=before_quantity,
-                after_quantity=product.stock_quantity,
                 reference_id=stock_out.id,
                 reference_type='stock_out',
                 notes=f'销售出库: {stock_out.delivery_number}',
-                created_by=current_user.id
+                user_id=current_user.id
             )
-            db.session.add(log)
         
         # 先更新出库单状态为已完成（必须在前，delivered_quantity 只统计已完成的单）
         stock_out.status = 'completed'
@@ -1171,23 +1111,16 @@ def quick_return(id):
             db.session.add(item)
             total_amount += amount
 
-            before_quantity = to_decimal(product.stock_quantity)
-            after_quantity = before_quantity + return_qty
-            product.stock_quantity = after_quantity
-
-            log = StockLog(
-                product_id=product.id,
+            create_stock_log(
+                product=product,
                 warehouse_id=order.warehouse_id,
                 change_type='return_in',
                 quantity=return_qty,
-                before_quantity=before_quantity,
-                after_quantity=after_quantity,
                 reference_id=sales_return.id,
                 reference_type='sales_return',
                 notes=f'销售退货: {return_number}',
-                created_by=current_user.id
+                user_id=current_user.id
             )
-            db.session.add(log)
 
         if not has_items:
             db.session.rollback()

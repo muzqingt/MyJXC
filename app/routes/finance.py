@@ -4,9 +4,9 @@ from datetime import datetime, timedelta
 from app import db
 from app.models import Receipt, Payment, Expense, Customer, Supplier, SalesOrder, PurchaseOrder, SalesOrderItem, PurchaseOrderItem, SalesReturn, PurchaseReturn
 from app.forms import ReceiptForm, PaymentForm, ExpenseForm
-from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 from app.utils import to_decimal, add_balance, sub_balance, generate_order_number, PAYMENT_METHOD_MAP, apply_excel_header_style, EXCEL_HEADER_FONT, EXCEL_HEADER_FILL, EXCEL_THIN_BORDER, EXCEL_HEADER_ALIGNMENT
+from app.utils_order import match_reference_id_filter
 import io
 
 # 创建蓝图
@@ -18,32 +18,18 @@ def calc_order_paid_amount(order_id, order_type):
     使用数据库层模糊匹配避免加载全表。
     reference_id 格式: "1" / "1,2,3" / "12,13"
     """
-    oid = str(order_id)
     if order_type == 'sales_order':
-        # 构造 4 种可能的位置匹配（首／尾／中／独）
-        ref_cond = or_(
-            Receipt.reference_id == oid,
-            Receipt.reference_id.like(f'{oid},%'),
-            Receipt.reference_id.like(f'%,{oid},%'),
-            Receipt.reference_id.like(f'%,{oid}'),
-        )
         rows = db.session.query(Receipt).filter(
             Receipt.reference_type == 'sales_order',
             Receipt.reference_id.isnot(None),
-            ref_cond
+            match_reference_id_filter(Receipt, order_id)
         ).all()
         return float(sum(to_decimal(r.amount) for r in rows))
     else:
-        ref_cond = or_(
-            Payment.reference_id == oid,
-            Payment.reference_id.like(f'{oid},%'),
-            Payment.reference_id.like(f'%,{oid},%'),
-            Payment.reference_id.like(f'%,{oid}'),
-        )
         rows = db.session.query(Payment).filter(
             Payment.reference_type == 'purchase_order',
             Payment.reference_id.isnot(None),
-            ref_cond
+            match_reference_id_filter(Payment, order_id)
         ).all()
         return float(sum(to_decimal(p.amount) for p in rows))
 

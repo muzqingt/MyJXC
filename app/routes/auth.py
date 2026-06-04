@@ -103,7 +103,7 @@ def logout():
 @bp.route('/profile')
 @login_required
 def profile():
-    return render_template('auth/profile.html', title='个人资料', now=datetime.now())
+    return render_template('auth/profile.html', title='个人资料')
 
 @bp.route('/change-password', methods=['POST'])
 @login_required

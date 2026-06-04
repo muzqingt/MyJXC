@@ -4,9 +4,33 @@
 from decimal import Decimal
 from typing import Optional, List
 
+from sqlalchemy import or_
 from app import db
 from app.models import StockLog, Product
 from app.utils import to_decimal
+
+
+def match_reference_id_filter(model_class: type, order_id: int):
+    """
+    构建逗号分隔 reference_id 的 SQLAlchemy 过滤条件。
+
+    reference_id 字段存储格式为 "1" / "1,2,3" / "12,13"，
+    需要匹配 4 种位置：独占、首、尾、中。
+
+    Args:
+        model_class: 包含 reference_id 字段的模型类（Receipt / Payment）
+        order_id: 要匹配的订单 ID
+
+    Returns:
+        SQLAlchemy Or 条件对象
+    """
+    oid = str(order_id)
+    return or_(
+        model_class.reference_id == oid,
+        model_class.reference_id.like(f'{oid},%'),
+        model_class.reference_id.like(f'%,{oid},%'),
+        model_class.reference_id.like(f'%,{oid}'),
+    )
 
 
 def parse_reference_ids(reference_id: Optional[str]) -> List[int]:
