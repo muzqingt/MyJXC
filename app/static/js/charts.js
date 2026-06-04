@@ -296,3 +296,93 @@ function createChart(canvasId, type, data, options = {}) {
         }
     });
 }
+
+/**
+ * 导出图表为 PNG 图片
+ * @param {string} canvasId - Canvas 元素 ID
+ * @param {string} filename - 文件名（不含扩展名）
+ */
+function exportChartAsPNG(canvasId, filename) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    const link = document.createElement('a');
+    link.download = (filename || canvasId) + '.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+}
+
+/**
+ * 图表管理器 — 管理多个图表的刷新和导出
+ */
+class ChartManager {
+    constructor() {
+        this.charts = {};
+        this.refreshInterval = null;
+        this.refreshCallbacks = {};
+    }
+
+    /**
+     * 注册图表
+     * @param {string} id - 图表 ID
+     * @param {Chart} chart - Chart 实例
+     * @param {Function} refreshCallback - 刷新回调函数
+     */
+    register(id, chart, refreshCallback) {
+        this.charts[id] = chart;
+        if (refreshCallback) {
+            this.refreshCallbacks[id] = refreshCallback;
+        }
+    }
+
+    /**
+     * 导出指定图表
+     * @param {string} id - 图表 ID
+     */
+    exportChart(id) {
+        exportChartAsPNG(id, id);
+    }
+
+    /**
+     * 设置自动刷新
+     * @param {number} intervalSeconds - 刷新间隔（秒），0 表示关闭
+     */
+    setAutoRefresh(intervalSeconds) {
+        if (this.refreshInterval) {
+            clearInterval(this.refreshInterval);
+            this.refreshInterval = null;
+        }
+
+        if (intervalSeconds > 0) {
+            this.refreshInterval = setInterval(() => {
+                this.refreshAll();
+            }, intervalSeconds * 1000);
+        }
+    }
+
+    /**
+     * 刷新所有图表
+     */
+    refreshAll() {
+        Object.keys(this.refreshCallbacks).forEach(id => {
+            if (this.refreshCallbacks[id]) {
+                this.refreshCallbacks[id]();
+            }
+        });
+    }
+
+    /**
+     * 销毁管理器
+     */
+    destroy() {
+        if (this.refreshInterval) {
+            clearInterval(this.refreshInterval);
+        }
+        Object.values(this.charts).forEach(chart => chart.destroy());
+        this.charts = {};
+        this.refreshCallbacks = {};
+    }
+}
+
+// 全局图表管理器实例
+const chartManager = new ChartManager();

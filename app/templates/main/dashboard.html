@@ -367,12 +367,51 @@
     </div>
 
     <!-- 图表区域 -->
+    <!-- 控制栏 -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-body py-2">
+                    <div class="d-flex align-items-center gap-3">
+                        <div>
+                            <label class="form-label mb-0 small">时间范围：</label>
+                            <select id="timeRange" class="form-select form-select-sm d-inline-block" style="width: auto;">
+                                <option value="7">近 7 天</option>
+                                <option value="30" selected>近 30 天</option>
+                                <option value="90">近 90 天</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label mb-0 small">自动刷新：</label>
+                            <select id="autoRefresh" class="form-select form-select-sm d-inline-block" style="width: auto;">
+                                <option value="0">关闭</option>
+                                <option value="30">30 秒</option>
+                                <option value="60">1 分钟</option>
+                                <option value="300">5 分钟</option>
+                            </select>
+                        </div>
+                        <div>
+                            <button id="refreshBtn" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-arrow-clockwise"></i> 刷新
+                            </button>
+                        </div>
+                        <div class="ms-auto">
+                            <button onclick="exportChartAsPNG('salesTrendChart', '销售趋势')" class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-download"></i> 导出图表
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="row">
         <!-- 销售趋势 -->
         <div class="col-lg-8 mb-4">
             <div class="card shadow">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">销售趋势（近 30 天）</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">销售趋势</h6>
                 </div>
                 <div class="card-body">
                     <div style="height: 300px;">
@@ -402,7 +441,7 @@
         <div class="col-12 mb-4">
             <div class="card shadow">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">财务摘要（近 7 天）</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">财务摘要</h6>
                 </div>
                 <div class="card-body">
                     <div style="height: 250px;">
@@ -416,19 +455,64 @@
 
 <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
 <script>
-// 加载销售趋势数据
-fetch('/api/sales-trend')
-    .then(response => response.json())
-    .then(data => renderSalesTrendChart('salesTrendChart', data));
+let salesChart = null;
+let stockChart = null;
+let financeChart = null;
 
-// 加载库存分布数据
-fetch('/api/stock-overview')
-    .then(response => response.json())
-    .then(data => renderStockOverviewChart('stockOverviewChart', data));
+function loadCharts(days) {
+    // 加载销售趋势数据
+    fetch('/api/sales-trend?days=' + days)
+        .then(response => response.json())
+        .then(data => {
+            if (salesChart) salesChart.destroy();
+            salesChart = renderSalesTrendChart('salesTrendChart', data);
+        });
 
-// 加载财务摘要数据
-fetch('/api/finance-summary')
-    .then(response => response.json())
-    .then(data => renderFinanceSummaryChart('financeSummaryChart', data));
+    // 加载库存分布数据
+    fetch('/api/stock-overview')
+        .then(response => response.json())
+        .then(data => {
+            if (stockChart) stockChart.destroy();
+            stockChart = renderStockOverviewChart('stockOverviewChart', data);
+        });
+
+    // 加载财务摘要数据
+    fetch('/api/finance-summary?days=' + days)
+        .then(response => response.json())
+        .then(data => {
+            if (financeChart) financeChart.destroy();
+            financeChart = renderFinanceSummaryChart('financeSummaryChart', data);
+        });
+}
+
+// 初始化加载
+loadCharts(30);
+
+// 时间范围变化
+document.getElementById('timeRange').addEventListener('change', function() {
+    loadCharts(parseInt(this.value));
+});
+
+// 刷新按钮
+document.getElementById('refreshBtn').addEventListener('click', function() {
+    const days = parseInt(document.getElementById('timeRange').value);
+    loadCharts(days);
+});
+
+// 自动刷新
+let refreshTimer = null;
+document.getElementById('autoRefresh').addEventListener('change', function() {
+    const seconds = parseInt(this.value);
+    if (refreshTimer) {
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+    }
+    if (seconds > 0) {
+        refreshTimer = setInterval(() => {
+            const days = parseInt(document.getElementById('timeRange').value);
+            loadCharts(days);
+        }, seconds * 1000);
+    }
+});
 </script>
 {% endblock %}

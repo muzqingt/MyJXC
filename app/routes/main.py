@@ -17,9 +17,12 @@ bp = Blueprint('main', __name__)
 @bp.route('/api/sales-trend')
 @login_required
 def api_sales_trend():
-    """近 30 天销售趋势数据"""
+    """销售趋势数据（支持时间范围参数）"""
+    from flask import request as flask_request
+
+    days = flask_request.args.get('days', 30, type=int)
     today = datetime.now().date()
-    start_date = today - timedelta(days=29)
+    start_date = today - timedelta(days=days - 1)
 
     # 查询每日销售金额
     results = db.session.query(
@@ -79,11 +82,13 @@ def api_stock_overview():
 @bp.route('/api/finance-summary')
 @login_required
 def api_finance_summary():
-    """近 7 天收支数据"""
+    """收支数据（支持时间范围参数）"""
+    from flask import request as flask_request
     from app.models import Receipt, Payment, Expense
 
+    days = flask_request.args.get('days', 7, type=int)
     today = datetime.now().date()
-    start_date = today - timedelta(days=6)
+    start_date = today - timedelta(days=days - 1)
 
     # 每日收款
     receipts = db.session.query(
