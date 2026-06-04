@@ -82,26 +82,28 @@ def generate_order_number(prefix: str, model_class: type, date_field_name: str =
     编号格式：{前缀}{日期}{序号}，例如 PO20240101001、SI20240115003。
     - 前缀：PO（采购）、SI（采购入库）、SO（销售）、OUT（出库）等
     - 日期：8 位年月日，如 20240101
-    - 序号：3 位数字，从 001 开始，同一天自动递增
+    - 序号：4 位数字，从 0001 开始，同一天自动递增
 
     通过 LIKE 查询当日最大编号，提取序号部分并 +1 实现自增。
     """
     today = datetime.now().strftime('%Y%m%d')
     like_pattern = f'{prefix}{today}%'
-    
+
     # 使用filter通过字段名构建查询
     filter_field = getattr(model_class, 'order_number', None) or \
                    getattr(model_class, 'receipt_number', None) or \
                    getattr(model_class, 'delivery_number', None) or \
-                   getattr(model_class, 'return_number', None)
-    
+                   getattr(model_class, 'return_number', None) or \
+                   getattr(model_class, 'payment_number', None) or \
+                   getattr(model_class, 'expense_number', None)
+
     if filter_field:
         last_order = model_class.query.filter(filter_field.like(like_pattern)).order_by(
             model_class.id.desc()
         ).first()
     else:
         last_order = None
-    
+
     if last_order:
         # 从订单号提取序号（使用 filter_field 获取正确的字段值）
         order_str = str(getattr(last_order, filter_field.key) if filter_field else '')
@@ -114,6 +116,47 @@ def generate_order_number(prefix: str, model_class: type, date_field_name: str =
                 pass
         return f'{prefix}{today}0001'
     return f'{prefix}{today}0001'
+
+
+def generate_order_number_safe(prefix: str, model_class: type, max_retries: int = 3) -> str:
+    """
+    安全生成订单编号（带重试机制）
+
+    Args:
+        prefix: 订单号前缀
+        model_class: 模型类
+        max_retries: 最大重试次数
+
+    Returns:
+        唯一的订单编号
+
+    Raises:
+        RuntimeError: 超过最大重试次数
+    """
+    for attempt in range(max_retries):
+        order_number = generate_order_number(prefix, model_class)
+
+        # 检查是否已存在
+        filter_field = getattr(model_class, 'order_number', None) or \
+                       getattr(model_class, 'receipt_number', None) or \
+                       getattr(model_class, 'delivery_number', None) or \
+                       getattr(model_class, 'return_number', None) or \
+                       getattr(model_class, 'payment_number', None) or \
+                       getattr(model_class, 'expense_number', None)
+
+        if filter_field:
+            exists = model_class.query.filter(
+                filter_field == order_number
+            ).first()
+            if not exists:
+                return order_number
+        else:
+            return order_number
+
+    # 最后一次尝试，添加微秒后缀
+    import time
+    suffix = str(int(time.time()) % 10000).zfill(4)
+    return f'{prefix}{datetime.now().strftime("%Y%m%d")}{suffix}'
 
 
 def build_products_data(products: list, include_purchase_price: bool = True, include_sale_price: bool = True) -> list[dict]:

@@ -69,7 +69,7 @@
             <div class="card-body">
                 <div class="row mb-2">
                     <div class="col-6 fw-bold">当前时间:</div>
-                    <div class="col-6">{{ format_local_dt(now()) }}</div>
+                    <div class="col-6" id="current-time">{{ format_local_dt(now()) }}</div>
                 </div>
                 <div class="row mb-2">
                     <div class="col-6 fw-bold">登录IP:</div>
@@ -77,6 +77,22 @@
                 </div>
             </div>
         </div>
+
+<script>
+function updateClock() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    document.getElementById('current-time').textContent =
+        year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
+}
+setInterval(updateClock, 1000);
+updateClock();
+</script>
     </div>
 </div>
 
@@ -139,32 +155,4 @@
 </div>
 {% endblock %}
 
-{% block extra_js %}
-<script>
-    // 添加当前时间到页面
-    document.addEventListener('DOMContentLoaded', function() {
-        // 更新当前时间显示
-        function updateCurrentTime() {
-            const now = new Date();
-            const timeStr = now.toLocaleString('zh-CN', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
-            });
-            const timeElement = document.querySelector('.current-time');
-            if (timeElement) {
-                timeElement.textContent = timeStr;
-            }
-        }
-        
-        // 初始更新
-        updateCurrentTime();
-        // 每秒更新一次
-        setInterval(updateCurrentTime, 1000);
-    });
-</script>
-{% endblock %}
+{% block extra_js %}{% endblock %}
