@@ -114,7 +114,9 @@ def new_order():
         order_status = request.form.get('order_status', 'draft')
         if order_status not in ('draft', 'confirmed', 'completed'):
             order_status = 'draft'
-        
+        if order_status != 'draft' and current_user.role != 'admin':
+            order_status = 'draft'
+
         # 获取表单数据
         customer_id = request.form.get('customer_id', type=int)
         warehouse_id = request.form.get('warehouse_id', type=int)
@@ -199,7 +201,7 @@ def new_order():
             delivery_date=parsed_delivery_date,
             notes=notes,
             created_by=current_user.id,
-            status='confirmed'
+            status='confirmed' if order_status == 'completed' else order_status
         )
 
         db.session.add(order)
