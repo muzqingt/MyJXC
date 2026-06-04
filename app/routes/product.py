@@ -4,6 +4,7 @@ from app import db
 from app.models import Product, Category, Log, PurchaseOrderItem, SalesOrderItem, StockInItem, StockOutItem, StockLog
 from app.forms import ProductForm, CategoryForm, SearchForm
 from datetime import datetime
+from decimal import Decimal
 import os
 from werkzeug.utils import secure_filename
 from flask import Blueprint
@@ -68,7 +69,7 @@ def index():
     if category_id:
         query = query.filter_by(category_id=category_id)
     
-    products = query.order_by(Product.updated_at.desc()).paginate(page=page, per_page=per_page)
+    products = query.order_by(Product.updated_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
     categories = Category.query.all()
     
     return render_template('product/index.html', 
@@ -422,3 +423,148 @@ def api_categories():
             'parent_id': category.parent_id
         })
     return jsonify(result)
+
+
+@bp.route('/import')
+@login_required
+def import_page():
+    """商品导入页面"""
+    return render_template('product/import.html', title='商品导入')
+
+
+@bp.route('/import/template')
+@login_required
+def import_template():
+    """下载商品导入模板"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    from flask import send_file
+    import io
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = '商品导入模板'
+
+    # 表头
+    headers = ['商品编码', '商品名称', '分类名称', '单位', '采购价', '销售价', '安全库存']
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True)
+
+    # 示例数据
+    ws.append(['SKU001', '示例商品', '默认分类', '个', 10.00, 20.00, 10])
+
+    # 调整列宽
+    for col in range(1, len(headers) + 1):
+        ws.column_dimensions[chr(64 + col)].width = 15
+
+    # 保存到内存
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name='商品导入模板.xlsx'
+    )
+
+
+@bp.route('/import', methods=['POST'])
+@login_required
+def import_products():
+    """处理商品导入"""
+    from openpyxl import load_workbook
+    import io
+
+    if 'file' not in request.files:
+        flash('请选择文件', 'danger')
+        return redirect(url_for('product.import_page'))
+
+    file = request.files['file']
+    if not file.filename.endswith('.xlsx'):
+        flash('请上传 .xlsx 格式文件', 'danger')
+        return redirect(url_for('product.import_page'))
+
+    try:
+        wb = load_workbook(io.BytesIO(file.read()))
+        ws = wb.active
+    except Exception as e:
+        flash('文件格式错误', 'danger')
+        return redirect(url_for('product.import_page'))
+
+    # 获取分类映射
+    categories = {c.name: c.id for c in Category.query.all()}
+
+    success_count = 0
+    fail_count = 0
+    skip_count = 0
+    errors = []
+
+    for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        if not row or not row[0]:
+            continue
+
+        code = str(row[0]).strip()
+        name = str(row[1]).strip() if row[1] else ''
+        category_name = str(row[2]).strip() if row[2] else ''
+        unit = str(row[3]).strip() if row[3] else '个'
+        purchase_price = row[4] if row[4] else 0
+        sale_price = row[5] if row[5] else 0
+        safety_stock = row[6] if row[6] else 0
+
+        # 校验
+        if not code:
+            errors.append(f'第 {row_idx} 行: 编码不能为空')
+            fail_count += 1
+            continue
+
+        if not name:
+            errors.append(f'第 {row_idx} 行: 名称不能为空')
+            fail_count += 1
+            continue
+
+        # 检查编码唯一性
+        if Product.query.filter_by(code=code).first():
+            errors.append(f'第 {row_idx} 行: 编码 {code} 已存在')
+            skip_count += 1
+            continue
+
+        # 获取分类 ID
+        category_id = categories.get(category_name)
+        if category_name and not category_id:
+            errors.append(f'第 {row_idx} 行: 分类 {category_name} 不存在')
+            fail_count += 1
+            continue
+
+        # 创建商品
+        try:
+            product = Product(
+                code=code,
+                name=name,
+                category_id=category_id,
+                unit=unit,
+                purchase_price=Decimal(str(purchase_price)),
+                sale_price=Decimal(str(sale_price)),
+                safety_stock=Decimal(str(safety_stock)),
+            )
+            db.session.add(product)
+            success_count += 1
+        except Exception as e:
+            errors.append(f'第 {row_idx} 行: 创建失败 - {str(e)}')
+            fail_count += 1
+
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        flash('导入失败，请重试', 'danger')
+        return redirect(url_for('product.import_page'))
+
+    return render_template('product/import_result.html',
+                         title='导入结果',
+                         success_count=success_count,
+                         fail_count=fail_count,
+                         skip_count=skip_count,
+                         errors=errors)
