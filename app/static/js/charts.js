@@ -154,3 +154,145 @@ function renderFinanceSummaryChart(canvasId, data) {
         }
     });
 }
+
+/**
+ * 渲染饼图
+ * @param {string} canvasId - Canvas 元素 ID
+ * @param {Object} data - {labels: [], values: []}
+ * @param {Object} options - 可选配置
+ */
+function renderPieChart(canvasId, data, options = {}) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+
+    const colors = [
+        'rgb(54, 162, 235)',
+        'rgb(255, 99, 132)',
+        'rgb(75, 192, 192)',
+        'rgb(255, 205, 86)',
+        'rgb(153, 102, 255)',
+        'rgb(255, 159, 64)',
+        'rgb(201, 203, 207)',
+        'rgb(46, 204, 113)'
+    ];
+
+    new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                data: data.values,
+                backgroundColor: colors.slice(0, data.labels.length),
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((context.parsed / total) * 100).toFixed(1);
+                            return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
+                        }
+                    }
+                }
+            },
+            ...options
+        }
+    });
+}
+
+/**
+ * 渲染环形图（仪表盘风格）
+ * @param {string} canvasId - Canvas 元素 ID
+ * @param {Object} data - {labels: [], values: []}
+ * @param {Object} options - 可选配置
+ */
+function renderDoughnutChart(canvasId, data, options = {}) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+
+    const colors = [
+        'rgb(54, 162, 235)',
+        'rgb(255, 99, 132)',
+        'rgb(75, 192, 192)',
+        'rgb(255, 205, 86)',
+        'rgb(153, 102, 255)',
+        'rgb(255, 159, 64)'
+    ];
+
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                data: data.values,
+                backgroundColor: colors.slice(0, data.labels.length),
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '70%',
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            },
+            ...options
+        }
+    });
+}
+
+/**
+ * 通用图表创建函数
+ * @param {string} canvasId - Canvas 元素 ID
+ * @param {string} type - 图表类型 (line, bar, pie, doughnut)
+ * @param {Object} data - 图表数据
+ * @param {Object} options - 可选配置
+ * @returns {Chart} Chart 实例
+ */
+function createChart(canvasId, type, data, options = {}) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return null;
+
+    const defaultColors = [
+        'rgb(54, 162, 235)',
+        'rgb(255, 99, 132)',
+        'rgb(75, 192, 192)',
+        'rgb(255, 205, 86)',
+        'rgb(153, 102, 255)',
+        'rgb(255, 159, 64)'
+    ];
+
+    // 为没有颜色的数据集添加默认颜色
+    if (data.datasets) {
+        data.datasets.forEach((dataset, index) => {
+            if (!dataset.backgroundColor) {
+                dataset.backgroundColor = type === 'line'
+                    ? defaultColors[index % defaultColors.length].replace('rgb', 'rgba').replace(')', ', 0.2)')
+                    : defaultColors.slice(0, data.labels?.length || 6);
+            }
+            if (!dataset.borderColor && type === 'line') {
+                dataset.borderColor = defaultColors[index % defaultColors.length];
+            }
+        });
+    }
+
+    return new Chart(ctx, {
+        type: type,
+        data: data,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            ...options
+        }
+    });
+}

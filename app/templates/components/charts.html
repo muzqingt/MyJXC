@@ -1,0 +1,75 @@
+{# 图表组件宏 #}
+
+{# 图表卡片容器 #}
+{% macro chart_card(title, canvas_id, height='300px') %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">{{ title }}</h6>
+    </div>
+    <div class="card-body">
+        <div style="height: {{ height }};">
+            <canvas id="{{ canvas_id }}"></canvas>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{# 折线图卡片 #}
+{% macro line_card(title, canvas_id, height='300px') %}
+{{ chart_card(title, canvas_id, height) }}
+{% endmacro %}
+
+{# 柱状图卡片 #}
+{% macro bar_card(title, canvas_id, height='300px') %}
+{{ chart_card(title, canvas_id, height) }}
+{% endmacro %}
+
+{# 饼图卡片 #}
+{% macro pie_card(title, canvas_id, height='350px') %}
+{{ chart_card(title, canvas_id, height) }}
+{% endmacro %}
+
+{# 环形图卡片 #}
+{% macro doughnut_card(title, canvas_id, height='350px') %}
+{{ chart_card(title, canvas_id, height) }}
+{% endmacro %}
+
+{# 仪表盘卡片 #}
+{% macro gauge_card(title, canvas_id, value, max, unit='', height='200px') %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">{{ title }}</h6>
+    </div>
+    <div class="card-body text-center">
+        <div style="height: {{ height }}; position: relative;">
+            <canvas id="{{ canvas_id }}"></canvas>
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+                <div class="h3 mb-0 font-weight-bold text-gray-800">{{ value }}</div>
+                <div class="text-muted small">{{ unit }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{# 指标卡片 #}
+{% macro metric_card(title, value, icon='bi-graph-up', color='primary', subtitle='') %}
+<div class="col-xl-3 col-md-6 mb-4">
+    <div class="card border-left-{{ color }} shadow h-100 py-2">
+        <div class="card-body">
+            <div class="row no-gutters align-items-center">
+                <div class="col mr-2">
+                    <div class="text-xs font-weight-bold text-{{ color }} text-uppercase mb-1">{{ title }}</div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ value }}</div>
+                    {% if subtitle %}
+                    <div class="text-muted small mt-1">{{ subtitle }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-auto">
+                    <i class="bi {{ icon }} fa-2x text-gray-300"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endmacro %}
