@@ -365,5 +365,70 @@
             </div>
         </div>
     </div>
+
+    <!-- 图表区域 -->
+    <div class="row">
+        <!-- 销售趋势 -->
+        <div class="col-lg-8 mb-4">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">销售趋势（近 30 天）</h6>
+                </div>
+                <div class="card-body">
+                    <div style="height: 300px;">
+                        <canvas id="salesTrendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 库存分布 -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">库存分布</h6>
+                </div>
+                <div class="card-body">
+                    <div style="height: 300px;">
+                        <canvas id="stockOverviewChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- 财务摘要 -->
+        <div class="col-12 mb-4">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">财务摘要（近 7 天）</h6>
+                </div>
+                <div class="card-body">
+                    <div style="height: 250px;">
+                        <canvas id="financeSummaryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script>
+// 加载销售趋势数据
+fetch('/api/sales-trend')
+    .then(response => response.json())
+    .then(data => renderSalesTrendChart('salesTrendChart', data));
+
+// 加载库存分布数据
+fetch('/api/stock-overview')
+    .then(response => response.json())
+    .then(data => renderStockOverviewChart('stockOverviewChart', data));
+
+// 加载财务摘要数据
+fetch('/api/finance-summary')
+    .then(response => response.json())
+    .then(data => renderFinanceSummaryChart('financeSummaryChart', data));
+</script>
 {% endblock %}
