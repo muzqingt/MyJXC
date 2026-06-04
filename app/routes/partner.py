@@ -419,3 +419,261 @@ def delete_warehouse(id):
 
     flash('仓库删除成功！', 'success')
     return redirect(url_for('partner.warehouses'))
+
+
+@bp.route('/suppliers/import')
+@login_required
+def supplier_import_page():
+    """供应商导入页面"""
+    return render_template('partner/supplier_import.html', title='供应商导入')
+
+
+@bp.route('/suppliers/import/template')
+@login_required
+def supplier_import_template():
+    """下载供应商导入模板"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    from flask import send_file
+    import io
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = '供应商导入模板'
+
+    headers = ['供应商编码', '供应商名称', '联系人', '电话', '地址', '邮箱']
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True)
+
+    ws.append(['SUP001', '示例供应商', '张三', '13800000000', '示例地址', 'example@test.com'])
+
+    for col in range(1, len(headers) + 1):
+        ws.column_dimensions[chr(64 + col)].width = 15
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name='供应商导入模板.xlsx'
+    )
+
+
+@bp.route('/suppliers/import', methods=['POST'])
+@login_required
+def import_suppliers():
+    """处理供应商导入"""
+    from openpyxl import load_workbook
+    import io
+    from decimal import Decimal
+
+    if 'file' not in request.files:
+        flash('请选择文件', 'danger')
+        return redirect(url_for('partner.supplier_import_page'))
+
+    file = request.files['file']
+    if not file.filename.endswith('.xlsx'):
+        flash('请上传 .xlsx 格式文件', 'danger')
+        return redirect(url_for('partner.supplier_import_page'))
+
+    try:
+        wb = load_workbook(io.BytesIO(file.read()))
+        ws = wb.active
+    except Exception:
+        flash('文件格式错误', 'danger')
+        return redirect(url_for('partner.supplier_import_page'))
+
+    success_count = 0
+    fail_count = 0
+    skip_count = 0
+    errors = []
+
+    for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        if not row or not row[0]:
+            continue
+
+        code = str(row[0]).strip()
+        name = str(row[1]).strip() if row[1] else ''
+        contact = str(row[2]).strip() if row[2] else ''
+        phone = str(row[3]).strip() if row[3] else ''
+        address = str(row[4]).strip() if row[4] else ''
+        email = str(row[5]).strip() if row[5] else ''
+
+        if not code:
+            errors.append(f'第 {row_idx} 行: 编码不能为空')
+            fail_count += 1
+            continue
+
+        if not name:
+            errors.append(f'第 {row_idx} 行: 名称不能为空')
+            fail_count += 1
+            continue
+
+        if Supplier.query.filter_by(code=code).first():
+            errors.append(f'第 {row_idx} 行: 编码 {code} 已存在')
+            skip_count += 1
+            continue
+
+        try:
+            supplier = Supplier(
+                code=code,
+                name=name,
+                contact_person=contact,
+                phone=phone,
+                address=address,
+                email=email,
+            )
+            db.session.add(supplier)
+            success_count += 1
+        except Exception as e:
+            errors.append(f'第 {row_idx} 行: 创建失败 - {str(e)}')
+            fail_count += 1
+
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        flash('导入失败，请重试', 'danger')
+        return redirect(url_for('partner.supplier_import_page'))
+
+    return render_template('partner/import_result.html',
+                         title='导入结果',
+                         success_count=success_count,
+                         fail_count=fail_count,
+                         skip_count=skip_count,
+                         errors=errors,
+                         back_url=url_for('partner.supplier_import_page'),
+                         list_url=url_for('partner.suppliers'))
+
+
+@bp.route('/customers/import')
+@login_required
+def customer_import_page():
+    """客户导入页面"""
+    return render_template('partner/customer_import.html', title='客户导入')
+
+
+@bp.route('/customers/import/template')
+@login_required
+def customer_import_template():
+    """下载客户导入模板"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    from flask import send_file
+    import io
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = '客户导入模板'
+
+    headers = ['客户编码', '客户名称', '联系人', '电话', '地址', '邮箱']
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True)
+
+    ws.append(['CUS001', '示例客户', '李四', '13900000000', '示例地址', 'example@test.com'])
+
+    for col in range(1, len(headers) + 1):
+        ws.column_dimensions[chr(64 + col)].width = 15
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name='客户导入模板.xlsx'
+    )
+
+
+@bp.route('/customers/import', methods=['POST'])
+@login_required
+def import_customers():
+    """处理客户导入"""
+    from openpyxl import load_workbook
+    import io
+    from decimal import Decimal
+
+    if 'file' not in request.files:
+        flash('请选择文件', 'danger')
+        return redirect(url_for('partner.customer_import_page'))
+
+    file = request.files['file']
+    if not file.filename.endswith('.xlsx'):
+        flash('请上传 .xlsx 格式文件', 'danger')
+        return redirect(url_for('partner.customer_import_page'))
+
+    try:
+        wb = load_workbook(io.BytesIO(file.read()))
+        ws = wb.active
+    except Exception:
+        flash('文件格式错误', 'danger')
+        return redirect(url_for('partner.customer_import_page'))
+
+    success_count = 0
+    fail_count = 0
+    skip_count = 0
+    errors = []
+
+    for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        if not row or not row[0]:
+            continue
+
+        code = str(row[0]).strip()
+        name = str(row[1]).strip() if row[1] else ''
+        contact = str(row[2]).strip() if row[2] else ''
+        phone = str(row[3]).strip() if row[3] else ''
+        address = str(row[4]).strip() if row[4] else ''
+        email = str(row[5]).strip() if row[5] else ''
+
+        if not code:
+            errors.append(f'第 {row_idx} 行: 编码不能为空')
+            fail_count += 1
+            continue
+
+        if not name:
+            errors.append(f'第 {row_idx} 行: 名称不能为空')
+            fail_count += 1
+            continue
+
+        if Customer.query.filter_by(code=code).first():
+            errors.append(f'第 {row_idx} 行: 编码 {code} 已存在')
+            skip_count += 1
+            continue
+
+        try:
+            customer = Customer(
+                code=code,
+                name=name,
+                contact_person=contact,
+                phone=phone,
+                address=address,
+                email=email,
+            )
+            db.session.add(customer)
+            success_count += 1
+        except Exception as e:
+            errors.append(f'第 {row_idx} 行: 创建失败 - {str(e)}')
+            fail_count += 1
+
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        flash('导入失败，请重试', 'danger')
+        return redirect(url_for('partner.customer_import_page'))
+
+    return render_template('partner/import_result.html',
+                         title='导入结果',
+                         success_count=success_count,
+                         fail_count=fail_count,
+                         skip_count=skip_count,
+                         errors=errors,
+                         back_url=url_for('partner.customer_import_page'),
+                         list_url=url_for('partner.customers'))

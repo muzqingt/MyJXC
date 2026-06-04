@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-8 offset-lg-2">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">供应商导入</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <h6>导入说明：</h6>
+                        <ol>
+                            <li>下载导入模板，按照模板格式填写数据</li>
+                            <li>供应商编码必须唯一</li>
+                            <li>供应商名称为必填项</li>
+                        </ol>
+                        <a href="{{ url_for('partner.supplier_import_template') }}" class="btn btn-outline-primary">
+                            <i class="bi bi-download"></i> 下载导入模板
+                        </a>
+                    </div>
+
+                    <form method="POST" action="{{ url_for('partner.import_suppliers') }}" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <label for="file" class="form-label">选择 Excel 文件</label>
+                            <input type="file" class="form-control" id="file" name="file" accept=".xlsx" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-upload"></i> 开始导入
+                        </button>
+                        <a href="{{ url_for('partner.suppliers') }}" class="btn btn-secondary">返回</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
