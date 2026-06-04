@@ -479,19 +479,19 @@ def import_products():
     import io
 
     if 'file' not in request.files:
-        flash('请选择文件', 'danger')
+        flash('请选择文件！', 'danger')
         return redirect(url_for('product.import_page'))
 
     file = request.files['file']
     if not file.filename.endswith('.xlsx'):
-        flash('请上传 .xlsx 格式文件', 'danger')
+        flash('请上传 .xlsx 格式文件！', 'danger')
         return redirect(url_for('product.import_page'))
 
     try:
         wb = load_workbook(io.BytesIO(file.read()))
         ws = wb.active
     except Exception as e:
-        flash('文件格式错误', 'danger')
+        flash('文件格式错误！', 'danger')
         return redirect(url_for('product.import_page'))
 
     # 获取分类映射
@@ -559,7 +559,7 @@ def import_products():
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        flash('导入失败，请重试', 'danger')
+        flash('导入失败，请重试！', 'danger')
         return redirect(url_for('product.import_page'))
 
     return render_template('product/import_result.html',

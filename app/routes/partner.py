@@ -472,19 +472,19 @@ def import_suppliers():
     from decimal import Decimal
 
     if 'file' not in request.files:
-        flash('请选择文件', 'danger')
+        flash('请选择文件！', 'danger')
         return redirect(url_for('partner.supplier_import_page'))
 
     file = request.files['file']
     if not file.filename.endswith('.xlsx'):
-        flash('请上传 .xlsx 格式文件', 'danger')
+        flash('请上传 .xlsx 格式文件！', 'danger')
         return redirect(url_for('partner.supplier_import_page'))
 
     try:
         wb = load_workbook(io.BytesIO(file.read()))
         ws = wb.active
     except Exception:
-        flash('文件格式错误', 'danger')
+        flash('文件格式错误！', 'danger')
         return redirect(url_for('partner.supplier_import_page'))
 
     success_count = 0
@@ -537,7 +537,7 @@ def import_suppliers():
         db.session.commit()
     except Exception:
         db.session.rollback()
-        flash('导入失败，请重试', 'danger')
+        flash('导入失败，请重试！', 'danger')
         return redirect(url_for('partner.supplier_import_page'))
 
     return render_template('partner/import_result.html',
@@ -601,19 +601,19 @@ def import_customers():
     from decimal import Decimal
 
     if 'file' not in request.files:
-        flash('请选择文件', 'danger')
+        flash('请选择文件！', 'danger')
         return redirect(url_for('partner.customer_import_page'))
 
     file = request.files['file']
     if not file.filename.endswith('.xlsx'):
-        flash('请上传 .xlsx 格式文件', 'danger')
+        flash('请上传 .xlsx 格式文件！', 'danger')
         return redirect(url_for('partner.customer_import_page'))
 
     try:
         wb = load_workbook(io.BytesIO(file.read()))
         ws = wb.active
     except Exception:
-        flash('文件格式错误', 'danger')
+        flash('文件格式错误！', 'danger')
         return redirect(url_for('partner.customer_import_page'))
 
     success_count = 0
@@ -666,7 +666,7 @@ def import_customers():
         db.session.commit()
     except Exception:
         db.session.rollback()
-        flash('导入失败，请重试', 'danger')
+        flash('导入失败，请重试！', 'danger')
         return redirect(url_for('partner.customer_import_page'))
 
     return render_template('partner/import_result.html',

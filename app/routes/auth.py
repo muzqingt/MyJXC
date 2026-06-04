@@ -22,7 +22,7 @@ def login():
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data).first()
         if user is None or not user.check_password(form.password.data):
-            flash('用户名或密码错误', 'danger')
+            flash('用户名或密码错误！', 'danger')
             return redirect(url_for('auth.login'))
         
         if not user.is_active:
@@ -119,19 +119,19 @@ def change_password():
     confirm_password = request.form.get('confirm_password', '')
     
     if not current_user.check_password(old_password):
-        flash('当前密码错误', 'danger')
+        flash('当前密码错误！', 'danger')
         return redirect(url_for('auth.profile'))
     
     if len(new_password) < 6:
-        flash('新密码长度至少6位', 'danger')
+        flash('新密码长度至少6位！', 'danger')
         return redirect(url_for('auth.profile'))
 
     if len(new_password) > 128:
-        flash('新密码长度不能超过128位', 'danger')
+        flash('新密码长度不能超过128位！', 'danger')
         return redirect(url_for('auth.profile'))
 
     if new_password != confirm_password:
-        flash('两次输入的密码不一致', 'danger')
+        flash('两次输入的密码不一致！', 'danger')
         return redirect(url_for('auth.profile'))
     
     current_user.set_password(new_password)
@@ -146,7 +146,7 @@ def change_password():
     db.session.add(log)
     try:
         db.session.commit()
-        flash('密码修改成功', 'success')
+        flash('密码修改成功！', 'success')
     except SQLAlchemyError:
         db.session.rollback()
 
@@ -164,17 +164,17 @@ def change_email():
     new_email = request.form.get('new_email', '').strip()
     
     if not new_email:
-        flash('邮箱地址不能为空', 'danger')
+        flash('邮箱地址不能为空！', 'danger')
         return redirect(url_for('auth.profile'))
     
     if not re.match(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$', new_email):
-        flash('请输入有效的邮箱地址', 'danger')
+        flash('请输入有效的邮箱地址！', 'danger')
         return redirect(url_for('auth.profile'))
     
     # 检查邮箱是否已被使用
     existing = User.query.filter(User.email == new_email, User.id != current_user.id).first()
     if existing:
-        flash('该邮箱已被其他用户使用', 'danger')
+        flash('该邮箱已被其他用户使用！', 'danger')
         return redirect(url_for('auth.profile'))
     
     current_user.email = new_email
@@ -189,7 +189,7 @@ def change_email():
     db.session.add(log)
     try:
         db.session.commit()
-        flash('邮箱修改成功', 'success')
+        flash('邮箱修改成功！', 'success')
     except SQLAlchemyError:
         db.session.rollback()
 

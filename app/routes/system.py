@@ -91,7 +91,7 @@ def create_backup():
         flash(msg, 'success')
     except (OSError, SQLAlchemyError):
         db.session.rollback()
-        flash('备份创建失败，请稍后重试', 'danger')
+        flash('备份创建失败，请稍后重试！', 'danger')
 
     return redirect(url_for('system.backup'))
 
@@ -126,17 +126,17 @@ def download_backup(filename):
 
     filename = _safe_filename(filename)
     if not filename:
-        flash('无效的文件名', 'danger')
+        flash('无效的文件名！', 'danger')
         return redirect(url_for('system.backup'))
 
     backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../backups')
     filepath = os.path.realpath(os.path.join(backup_dir, filename))
     if not filepath.startswith(os.path.realpath(backup_dir)):
-        flash('非法文件路径', 'danger')
+        flash('非法文件路径！', 'danger')
         return redirect(url_for('system.backup'))
 
     if not os.path.exists(filepath):
-        flash('备份文件不存在', 'danger')
+        flash('备份文件不存在！', 'danger')
         return redirect(url_for('system.backup'))
 
     return send_file(filepath, as_attachment=True)
@@ -149,31 +149,31 @@ def restore_backup():
 
     filename = request.form.get('filename')
     if not filename:
-        flash('请选择要恢复的备份文件', 'danger')
+        flash('请选择要恢复的备份文件！', 'danger')
         return redirect(url_for('system.backup'))
 
     filename = _safe_filename(filename)
     if not filename:
-        flash('无效的文件名', 'danger')
+        flash('无效的文件名！', 'danger')
         return redirect(url_for('system.backup'))
 
     backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../backups')
     backup_path = os.path.realpath(os.path.join(backup_dir, filename))
     if not backup_path.startswith(os.path.realpath(backup_dir)):
-        flash('非法文件路径', 'danger')
+        flash('非法文件路径！', 'danger')
         return redirect(url_for('system.backup'))
 
     db_path = current_app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
 
     if not os.path.exists(backup_path):
-        flash('备份文件不存在', 'danger')
+        flash('备份文件不存在！', 'danger')
         return redirect(url_for('system.backup'))
     
     try:
         current_backup = f'current_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db'
         shutil.copy2(db_path, os.path.join(backup_dir, current_backup))
     except OSError:
-        flash('数据恢复失败，请稍后重试', 'danger')
+        flash('数据恢复失败，请稍后重试！', 'danger')
         return redirect(url_for('system.backup'))
 
     db.session.remove()
@@ -181,7 +181,7 @@ def restore_backup():
         shutil.copy2(backup_path, db_path)
     except OSError:
         db.session.rollback()
-        flash('数据恢复失败，请稍后重试', 'danger')
+        flash('数据恢复失败，请稍后重试！', 'danger')
         return redirect(url_for('system.backup'))
 
     flash(f'数据恢复成功，当前数据库已备份为: {current_backup}', 'success')
@@ -195,27 +195,27 @@ def delete_backup():
 
     filename = request.form.get('filename')
     if not filename:
-        flash('请选择要删除的备份文件', 'danger')
+        flash('请选择要删除的备份文件！', 'danger')
         return redirect(url_for('system.backup'))
 
     filename = _safe_filename(filename)
     if not filename:
-        flash('无效的文件名', 'danger')
+        flash('无效的文件名！', 'danger')
         return redirect(url_for('system.backup'))
 
     backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../backups')
     backup_path = os.path.realpath(os.path.join(backup_dir, filename))
     if not backup_path.startswith(os.path.realpath(backup_dir)):
-        flash('非法文件路径', 'danger')
+        flash('非法文件路径！', 'danger')
         return redirect(url_for('system.backup'))
 
     if not os.path.exists(backup_path):
-        flash('备份文件不存在', 'danger')
+        flash('备份文件不存在！', 'danger')
         return redirect(url_for('system.backup'))
 
     # 不允许删除当前备份文件
     if filename.startswith('current_'):
-        flash('不能删除当前备份文件', 'danger')
+        flash('不能删除当前备份文件！', 'danger')
         return redirect(url_for('system.backup'))
     
     try:
@@ -234,7 +234,7 @@ def delete_backup():
         flash(f'备份文件已删除: {filename}', 'success')
     except (OSError, SQLAlchemyError):
         db.session.rollback()
-        flash('删除备份失败，请稍后重试', 'danger')
+        flash('删除备份失败，请稍后重试！', 'danger')
     
     return redirect(url_for('system.backup'))
 
@@ -291,12 +291,12 @@ def add_user():
         role = 'user'
 
     if not username or not password:
-        flash('用户名和密码不能为空', 'danger')
+        flash('用户名和密码不能为空！', 'danger')
         return redirect(url_for('system.user_management'))
     
     # 检查用户名是否已存在
     if User.query.filter_by(username=username).first():
-        flash('用户名已存在', 'danger')
+        flash('用户名已存在！', 'danger')
         return redirect(url_for('system.user_management'))
     
     # 创建新用户
@@ -306,13 +306,13 @@ def add_user():
     try:
         db.session.add(user)
         db.session.commit()
-        flash('用户添加成功', 'success')
+        flash('用户添加成功！', 'success')
     except IntegrityError:
         db.session.rollback()
-        flash('用户名或邮箱已存在', 'danger')
+        flash('用户名或邮箱已存在！', 'danger')
     except SQLAlchemyError:
         db.session.rollback()
-        flash('添加用户失败，请稍后重试', 'danger')
+        flash('添加用户失败，请稍后重试！', 'danger')
 
     return redirect(url_for('system.user_management'))
 
@@ -335,7 +335,7 @@ def edit_user(user_id):
 
         email = request.form.get('email', '').strip()
         if email and ('@' not in email or '.' not in email.split('@')[1]):
-            flash('请输入有效的邮箱地址', 'danger')
+            flash('请输入有效的邮箱地址！', 'danger')
             return redirect(url_for('system.edit_user', user_id=user_id))
         user.email = email
         role = request.form.get('role')
@@ -347,12 +347,12 @@ def edit_user(user_id):
         password = request.form.get('password')
         if password:
             if len(password) < 6 or len(password) > 128:
-                flash('密码长度必须在6到128个字符之间', 'danger')
+                flash('密码长度必须在6到128个字符之间！', 'danger')
                 return redirect(url_for('system.edit_user', user_id=user_id))
             user.set_password(password)
 
         db.session.commit()
-        flash('用户信息已更新', 'success')
+        flash('用户信息已更新！', 'success')
         return redirect(url_for('system.user_management'))
     
     return render_template('system/user_edit.html', title='编辑用户', user=user)
@@ -369,7 +369,7 @@ def delete_user(user_id):
         return redirect(url_for('system.user_management'))
 
     if user_id == current_user.id:
-        flash('不能删除当前登录用户', 'danger')
+        flash('不能删除当前登录用户！', 'danger')
         return redirect(url_for('system.user_management'))
     
     user = db.session.get(User, user_id)
@@ -382,10 +382,10 @@ def delete_user(user_id):
     try:
         db.session.delete(user)
         db.session.commit()
-        flash('用户已删除', 'success')
+        flash('用户已删除！', 'success')
     except SQLAlchemyError:
         db.session.rollback()
-        flash('删除用户失败，请稍后重试', 'danger')
+        flash('删除用户失败，请稍后重试！', 'danger')
     return redirect(url_for('system.user_management'))
 
 @bp.route('/api/system-info')
@@ -470,7 +470,7 @@ def export_db():
     export_filename = f'export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db'
     
     if not os.path.exists(db_path):
-        flash('数据库文件不存在', 'danger')
+        flash('数据库文件不存在！', 'danger')
         return redirect(url_for('system.settings'))
 
     db.session.remove()

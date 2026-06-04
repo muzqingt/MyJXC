@@ -200,7 +200,7 @@ def new_order():
                     pid = int(product_ids[i])
                 except ValueError:
                     db.session.rollback()
-                    flash('商品ID无效!', 'danger')
+                    flash('商品ID无效！', 'danger')
                     return redirect(url_for('sales.new_order'))
                 product = db.session.get(Product, pid)
                 if product:
@@ -300,7 +300,7 @@ def new_order():
                 flash(f'销售订单创建并出库完成！出库单号: {delivery_number}', 'success')
             except SQLAlchemyError as e:
                 db.session.rollback()
-                flash('直接出库失败，请重试', 'danger')
+                flash('直接出库失败，请重试！', 'danger')
                 return render_template('sales/order_items.html',
                                      title='新建销售订单',
                                      customers=customers_data,
@@ -321,7 +321,7 @@ def new_order():
             db.session.commit()
         except SQLAlchemyError as e:
             db.session.rollback()
-            flash('创建订单失败，请重试', 'danger')
+            flash('创建订单失败，请重试！', 'danger')
             return render_template('sales/order_items.html',
                                  title='新建销售订单',
                                  customers=customers_data,
@@ -452,7 +452,7 @@ def edit_order(id):
                 try:
                     product_id = int(product_ids[i])
                 except ValueError:
-                    flash('商品ID无效!', 'danger')
+                    flash('商品ID无效！', 'danger')
                     return redirect(url_for('sales.edit_order', id=id))
                 remaining_product_ids.add(product_id)
                 product = db.session.get(Product, product_id)
@@ -492,7 +492,7 @@ def edit_order(id):
             return redirect(url_for('sales.index', tab=get_redirect_tab(order.status)))
         except SQLAlchemyError:
             db.session.rollback()
-            flash('修改订单失败，请重试', 'danger')
+            flash('修改订单失败，请重试！', 'danger')
             return redirect(url_for('sales.index'))
     
     return render_template('sales/order_items.html',
@@ -555,7 +555,7 @@ def delete_order(id):
         flash('销售订单删除成功！', 'success')
     except SQLAlchemyError:
         db.session.rollback()
-        flash('销售订单删除失败，请稍后重试', 'danger')
+        flash('销售订单删除失败，请稍后重试！', 'danger')
     return redirect(url_for('sales.index'))
 
 @bp.route('/orders/<int:id>/quick-stock-out', methods=['POST'])
@@ -674,7 +674,7 @@ def quick_stock_out(id):
         
     except SQLAlchemyError as e:
         db.session.rollback()
-        flash('出库失败，请重试', 'danger')
+        flash('出库失败，请重试！', 'danger')
 
     return redirect(url_for('sales.index', tab='stockouts'))
 
@@ -874,7 +874,7 @@ def edit_stock_out_items(id):
                 try:
                     pid = int(product_ids[i])
                 except ValueError:
-                    flash('商品ID无效!', 'danger')
+                    flash('商品ID无效！', 'danger')
                     return redirect(url_for('sales.edit_stock_out_items', id=id))
                 product = db.session.get(Product, pid)
                 if product:
@@ -1007,7 +1007,7 @@ def complete_stock_out(id):
         
     except SQLAlchemyError as e:
         db.session.rollback()
-        flash('出库失败，请重试', 'danger')
+        flash('出库失败，请重试！', 'danger')
 
     return redirect(url_for('sales.index', tab='stockouts'))
 
@@ -1138,7 +1138,7 @@ def quick_return(id):
         flash(f'退货单 {return_number} 创建成功，库存已更新！', 'success')
     except SQLAlchemyError as e:
         db.session.rollback()
-        flash('退货失败，请重试', 'danger')
+        flash('退货失败，请重试！', 'danger')
 
     return redirect(url_for('sales.index', tab='returns'))
 
@@ -1196,7 +1196,7 @@ def delete_return(id):
         flash('退货单删除成功！', 'success')
     except SQLAlchemyError:
         db.session.rollback()
-        flash('退货单删除失败，请稍后重试', 'danger')
+        flash('退货单删除失败，请稍后重试！', 'danger')
     return redirect(url_for('sales.returns'))
 
 

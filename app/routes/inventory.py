@@ -142,7 +142,7 @@ def stock_check():
             return redirect(url_for('inventory.stock_check'))
         except SQLAlchemyError as e:
             db.session.rollback()
-            flash('盘点失败，请重试', 'danger')
+            flash('盘点失败，请重试！', 'danger')
     
     products = Product.query.all()
     warehouses = Warehouse.query.all()
@@ -309,7 +309,7 @@ def stock_transfer():
             return redirect(url_for('inventory.stock_transfer'))
         except SQLAlchemyError as e:
             db.session.rollback()
-            flash('调拨失败，请重试', 'danger')
+            flash('调拨失败，请重试！', 'danger')
 
     # 验证失败时，从 form.items 构建 items_data 供 JS 回填
     if form.items.data:
@@ -687,7 +687,7 @@ def stock_adjust():
             return redirect(url_for('inventory.product_list'))
         except SQLAlchemyError as e:
             db.session.rollback()
-            flash('调整失败，请重试', 'danger')
+            flash('调整失败，请重试！', 'danger')
 
     return render_template('inventory/stock_adjust.html',
                          title='库存调整',

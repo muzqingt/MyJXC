@@ -190,6 +190,9 @@ def build_partners_data(partners: list) -> list[dict]:
 
 def flash_success(message: str, endpoint: Optional[str] = None, **kwargs: Any) -> Optional[Any]:
     """成功消息并重定向"""
+    # 确保中文标点
+    if not message.endswith(('！', '。', '…')):
+        message += '！'
     flash(message, 'success')
     if endpoint:
         return redirect(url_for(endpoint, **kwargs))
@@ -198,7 +201,19 @@ def flash_success(message: str, endpoint: Optional[str] = None, **kwargs: Any) -
 
 def flash_error(message: str, endpoint: Optional[str] = None, **kwargs: Any) -> Optional[Any]:
     """错误消息并重定向"""
+    if not message.endswith(('！', '。', '…')):
+        message += '！'
     flash(message, 'danger')
+    if endpoint:
+        return redirect(url_for(endpoint, **kwargs))
+    return None
+
+
+def flash_warning(message: str, endpoint: Optional[str] = None, **kwargs: Any) -> Optional[Any]:
+    """警告消息并重定向"""
+    if not message.endswith(('！', '。', '…')):
+        message += '！'
+    flash(message, 'warning')
     if endpoint:
         return redirect(url_for(endpoint, **kwargs))
     return None

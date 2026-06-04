@@ -114,9 +114,9 @@ def add_receipt():
             db.session.commit()
         except SQLAlchemyError:
             db.session.rollback()
-            flash('添加失败，请重试!', 'danger')
+            flash('添加失败，请重试！', 'danger')
             return redirect(url_for('finance.add_receipt'))
-        flash('收款记录已添加成功!', 'success')
+        flash('收款记录已添加成功！', 'success')
         return redirect(url_for('finance.receipts'))
 
     customers = Customer.query.all()
@@ -182,9 +182,9 @@ def add_payment():
             db.session.commit()
         except SQLAlchemyError:
             db.session.rollback()
-            flash('添加失败，请重试!', 'danger')
+            flash('添加失败，请重试！', 'danger')
             return redirect(url_for('finance.add_payment'))
-        flash('付款记录已添加成功!', 'success')
+        flash('付款记录已添加成功！', 'success')
         return redirect(url_for('finance.payments'))
 
     suppliers = Supplier.query.all()
@@ -237,11 +237,11 @@ def add_expense():
             )
             db.session.add(expense)
             db.session.commit()
-            flash('费用记录已添加成功!', 'success')
+            flash('费用记录已添加成功！', 'success')
             return redirect(url_for('finance.expenses'))
         except SQLAlchemyError:
             db.session.rollback()
-            flash('添加失败，请重试', 'danger')
+            flash('添加失败，请重试！', 'danger')
             return redirect(url_for('finance.add_expense'))
 
     return render_template('finance/expense_edit.html', title='添加费用', form=form)
@@ -337,7 +337,7 @@ def edit_receipt(receipt_id):
                 sub_balance(customer, "receivable_balance", receipt.amount)
 
         db.session.commit()
-        flash('收款记录已更新成功!', 'success')
+        flash('收款记录已更新成功！', 'success')
         return redirect(url_for('finance.view_receipt', receipt_id=receipt.id))
 
     customers = Customer.query.all()
@@ -434,7 +434,7 @@ def edit_payment(payment_id):
                 sub_balance(supplier, "payable_balance", payment.amount)
 
         db.session.commit()
-        flash('付款记录已更新成功!', 'success')
+        flash('付款记录已更新成功！', 'success')
         return redirect(url_for('finance.view_payment', payment_id=payment.id))
 
     suppliers = Supplier.query.all()
