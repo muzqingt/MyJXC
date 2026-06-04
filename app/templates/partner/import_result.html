@@ -8,32 +8,74 @@
         <div class="col-lg-8 offset-lg-2">
             <div class="card shadow">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">导入结果</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="bi bi-check-circle"></i> 导入结果
+                    </h6>
                 </div>
                 <div class="card-body">
+                    <!-- 统计卡片 -->
                     <div class="row text-center mb-4">
                         <div class="col-md-4">
-                            <div class="h3 mb-0 text-success">{{ success_count }}</div>
-                            <div class="text-muted">成功</div>
+                            <div class="card border-success">
+                                <div class="card-body">
+                                    <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+                                    <div class="h3 mb-0 text-success mt-2">{{ success_count }}</div>
+                                    <div class="text-muted">成功</div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-md-4">
-                            <div class="h3 mb-0 text-danger">{{ fail_count }}</div>
-                            <div class="text-muted">失败</div>
+                            <div class="card border-danger">
+                                <div class="card-body">
+                                    <i class="bi bi-x-circle text-danger" style="font-size: 2rem;"></i>
+                                    <div class="h3 mb-0 text-danger mt-2">{{ fail_count }}</div>
+                                    <div class="text-muted">失败</div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-md-4">
-                            <div class="h3 mb-0 text-warning">{{ skip_count }}</div>
-                            <div class="text-muted">跳过</div>
+                            <div class="card border-warning">
+                                <div class="card-body">
+                                    <i class="bi bi-skip-forward text-warning" style="font-size: 2rem;"></i>
+                                    <div class="h3 mb-0 text-warning mt-2">{{ skip_count }}</div>
+                                    <div class="text-muted">跳过</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     {% if errors %}
-                    <div class="alert alert-warning">
-                        <h6>错误详情：</h6>
-                        <ul class="mb-0">
-                            {% for error in errors %}
-                            <li>{{ error }}</li>
-                            {% endfor %}
-                        </ul>
+                    <div class="card border-warning mb-4">
+                        <div class="card-header bg-warning text-white">
+                            <i class="bi bi-exclamation-triangle"></i> 错误详情
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>行号</th>
+                                            <th>错误信息</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for error in errors %}
+                                        <tr class="table-danger">
+                                            <td>{{ loop.index }}</td>
+                                            <td>{{ error }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if success_count > 0 %}
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle"></i>
+                        成功导入 {{ success_count }} 条记录！
                     </div>
                     {% endif %}
 
