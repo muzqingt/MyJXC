@@ -164,17 +164,19 @@ $(document).ready(function() {
         $('#items-body').append(row);
         
         // 初始化商品搜索组件
-        const searcher = new ProductSearcher({
-            products: products,
-            onSelect: function(product) {
-                handleProductSelect(rowId, product);
-            },
+        const searcher = initEntitySearch('#product-wrapper-' + rowId, products, function(product) {
+            handleProductSelect(rowId, product);
+        }, {
             containerClass: `product-search-${rowId}`,
-            rowId: rowId,
-            selectedProductId: productId || null
+            hiddenName: 'product_id[]',
+            selectedId: productId || null,
+            extraSearchFields: ['specification'],
+            notFoundText: '未找到匹配的商品',
+            displayExtra: function(p) {
+                const stockInfo = p.stock_quantity !== undefined ? ` - 库存: ${p.stock_quantity}${p.unit || ''}` : '';
+                return `<small class="text-muted">${p.specification || '无规格'}${stockInfo}</small>`;
+            }
         });
-        
-        $('#product-wrapper-' + rowId).append(searcher.getContainer());
         
         // 存储searcher实例
         window[`searcher_${rowId}`] = searcher;
