@@ -7,6 +7,7 @@ from app.models import Product, Warehouse, StockLog
 import io
 from app.forms import StockAdjustForm, StockTransferForm
 from app.utils import to_decimal, apply_excel_header_style, EXCEL_THIN_BORDER
+from app.utils_order import create_stock_log
 from sqlalchemy.exc import SQLAlchemyError
 
 VALID_LOG_TYPES = {'in', 'out', 'check_in', 'check_out', 'adjust_in', 'adjust_out', 'return_in', 'return_out', 'stock_transfer'}
@@ -119,26 +120,22 @@ def stock_check():
                     if product:
                         book_quantity = to_decimal(product.stock_quantity)
                         actual_quantity = to_decimal(actual_quantities[i])
-                        
+
                         # 计算差异：正值为盘盈(入库)，负值为盘亏(出库)
                         if book_quantity != actual_quantity:
                             diff = actual_quantity - book_quantity
                             change_type = 'check_in' if diff > 0 else 'check_out'
-                            
-                            product.stock_quantity = actual_quantity
-                            
-                            log = StockLog(
-                                product_id=product.id,
+
+                            create_stock_log(
+                                product=product,
                                 warehouse_id=warehouse_id,
                                 change_type=change_type,
                                 quantity=abs(diff),
-                                before_quantity=book_quantity,
-                                after_quantity=actual_quantity,
+                                reference_id=None,
                                 reference_type='stock_check',
                                 notes=f'库存盘点: {notes}',
-                                created_by=current_user.id
+                                user_id=current_user.id
                             )
-                            db.session.add(log)
             
             db.session.commit()
             flash('库存盘点完成！', 'success')
@@ -282,41 +279,30 @@ def stock_transfer():
                                                  items_data=items_data)
 
                         # 步骤1：源仓库扣减库存，记录出库日志
-                        product.stock_quantity -= quantity
-                        before_out = actual_stock
-                        after_out = actual_stock - quantity
-                        log_out = StockLog(
-                            product_id=product.id,
+                        create_stock_log(
+                            product=product,
                             warehouse_id=from_warehouse_id,
                             change_type='out',
                             quantity=quantity,
-                            before_quantity=before_out,
-                            after_quantity=after_out,
+                            reference_id=None,
                             reference_type='stock_transfer',
                             notes=f'调拨出库至{to_warehouse_name}: {notes}',
-                            created_by=current_user.id
+                            user_id=current_user.id
                         )
-                        product_warehouse_stock[pid][from_warehouse_id] = after_out
-                        db.session.add(log_out)
+                        product_warehouse_stock[pid][from_warehouse_id] = actual_stock - quantity
 
                         # 步骤2：目标仓库增加库存，记录入库日志
-                        product.stock_quantity += quantity
-                        actual_stock_to = product_warehouse_stock[pid][to_warehouse_id]
-                        before_in = actual_stock_to
-                        after_in = actual_stock_to + quantity
-                        log_in = StockLog(
-                            product_id=product.id,
+                        create_stock_log(
+                            product=product,
                             warehouse_id=to_warehouse_id,
                             change_type='in',
                             quantity=quantity,
-                            before_quantity=before_in,
-                            after_quantity=after_in,
+                            reference_id=None,
                             reference_type='stock_transfer',
                             notes=f'调拨入库自{from_warehouse_name}: {notes}',
-                            created_by=current_user.id
+                            user_id=current_user.id
                         )
-                        product_warehouse_stock[pid][to_warehouse_id] = after_in
-                        db.session.add(log_in)
+                        product_warehouse_stock[pid][to_warehouse_id] = product_warehouse_stock[pid].get(to_warehouse_id, 0) + quantity
 
             db.session.commit()
             flash('库存调拨完成！', 'success')
@@ -606,27 +592,22 @@ def api_stock_check():
                     warehouse_id = int(warehouse_id)
                     system_stock = to_decimal(product.stock_quantity)
                     new_stock = to_decimal(actual_stock)
-                    
+
                     if system_stock != new_stock:
-                        # 更新产品库存
-                        product.stock_quantity = new_stock
-                        
-                        # 记录库存日志
+                        # 计算差异
                         diff = new_stock - system_stock
                         change_type = 'check_in' if diff > 0 else 'check_out'
-                        
-                        log = StockLog(
-                            product_id=product.id,
+
+                        create_stock_log(
+                            product=product,
                             warehouse_id=warehouse_id,
                             change_type=change_type,
                             quantity=abs(diff),
-                            before_quantity=system_stock,
-                            after_quantity=new_stock,
+                            reference_id=None,
                             reference_type='stock_check',
                             notes=f'库存盘点: {remark}',
-                            created_by=current_user.id
+                            user_id=current_user.id
                         )
-                        db.session.add(log)
         
         db.session.commit()
         return jsonify({'success': True, 'message': '盘点保存成功'})
@@ -661,12 +642,19 @@ def stock_adjust():
             product = db.session.query(Product).filter(Product.id == form.product_id.data).with_for_update().first()
             if product is None:
                 abort(404)
-            before_quantity = to_decimal(product.stock_quantity)
             quantity = to_decimal(form.quantity.data)
 
             if form.adjust_type.data == 'adjust_in':
-                product.stock_quantity += quantity
-                after_quantity = to_decimal(product.stock_quantity)
+                create_stock_log(
+                    product=product,
+                    warehouse_id=form.warehouse_id.data,
+                    change_type='adjust_in',
+                    quantity=quantity,
+                    reference_id=None,
+                    reference_type='stock_adjust',
+                    notes=form.notes.data or '',
+                    user_id=current_user.id
+                )
             elif form.adjust_type.data == 'adjust_out':
                 if product.stock_quantity < quantity:
                     flash('库存不足，无法调整！', 'danger')
@@ -675,8 +663,16 @@ def stock_adjust():
                                          form=form,
                                          products=products_data,
                                          warehouses=warehouses_data)
-                product.stock_quantity -= quantity
-                after_quantity = to_decimal(product.stock_quantity)
+                create_stock_log(
+                    product=product,
+                    warehouse_id=form.warehouse_id.data,
+                    change_type='adjust_out',
+                    quantity=quantity,
+                    reference_id=None,
+                    reference_type='stock_adjust',
+                    notes=form.notes.data or '',
+                    user_id=current_user.id
+                )
             else:
                 flash('无效的调整类型！', 'danger')
                 return render_template('inventory/stock_adjust.html',
@@ -685,18 +681,6 @@ def stock_adjust():
                                      products=products_data,
                                      warehouses=warehouses_data)
 
-            log = StockLog(
-                product_id=product.id,
-                warehouse_id=form.warehouse_id.data,
-                change_type=form.adjust_type.data,
-                quantity=quantity,
-                before_quantity=before_quantity,
-                after_quantity=after_quantity,
-                reference_type='stock_adjust',
-                notes=form.notes.data or '',
-                created_by=current_user.id
-            )
-            db.session.add(log)
             db.session.commit()
 
             flash('库存调整成功！', 'success')
