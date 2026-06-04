@@ -131,7 +131,11 @@ def new_order():
             order_items_list = []
             for i in range(len(product_ids)):
                 if product_ids[i] and quantities[i] and unit_prices[i]:
-                    product = db.session.get(Product, int(product_ids[i]))
+                    try:
+                        pid = int(product_ids[i])
+                    except ValueError:
+                        continue
+                    product = db.session.get(Product, pid)
                     if product:
                         order_items_list.append({
                             'product_id': product.id,
@@ -205,7 +209,13 @@ def new_order():
         order_items_list = []
         for i in range(len(product_ids)):
             if product_ids[i] and quantities[i] and unit_prices[i]:
-                product = db.session.get(Product, int(product_ids[i]))
+                try:
+                    pid = int(product_ids[i])
+                except ValueError:
+                    db.session.rollback()
+                    flash('商品ID无效!', 'danger')
+                    return redirect(url_for('sales.new_order'))
+                product = db.session.get(Product, pid)
                 if product:
                     quantity = to_decimal(quantities[i])
                     unit_price = to_decimal(unit_prices[i])
@@ -402,7 +412,11 @@ def edit_order(id):
             order_items_list = []
             for i in range(len(product_ids)):
                 if product_ids[i] and quantities[i] and unit_prices[i]:
-                    product = db.session.get(Product, int(product_ids[i]))
+                    try:
+                        pid = int(product_ids[i])
+                    except ValueError:
+                        continue
+                    product = db.session.get(Product, pid)
                     if product:
                         order_items_list.append({
                             'product_id': product.id,
@@ -471,7 +485,11 @@ def edit_order(id):
 
         for i in range(len(product_ids)):
             if product_ids[i] and quantities[i] and unit_prices[i]:
-                product_id = int(product_ids[i])
+                try:
+                    product_id = int(product_ids[i])
+                except ValueError:
+                    flash('商品ID无效!', 'danger')
+                    return redirect(url_for('sales.edit_order', id=id))
                 remaining_product_ids.add(product_id)
                 product = db.session.get(Product, product_id)
                 if product:
@@ -571,15 +589,17 @@ def delete_order(id):
         return redirect(url_for('sales.index'))
 
     # 回滚客户应收余额（订单创建时已累加）
-    customer = order.customer
-    # 只有已完成的订单才需要回滚应收余额（confirmed/partial 未实际出库，无余额记录）
-    if customer and order.status == 'completed':
-        sub_balance(customer, "receivable_balance", order.total_amount)
-    
-    db.session.delete(order)
-    db.session.commit()
-    
-    flash('销售订单删除成功！', 'success')
+    try:
+        customer = order.customer
+        # 只有已完成的订单才需要回滚应收余额（confirmed/partial 未实际出库，无余额记录）
+        if customer and order.status == 'completed':
+            sub_balance(customer, "receivable_balance", order.total_amount)
+        db.session.delete(order)
+        db.session.commit()
+        flash('销售订单删除成功！', 'success')
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('销售订单删除失败，请稍后重试', 'danger')
     return redirect(url_for('sales.index'))
 
 @bp.route('/orders/<int:id>/quick-stock-out', methods=['POST'])
@@ -898,11 +918,16 @@ def edit_stock_out_items(id):
         
         # 删除原有明细并重建
         StockOutItem.query.filter_by(stock_out_id=stock_out.id).delete()
-        
+
         total_amount = 0
         for i in range(len(product_ids)):
             if product_ids[i] and quantities[i] and unit_prices[i]:
-                product = db.session.get(Product, int(product_ids[i]))
+                try:
+                    pid = int(product_ids[i])
+                except ValueError:
+                    flash('商品ID无效!', 'danger')
+                    return redirect(url_for('sales.edit_stock_out_items', id=id))
+                product = db.session.get(Product, pid)
                 if product:
                     quantity = to_decimal(quantities[i])
                     unit_price = to_decimal(unit_prices[i])
@@ -1231,8 +1256,12 @@ def delete_return(id):
         return redirect(url_for('sales.returns'))
 
     db.session.delete(sales_return)
-    db.session.commit()
-    flash('退货单删除成功！', 'success')
+    try:
+        db.session.commit()
+        flash('退货单删除成功！', 'success')
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('退货单删除失败，请稍后重试', 'danger')
     return redirect(url_for('sales.returns'))
 
 
