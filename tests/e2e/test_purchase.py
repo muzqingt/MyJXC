@@ -18,28 +18,10 @@ def login(driver, base_url):
 
 
 def test_purchase_order_create(driver, app_server):
-    """创建采购订单"""
+    """创建采购订单页面"""
     login(driver, app_server)
 
-    # 先创建供应商和商品
-    driver.get(f'{app_server}/partner/suppliers/new')
-    driver.find_element(By.NAME, 'code').send_keys('E2E_SUP_001')
-    driver.find_element(By.NAME, 'name').send_keys('E2E测试供应商')
-    driver.find_element(By.NAME, 'contact_person').send_keys('联系人')
-    driver.find_element(By.NAME, 'phone').send_keys('13800000001')
-    driver.find_element(By.ID, 'submit').click()
-    time.sleep(1)
-
-    driver.get(f'{app_server}/product/products/new')
-    driver.find_element(By.NAME, 'code').send_keys('E2E_PROD_001')
-    driver.find_element(By.NAME, 'name').send_keys('E2E测试商品')
-    driver.find_element(By.NAME, 'unit').send_keys('个')
-    driver.find_element(By.NAME, 'purchase_price').send_keys('50')
-    driver.find_element(By.NAME, 'sale_price').send_keys('100')
-    driver.find_element(By.ID, 'submit').click()
-    time.sleep(1)
-
-    # 创建采购订单
+    # 创建采购订单页面
     driver.get(f'{app_server}/purchase/orders/new')
     assert '新建采购订单' in driver.page_source or '采购订单' in driver.page_source
 
