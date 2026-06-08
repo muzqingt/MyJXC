@@ -341,3 +341,23 @@ def apply_excel_header_style(ws: Any, row: int, max_col: int) -> None:
 
 from app.constants import PaymentMethod
 PAYMENT_METHOD_MAP = PaymentMethod.LABELS
+
+
+def validate_csrf_token(token: str) -> bool:
+    """验证 CSRF token，尊重 WTF_CSRF_ENABLED 设置
+
+    Args:
+        token: CSRF token 字符串
+
+    Returns:
+        True 如果验证通过或 CSRF 已禁用，False 如果验证失败
+    """
+    from flask import current_app
+    if not current_app.config.get('WTF_CSRF_ENABLED', True):
+        return True
+    try:
+        from flask_wtf.csrf import validate_csrf
+        validate_csrf(token)
+        return True
+    except Exception:
+        return False

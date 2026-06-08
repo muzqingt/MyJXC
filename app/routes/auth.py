@@ -2,12 +2,11 @@ import re
 from flask import render_template, redirect, url_for, flash, request, Blueprint
 from urllib.parse import urlparse
 from flask_login import login_user, logout_user, current_user, login_required
-from flask_wtf.csrf import validate_csrf
-from wtforms import ValidationError
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from app import db
 from app.models import User, Log
 from app.forms import LoginForm, RegistrationForm
+from app.utils import validate_csrf_token
 from datetime import datetime
 
 # 创建蓝图
@@ -108,9 +107,7 @@ def profile():
 @bp.route('/change-password', methods=['POST'])
 @login_required
 def change_password():
-    try:
-        validate_csrf(request.form.get('csrf_token'))
-    except ValidationError:
+    if not validate_csrf_token(request.form.get('csrf_token')):
         flash('请求无效，请重试。', 'danger')
         return redirect(url_for('auth.profile'))
 
@@ -155,9 +152,7 @@ def change_password():
 @bp.route('/change-email', methods=['POST'])
 @login_required
 def change_email():
-    try:
-        validate_csrf(request.form.get('csrf_token'))
-    except ValidationError:
+    if not validate_csrf_token(request.form.get('csrf_token')):
         flash('请求无效，请重试。', 'danger')
         return redirect(url_for('auth.profile'))
 

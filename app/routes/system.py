@@ -1,13 +1,12 @@
 from flask import render_template, redirect, url_for, flash, request, jsonify, Blueprint, send_file, abort, current_app
 from flask_login import login_required, current_user
-from flask_wtf.csrf import validate_csrf
-from wtforms import ValidationError
 import os
 import shutil
 from datetime import datetime
 from app import db
 from app.models import Log, User
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+from app.utils import validate_csrf_token
 
 # 创建蓝图
 bp = Blueprint('system', __name__, url_prefix='/system')
@@ -277,9 +276,7 @@ def user_management():
 def add_user():
     """添加用户"""
     _require_admin()
-    try:
-        validate_csrf(request.form.get('csrf_token'))
-    except ValidationError:
+    if not validate_csrf_token(request.form.get('csrf_token')):
         flash('请求无效，请重试。', 'danger')
         return redirect(url_for('system.user_management'))
 
@@ -327,9 +324,7 @@ def edit_user(user_id):
         abort(404)
 
     if request.method == 'POST':
-        try:
-            validate_csrf(request.form.get('csrf_token'))
-        except ValidationError:
+        if not validate_csrf_token(request.form.get('csrf_token')):
             flash('请求无效，请重试。', 'danger')
             return redirect(url_for('system.user_management'))
 
@@ -362,9 +357,7 @@ def edit_user(user_id):
 def delete_user(user_id):
     """删除用户"""
     _require_admin()
-    try:
-        validate_csrf(request.form.get('csrf_token'))
-    except ValidationError:
+    if not validate_csrf_token(request.form.get('csrf_token')):
         flash('请求无效，请重试。', 'danger')
         return redirect(url_for('system.user_management'))
 
@@ -481,9 +474,7 @@ def export_db():
 def save_settings():
     """保存系统设置"""
     _require_admin()
-    try:
-        validate_csrf(request.form.get('csrf_token'))
-    except ValidationError:
+    if not validate_csrf_token(request.form.get('csrf_token')):
         return jsonify({'success': False, 'message': '请求无效，请重试。'}), 400
 
     from app.models import SystemSetting

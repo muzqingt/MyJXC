@@ -509,7 +509,6 @@ def test_expense_create_verifies(authenticated_client, app, db_session):
 
 # ==================== 用户管理断言 ====================
 
-@pytest.mark.skip(reason="CSRF token validation issue - needs fix in code")
 def test_user_add_verifies(authenticated_client, app, db_session):
     """添加用户 - 验证用户已创建"""
     import time
@@ -531,7 +530,6 @@ def test_user_add_verifies(authenticated_client, app, db_session):
     assert user.check_password('pass123') is True
 
 
-@pytest.mark.skip(reason="CSRF token validation issue - needs fix in code")
 def test_user_edit_verifies(authenticated_client, app, db_session):
     """编辑用户 - 验证修改已保存"""
     import time
@@ -555,7 +553,6 @@ def test_user_edit_verifies(authenticated_client, app, db_session):
     assert updated.role == 'admin'
 
 
-@pytest.mark.skip(reason="CSRF token validation issue - needs fix in code")
 def test_user_delete_verifies(authenticated_client, app, db_session):
     """删除用户 - 验证已删除"""
     import time
@@ -576,7 +573,6 @@ def test_user_delete_verifies(authenticated_client, app, db_session):
 
 # ==================== 密码修改断言 ====================
 
-@pytest.mark.skip(reason="CSRF token validation issue - needs fix in code")
 def test_change_password_verifies(authenticated_client, app, db_session):
     """修改密码 - 验证新密码可用"""
     resp = authenticated_client.post('/auth/change-password', data={
@@ -593,7 +589,6 @@ def test_change_password_verifies(authenticated_client, app, db_session):
     assert user.check_password('admin123') is False
 
 
-@pytest.mark.skip(reason="CSRF token validation issue - needs fix in code")
 def test_change_email_verifies(authenticated_client, app, db_session):
     """修改邮箱 - 验证邮箱已更新"""
     resp = authenticated_client.post('/auth/change-email', data={
