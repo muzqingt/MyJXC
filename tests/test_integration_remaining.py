@@ -364,12 +364,13 @@ def test_export_db(authenticated_client):
 
 def test_non_admin_access(client, app, db_session):
     """非管理员访问系统管理"""
-    user = User(username='non_admin_test', email='nonadmin@test.com', role='user')
+    import time
+    user = User(username=f'non_admin_{int(time.time())}', email='nonadmin@test.com', role='user')
     user.set_password('pass123')
     db.session.add(user)
     db.session.commit()
 
-    client.post('/auth/login', data={'username': 'non_admin_test', 'password': 'pass123'})
+    client.post('/auth/login', data={'username': user.username, 'password': 'pass123'})
     resp = client.get('/system/users')
     assert resp.status_code == 403
 

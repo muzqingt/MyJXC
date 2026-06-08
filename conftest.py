@@ -61,11 +61,26 @@ def client(app):
 
 @pytest.fixture(scope='function')
 def db_session(app):
-    """数据库会话，每个测试后自动回滚"""
+    """数据库会话，每个测试后清理"""
     from app import db
     with app.app_context():
         yield db.session
+        # 回滚未提交的更改
         db.session.rollback()
+        # 清除所有表数据（保留表结构）
+        for table in reversed(db.metadata.sorted_tables):
+            db.session.execute(table.delete())
+        db.session.commit()
+        # 重新创建默认数据
+        from app.models import User, Warehouse, Category
+        admin = User(username='admin', email='admin@example.com', role='admin')
+        admin.set_password('admin123')
+        db.session.add(admin)
+        warehouse = Warehouse(code='WH001', name='默认仓库')
+        db.session.add(warehouse)
+        category = Category(name='默认分类')
+        db.session.add(category)
+        db.session.commit()
 
 
 @pytest.fixture(scope='function')

@@ -1278,7 +1278,8 @@ def test_create_stock_log_out(app, db_session):
 
 def test_user_password_hash(app, db_session):
     """密码哈希"""
-    user = User(username='hash_user', email='hash@test.com')
+    import time
+    user = User(username=f'hash_{int(time.time())}', email='hash@test.com')
     user.set_password('test123')
     assert user.check_password('test123') is True
     assert user.check_password('wrong') is False
@@ -1286,33 +1287,38 @@ def test_user_password_hash(app, db_session):
 
 def test_user_is_authenticated(app, db_session):
     """用户认证状态"""
-    user = User(username='auth_user', email='auth@test.com')
+    import time
+    user = User(username=f'auth_{int(time.time())}', email='auth@test.com')
     assert user.is_authenticated is True
 
 
 def test_user_default_role(app, db_session):
     """默认角色"""
-    user = User(username='role_user', email='role@test.com')
+    import time
+    user = User(username=f'role_{int(time.time())}', email='role@test.com')
     # 默认角色可能为 None 或 'user'
     assert user.role is None or user.role == 'user'
 
 
 def test_user_admin_role(app, db_session):
     """管理员角色"""
-    user = User(username='admin_user', email='admin@test.com', role='admin')
+    import time
+    user = User(username=f'admin_{int(time.time())}', email='admin@test.com', role='admin')
     assert user.role == 'admin'
 
 
 def test_user_repr(app, db_session):
     """User __repr__"""
-    user = User(username='repr_user', email='repr@test.com')
-    assert 'repr_user' in repr(user)
+    import time
+    user = User(username=f'repr_{int(time.time())}', email='repr@test.com')
+    assert user.username in repr(user)
 
 
 def test_load_user(app, db_session):
     """加载用户"""
+    import time
     from app.models.user import load_user
-    user = User(username='load_user', email='load@test.com')
+    user = User(username=f'load_{int(time.time())}', email='load@test.com')
     user.set_password('test123')
     db.session.add(user)
     db.session.commit()
