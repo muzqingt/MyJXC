@@ -347,7 +347,6 @@ def edit_order(id):
                                  order_items=order_items_list)
 
         # 更新订单基本信息
-        old_supplier = order.supplier
         order.supplier_id = supplier_id
         order.warehouse_id = warehouse_id
         try:
@@ -359,7 +358,6 @@ def edit_order(id):
         order.notes = notes
 
         # 更新商品明细（保留已入库数量，只删除本次移除的商品）
-        original_total = to_decimal(order.total_amount)
         existing_items = {item.product_id: item for item in order.items}
         remaining_product_ids = set()
         total_amount = 0
@@ -436,28 +434,6 @@ def edit_order(id):
                                      submitted_expected_date=expected_date,
                                      submitted_notes=notes,
                                      order_items=order_items_list)
-
-        if order.status == 'completed':
-            if old_supplier and old_supplier.id != supplier_id:
-                new_supplier = db.session.get(Supplier, supplier_id)
-                if not new_supplier:
-                    flash('供应商不存在！', 'danger')
-                    return redirect(url_for('purchase.edit_order', id=id))
-                if to_decimal(old_supplier.payable_balance) < original_total:
-                    flash('原供应商应付余额不足，无法完成此修改！', 'danger')
-                    return redirect(url_for('purchase.edit_order', id=id))
-                sub_balance(old_supplier, "payable_balance", original_total)
-                add_balance(new_supplier, "payable_balance", total_amount)
-            elif old_supplier and old_supplier.id == supplier_id:
-                if original_total != total_amount:
-                    diff = total_amount - original_total
-                    if diff > 0:
-                        add_balance(old_supplier, "payable_balance", diff)
-                    else:
-                        if to_decimal(old_supplier.payable_balance) < abs(diff):
-                            flash('供应商应付余额不足，无法完成此修改！', 'danger')
-                            return redirect(url_for('purchase.edit_order', id=id))
-                        sub_balance(old_supplier, "payable_balance", abs(diff))
 
         try:
             db.session.commit()

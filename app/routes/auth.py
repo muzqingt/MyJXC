@@ -1,5 +1,5 @@
 import re
-from flask import render_template, redirect, url_for, flash, request, Blueprint
+from flask import render_template, redirect, url_for, flash, request, Blueprint, current_app
 from urllib.parse import urlparse
 from flask_login import login_user, logout_user, current_user, login_required
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
@@ -43,6 +43,7 @@ def login():
             db.session.commit()
         except SQLAlchemyError:
             db.session.rollback()
+            current_app.logger.warning(f'登录日志记录失败: user_id={user.id}')
 
         flash('登录成功！', 'success')
         next_page = request.args.get('next')
@@ -94,6 +95,7 @@ def logout():
         db.session.commit()
     except SQLAlchemyError:
         db.session.rollback()
+        current_app.logger.warning(f'登出日志记录失败: user_id={current_user.id}')
 
     logout_user()
     flash('您已成功登出。', 'info')
@@ -146,6 +148,8 @@ def change_password():
         flash('密码修改成功！', 'success')
     except SQLAlchemyError:
         db.session.rollback()
+        current_app.logger.warning(f'密码修改日志记录失败: user_id={current_user.id}')
+        flash('密码修改成功！', 'success')
 
     return redirect(url_for('auth.profile'))
 
@@ -187,5 +191,7 @@ def change_email():
         flash('邮箱修改成功！', 'success')
     except SQLAlchemyError:
         db.session.rollback()
+        current_app.logger.warning(f'邮箱修改日志记录失败: user_id={current_user.id}')
+        flash('邮箱修改成功！', 'success')
 
     return redirect(url_for('auth.profile'))

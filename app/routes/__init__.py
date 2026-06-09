@@ -9,5 +9,3 @@ from .inventory import bp as inventory_bp
 from .finance import bp as finance_bp
 from .report import bp as report_bp
 from .system import bp as system_bp
-
-__all__ = ['auth_bp', 'main_bp', 'product_bp', 'partner_bp', 'purchase_bp', 'sales_bp', 'inventory_bp', 'finance_bp', 'report_bp', 'system_bp']

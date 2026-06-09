@@ -138,36 +138,3 @@ def rebuild_items_on_error(
                     'unit_price': unit_prices[i],
                 })
     return items
-
-
-def validate_order_items(
-    product_ids: List[str],
-    quantities: List[str],
-    unit_prices: List[str],
-) -> bool:
-    """
-    验证订单明细是否有效
-
-    Args:
-        product_ids: 商品 ID 列表
-        quantities: 数量列表
-        unit_prices: 单价列表
-
-    Returns:
-        True 如果至少有一个有效明细
-    """
-    if not product_ids:
-        return False
-
-    for i in range(len(product_ids)):
-        if product_ids[i] and quantities[i] and unit_prices[i]:
-            try:
-                pid = int(product_ids[i])
-                qty = to_decimal(quantities[i])
-                price = to_decimal(unit_prices[i])
-                if pid > 0 and qty > 0 and price >= 0:
-                    return True
-            except (ValueError, TypeError):
-                continue
-
-    return False

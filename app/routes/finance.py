@@ -5,7 +5,7 @@ from app import db
 from app.models import Receipt, Payment, Expense, Customer, Supplier, SalesOrder, PurchaseOrder, SalesOrderItem, PurchaseOrderItem, SalesReturn, PurchaseReturn
 from app.forms import ReceiptForm, PaymentForm, ExpenseForm
 from sqlalchemy.exc import SQLAlchemyError
-from app.utils import to_decimal, add_balance, sub_balance, generate_order_number, PAYMENT_METHOD_MAP, apply_excel_header_style, EXCEL_HEADER_FONT, EXCEL_HEADER_FILL, EXCEL_THIN_BORDER, EXCEL_HEADER_ALIGNMENT
+from app.utils import to_decimal, add_balance, sub_balance, generate_order_number, PAYMENT_METHOD_MAP, apply_excel_header_style, EXCEL_THIN_BORDER
 from app.utils_order import match_reference_id_filter
 import io
 
@@ -257,9 +257,9 @@ def delete_expense(expense_id):
         db.session.delete(expense)
         db.session.commit()
         flash('费用记录已删除！', 'success')
-    except SQLAlchemyError as e:
+    except SQLAlchemyError:
         db.session.rollback()
-        flash(f'删除失败: {str(e)}', 'danger')
+        flash('删除费用记录失败，请稍后重试！', 'danger')
     return redirect(url_for('finance.expenses'))
 
 @bp.route('/profit-analysis')
@@ -336,7 +336,12 @@ def edit_receipt(receipt_id):
                 add_balance(customer, "receivable_balance", original_amount)
                 sub_balance(customer, "receivable_balance", receipt.amount)
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('收款记录更新失败，请稍后重试！', 'danger')
+            return redirect(url_for('finance.edit_receipt', receipt_id=receipt_id))
         flash('收款记录已更新成功！', 'success')
         return redirect(url_for('finance.view_receipt', receipt_id=receipt.id))
 
@@ -375,9 +380,9 @@ def delete_receipt(receipt_id):
         db.session.delete(receipt)
         db.session.commit()
         flash('收款记录已删除！', 'success')
-    except SQLAlchemyError as e:
+    except SQLAlchemyError:
         db.session.rollback()
-        flash(f'删除失败: {str(e)}', 'danger')
+        flash('删除收款记录失败，请稍后重试！', 'danger')
     return redirect(url_for('finance.receipts'))
 
 @bp.route('/payment/<int:payment_id>')
@@ -433,7 +438,12 @@ def edit_payment(payment_id):
                 add_balance(supplier, "payable_balance", original_amount)
                 sub_balance(supplier, "payable_balance", payment.amount)
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('付款记录更新失败，请稍后重试！', 'danger')
+            return redirect(url_for('finance.edit_payment', payment_id=payment_id))
         flash('付款记录已更新成功！', 'success')
         return redirect(url_for('finance.view_payment', payment_id=payment.id))
 
@@ -472,9 +482,9 @@ def delete_payment(payment_id):
         db.session.delete(payment)
         db.session.commit()
         flash('付款记录已删除！', 'success')
-    except SQLAlchemyError as e:
+    except SQLAlchemyError:
         db.session.rollback()
-        flash(f'删除失败: {str(e)}', 'danger')
+        flash('删除付款记录失败，请稍后重试！', 'danger')
     return redirect(url_for('finance.payments'))
 
 @bp.route('/api/financial-summary')
@@ -813,7 +823,7 @@ def export_customer_ar(customer_id):
             receipt.receipt_number,
             receipt.receipt_date.strftime('%Y-%m-%d'),
             float(receipt.amount),
-            receipt.payment_method,
+            PAYMENT_METHOD_MAP.get(receipt.payment_method, receipt.payment_method or ''),
             receipt.notes or '-'
         ])
         ws.cell(row=ws.max_row, column=3).number_format = money_format
@@ -1191,7 +1201,7 @@ def export_supplier_ap(supplier_id):
             payment.payment_number,
             payment.payment_date.strftime('%Y-%m-%d'),
             float(payment.amount),
-            payment.payment_method,
+            PAYMENT_METHOD_MAP.get(payment.payment_method, payment.payment_method or ''),
             payment.notes or '-'
         ])
         ws.cell(row=ws.max_row, column=3).number_format = money_format

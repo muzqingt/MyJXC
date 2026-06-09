@@ -46,14 +46,7 @@
                         <td class="text-end">¥{{ "%.2f"|format(payment.amount) }}</td>
                         <td>{{ payment.payment_date }}</td>
                         <td>
-                            <span class="badge bg-info">
-                                {% if payment.payment_method == 'cash' %}现金
-                                {% elif payment.payment_method == 'bank_transfer' %}银行转账
-                                {% elif payment.payment_method == 'wechat' %}微信支付
-                                {% elif payment.payment_method == 'alipay' %}支付宝
-                                {% else %}{{ payment.payment_method }}
-                                {% endif %}
-                            </span>
+                            <span class="badge bg-info">{{ payment.payment_method|payment_method }}</span>
                         </td>
                         <td>
                             {% if payment.reference_type == 'purchase_order' %}

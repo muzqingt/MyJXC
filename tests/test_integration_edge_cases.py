@@ -498,7 +498,7 @@ def test_user_edit_not_found(authenticated_client):
 def test_user_delete_not_found(authenticated_client):
     """删除用户 - 不存在"""
     resp = authenticated_client.post('/system/user/delete/99999', follow_redirects=True)
-    assert resp.status_code == 200
+    assert resp.status_code == 404
 
 
 def test_backup_download_invalid_filename(authenticated_client):

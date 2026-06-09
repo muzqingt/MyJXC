@@ -43,14 +43,7 @@
                         <td>{{ expense.expense_date }}</td>
                         <td>{{ expense.payee or '未填写' }}</td>
                         <td>
-                            <span class="badge bg-info">
-                                {% if expense.payment_method == 'cash' %}现金
-                                {% elif expense.payment_method == 'bank_transfer' %}银行转账
-                                {% elif expense.payment_method == 'wechat' %}微信支付
-                                {% elif expense.payment_method == 'alipay' %}支付宝
-                                {% else %}{{ expense.payment_method }}
-                                {% endif %}
-                            </span>
+                            <span class="badge bg-info">{{ expense.payment_method|payment_method }}</span>
                         </td>
                         <td>
                             {% if expense.notes %}

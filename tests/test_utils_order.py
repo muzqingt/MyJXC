@@ -8,7 +8,7 @@ from app import db
 from app.models import StockLog, Product
 from app.utils_order import (
     parse_reference_ids, create_stock_log,
-    rebuild_items_on_error, validate_order_items,
+    rebuild_items_on_error,
 )
 from tests.factories import create_product, create_warehouse
 
@@ -154,45 +154,3 @@ def test_rebuild_items_on_error_empty(app, db_session):
     )
 
     assert len(items) == 0
-
-
-# ==================== validate_order_items ====================
-
-def test_validate_order_items_valid():
-    """有效明细返回 True"""
-    result = validate_order_items(
-        product_ids=['1'],
-        quantities=['10'],
-        unit_prices=['50'],
-    )
-    assert result is True
-
-
-def test_validate_order_items_empty():
-    """空明细返回 False"""
-    result = validate_order_items(
-        product_ids=[],
-        quantities=[],
-        unit_prices=[],
-    )
-    assert result is False
-
-
-def test_validate_order_items_invalid_id():
-    """无效 ID 返回 False"""
-    result = validate_order_items(
-        product_ids=['abc'],
-        quantities=['10'],
-        unit_prices=['50'],
-    )
-    assert result is False
-
-
-def test_validate_order_items_zero_quantity():
-    """零数量返回 False"""
-    result = validate_order_items(
-        product_ids=['1'],
-        quantities=['0'],
-        unit_prices=['50'],
-    )
-    assert result is False

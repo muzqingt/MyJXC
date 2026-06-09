@@ -45,17 +45,7 @@
                                     <span class="badge bg-info">{{ receipt.customer.name if receipt.customer else '未知客户' }}</span>
                                 </td>
                                 <td>
-                                    {% if receipt.payment_method == 'cash' %}
-                                    <span class="badge bg-success">现金</span>
-                                    {% elif receipt.payment_method == 'bank_transfer' %}
-                                    <span class="badge bg-primary">银行转账</span>
-                                    {% elif receipt.payment_method == 'wechat' %}
-                                    <span class="badge bg-warning">微信支付</span>
-                                    {% elif receipt.payment_method == 'alipay' %}
-                                    <span class="badge bg-info">支付宝</span>
-                                    {% else %}
-                                    <span class="badge bg-secondary">{{ receipt.payment_method }}</span>
-                                    {% endif %}
+                                    <span class="badge bg-info">{{ receipt.payment_method|payment_method }}</span>
                                 </td>
                                 <td>
                                     <strong class="text-success">¥{{ "%.2f"|format(receipt.amount) }}</strong>

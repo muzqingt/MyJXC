@@ -346,7 +346,12 @@ def edit_user(user_id):
                 return redirect(url_for('system.edit_user', user_id=user_id))
             user.set_password(password)
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('用户信息更新失败，请稍后重试！', 'danger')
+            return redirect(url_for('system.edit_user', user_id=user_id))
         flash('用户信息已更新！', 'success')
         return redirect(url_for('system.user_management'))
     
@@ -430,9 +435,9 @@ def optimize_db():
         db.session.execute(db.text('COMMIT'))
         db.session.execute(db.text('VACUUM'))
         return jsonify({'success': True, 'message': '数据库优化完成'})
-    except SQLAlchemyError as e:
+    except SQLAlchemyError:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'优化失败: {str(e)}'}), 500
+        return jsonify({'success': False, 'message': '数据库优化失败，请稍后重试'}), 500
 
 @bp.route('/api/system/clean-logs', methods=['POST'])
 @login_required
@@ -449,9 +454,9 @@ def clean_logs():
             db.session.delete(log)
         db.session.commit()
         return jsonify({'success': True, 'deleted_count': deleted})
-    except SQLAlchemyError as e:
+    except SQLAlchemyError:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'清理失败: {str(e)}'}), 500
+        return jsonify({'success': False, 'message': '日志清理失败，请稍后重试'}), 500
 
 @bp.route('/api/system/export-db')
 @login_required
@@ -497,6 +502,6 @@ def save_settings():
                 db.session.add(setting)
         db.session.commit()
         return jsonify({'success': True, 'message': '设置已保存'})
-    except SQLAlchemyError as e:
+    except SQLAlchemyError:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'保存失败: {str(e)}'}), 500
+        return jsonify({'success': False, 'message': '设置保存失败，请稍后重试'}), 500

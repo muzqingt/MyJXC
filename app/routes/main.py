@@ -18,9 +18,9 @@ bp = Blueprint('main', __name__)
 @login_required
 def api_sales_trend():
     """销售趋势数据（支持时间范围参数）"""
-    from flask import request as flask_request
+    from flask import request
 
-    days = flask_request.args.get('days', 30, type=int)
+    days = request.args.get('days', 30, type=int)
     today = datetime.now().date()
     start_date = today - timedelta(days=days - 1)
 
@@ -83,10 +83,10 @@ def api_stock_overview():
 @login_required
 def api_finance_summary():
     """收支数据（支持时间范围参数）"""
-    from flask import request as flask_request
+    from flask import request
     from app.models import Receipt, Payment, Expense
 
-    days = flask_request.args.get('days', 7, type=int)
+    days = request.args.get('days', 7, type=int)
     today = datetime.now().date()
     start_date = today - timedelta(days=days - 1)
 

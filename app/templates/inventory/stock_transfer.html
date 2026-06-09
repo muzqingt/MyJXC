@@ -205,7 +205,7 @@ $(document).ready(function() {
     try {
         products = JSON.parse($('#products-data').text());
     } catch(e) {
-        console.log('Error parsing products:', e);
+        console.log('解析商品数据失败:', e);
     }
     
     // 添加商品行（使用 WTForms FieldList 命名）

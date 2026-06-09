@@ -5,23 +5,19 @@ from app import db
 from app.models import Product, SalesOrder, PurchaseOrder, Customer, Supplier, Receipt, PurchaseOrderItem, SalesOrderItem, StockLog
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment
-from app.utils import EXCEL_HEADER_FONT, EXCEL_HEADER_FILL, EXCEL_THIN_BORDER, EXCEL_HEADER_ALIGNMENT
+from app.utils import apply_excel_header_style, EXCEL_THIN_BORDER
 from io import BytesIO
-from decimal import Decimal
 from urllib.parse import quote
 
 # 创建蓝图
 bp = Blueprint('report', __name__, url_prefix='/report')
 
-def set_header_style(cell):
-    cell.font = EXCEL_HEADER_FONT
-    cell.fill = EXCEL_HEADER_FILL
-    cell.alignment = EXCEL_HEADER_ALIGNMENT
-    cell.border = EXCEL_THIN_BORDER
+_CELL_ALIGNMENT = Alignment(horizontal='center', vertical='center')
 
-def set_cell_style(cell):
-    cell.alignment = EXCEL_HEADER_ALIGNMENT
+
+def _apply_cell_style(cell):
     cell.border = EXCEL_THIN_BORDER
+    cell.alignment = _CELL_ALIGNMENT
 
 @bp.route('/')
 @login_required
@@ -360,9 +356,9 @@ def export_inventory():
     # 表头
     headers = ['序号', '商品编码', '商品名称', '单位', '采购数量', '采购金额', '销售数量', '销售金额', '期末库存']
     for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        set_header_style(cell)
-    
+        ws.cell(row=1, column=col, value=header)
+    apply_excel_header_style(ws, 1, len(headers))
+
     # 数据
     for row, item in enumerate(report_data, 2):
         ws.cell(row=row, column=1, value=row-1)
@@ -375,7 +371,7 @@ def export_inventory():
         ws.cell(row=row, column=8, value=item['sales_amount'])
         ws.cell(row=row, column=9, value=item['ending_stock'])
         for col in range(1, 10):
-            set_cell_style(ws.cell(row=row, column=col))
+            _apply_cell_style(ws.cell(row=row, column=col))
     
     # 调整列宽
     ws.column_dimensions['A'].width = 8
@@ -437,9 +433,9 @@ def export_sales_ranking():
     
     headers = ['排名', '商品编码', '商品名称', '销售数量', '销售金额', '平均单价']
     for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        set_header_style(cell)
-    
+        ws.cell(row=1, column=col, value=header)
+    apply_excel_header_style(ws, 1, len(headers))
+
     for row, item in enumerate(ranking_data, 2):
         avg_price = item.total_amount / item.total_quantity if item.total_quantity > 0 else 0
         ws.cell(row=row, column=1, value=row-1)
@@ -449,7 +445,7 @@ def export_sales_ranking():
         ws.cell(row=row, column=5, value=float(item.total_amount))
         ws.cell(row=row, column=6, value=avg_price)
         for col in range(1, 7):
-            set_cell_style(ws.cell(row=row, column=col))
+            _apply_cell_style(ws.cell(row=row, column=col))
     
     ws.column_dimensions['A'].width = 8
     ws.column_dimensions['B'].width = 12
@@ -490,9 +486,9 @@ def export_customer():
     
     headers = ['序号', '客户编码', '客户名称', '订单数量', '消费总额', '平均订单金额']
     for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        set_header_style(cell)
-    
+        ws.cell(row=1, column=col, value=header)
+    apply_excel_header_style(ws, 1, len(headers))
+
     for row, item in enumerate(customer_stats, 2):
         ws.cell(row=row, column=1, value=row-1)
         ws.cell(row=row, column=2, value=item.code)
@@ -501,7 +497,7 @@ def export_customer():
         ws.cell(row=row, column=5, value=float(item.total_amount or 0))
         ws.cell(row=row, column=6, value=float(item.avg_amount or 0))
         for col in range(1, 7):
-            set_cell_style(ws.cell(row=row, column=col))
+            _apply_cell_style(ws.cell(row=row, column=col))
     
     ws.column_dimensions['A'].width = 8
     ws.column_dimensions['B'].width = 12
@@ -542,9 +538,9 @@ def export_supplier():
     
     headers = ['序号', '供应商编码', '供应商名称', '采购订单数', '采购总金额', '平均订单金额']
     for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        set_header_style(cell)
-    
+        ws.cell(row=1, column=col, value=header)
+    apply_excel_header_style(ws, 1, len(headers))
+
     for row, item in enumerate(supplier_stats, 2):
         ws.cell(row=row, column=1, value=row-1)
         ws.cell(row=row, column=2, value=item.code)
@@ -553,7 +549,7 @@ def export_supplier():
         ws.cell(row=row, column=5, value=float(item.total_amount or 0))
         ws.cell(row=row, column=6, value=float(item.avg_amount or 0))
         for col in range(1, 7):
-            set_cell_style(ws.cell(row=row, column=col))
+            _apply_cell_style(ws.cell(row=row, column=col))
     
     ws.column_dimensions['A'].width = 8
     ws.column_dimensions['B'].width = 12
@@ -663,24 +659,23 @@ def export_daily():
     ws.cell(row=3, column=2, value='金额')
     ws.cell(row=3, column=3, value='订单数')
     ws.cell(row=3, column=4, value='平均')
-    for col in range(1, 5):
-        set_header_style(ws.cell(row=3, column=col))
-    
+    apply_excel_header_style(ws, 3, 4)
+
     data = [
-        ('销售总额', float(daily_sales.total_sales or 0), daily_sales.order_count or 0, 
+        ('销售总额', float(daily_sales.total_sales or 0), daily_sales.order_count or 0,
          (daily_sales.total_sales or 0) / (daily_sales.order_count or 1)),
         ('采购总额', float(daily_purchase.total_purchase or 0), daily_purchase.order_count or 0,
          (daily_purchase.total_purchase or 0) / (daily_purchase.order_count or 1)),
         ('收款总额', float(daily_receipts.total_receipts or 0), '-', '-'),
     ]
-    
+
     for row_idx, (name, amount, count, avg) in enumerate(data, 4):
         ws.cell(row=row_idx, column=1, value=name)
         ws.cell(row=row_idx, column=2, value=amount if amount != '-' else '-')
         ws.cell(row=row_idx, column=3, value=count)
         ws.cell(row=row_idx, column=4, value=avg if avg != '-' else '-')
         for col in range(1, 5):
-            set_cell_style(ws.cell(row=row_idx, column=col))
+            _apply_cell_style(ws.cell(row=row_idx, column=col))
     
     # 汇总
     row_idx = 8

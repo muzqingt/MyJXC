@@ -52,17 +52,7 @@
                     <div class="col-md-6">
                         <strong>付款方式：</strong>
                         <p>
-                            {% if payment.payment_method == 'cash' %}
-                            <span class="badge badge-primary">现金</span>
-                            {% elif payment.payment_method == 'bank_transfer' %}
-                            <span class="badge badge-info">银行转账</span>
-                            {% elif payment.payment_method == 'wechat' %}
-                            <span class="badge badge-success">微信支付</span>
-                            {% elif payment.payment_method == 'alipay' %}
-                            <span class="badge badge-warning">支付宝</span>
-                            {% else %}
-                            <span class="badge badge-secondary">{{ payment.payment_method or '现金' }}</span>
-                            {% endif %}
+                            <span class="badge badge-info">{{ payment.payment_method|payment_method }}</span>
                         </p>
                     </div>
                     <div class="col-md-6">

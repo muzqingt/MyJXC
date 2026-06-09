@@ -756,8 +756,12 @@ def new_stock_out_from_order(id):
             total_amount += amount
     
     stock_out.total_amount = total_amount
-    db.session.commit()
-    
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('出库单创建失败，请稍后重试！', 'danger')
+        return redirect(url_for('sales.view_order', id=id))
     flash(f'出库单 {delivery_number} 创建成功！请编辑出库明细后完成出库。', 'success')
     return redirect(url_for('sales.edit_stock_out_items', id=stock_out.id))
 
@@ -791,8 +795,13 @@ def new_stock_out():
         )
         
         db.session.add(stock_out)
-        db.session.commit()
-        
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('出库单创建失败，请稍后重试！', 'danger')
+            return redirect(url_for('sales.index'))
+
         flash('出库单创建成功！请添加商品明细。', 'success')
         return redirect(url_for('sales.edit_stock_out_items', id=stock_out.id))
     
@@ -895,8 +904,13 @@ def edit_stock_out_items(id):
                     product.sale_price = unit_price
         
         stock_out.total_amount = total_amount
-        db.session.commit()
-        
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash('商品明细保存失败，请稍后重试！', 'danger')
+            return redirect(url_for('sales.edit_stock_out_items', id=id))
+
         flash('商品明细保存成功！', 'success')
         return redirect(url_for('sales.index', tab='stockouts'))
     
@@ -1026,8 +1040,13 @@ def delete_stock_out(id):
         return redirect(url_for('sales.index', tab='stockouts'))
     
     db.session.delete(stock_out)
-    db.session.commit()
-    
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('出库单删除失败，请稍后重试！', 'danger')
+        return redirect(url_for('sales.index', tab='stockouts'))
+
     flash('出库单删除成功！', 'success')
     return redirect(url_for('sales.index', tab='stockouts'))
 

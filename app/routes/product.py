@@ -551,13 +551,13 @@ def import_products():
             )
             db.session.add(product)
             success_count += 1
-        except Exception as e:
-            errors.append(f'第 {row_idx} 行: 创建失败 - {str(e)}')
+        except Exception:
+            errors.append(f'第 {row_idx} 行: 创建失败，数据格式有误')
             fail_count += 1
 
     try:
         db.session.commit()
-    except Exception as e:
+    except Exception:
         db.session.rollback()
         flash('导入失败，请重试！', 'danger')
         return redirect(url_for('product.import_page'))

@@ -469,7 +469,6 @@ def import_suppliers():
     """处理供应商导入"""
     from openpyxl import load_workbook
     import io
-    from decimal import Decimal
 
     if 'file' not in request.files:
         flash('请选择文件！', 'danger')
@@ -529,8 +528,8 @@ def import_suppliers():
             )
             db.session.add(supplier)
             success_count += 1
-        except Exception as e:
-            errors.append(f'第 {row_idx} 行: 创建失败 - {str(e)}')
+        except Exception:
+            errors.append(f'第 {row_idx} 行: 创建失败，数据格式有误')
             fail_count += 1
 
     try:
@@ -598,7 +597,6 @@ def import_customers():
     """处理客户导入"""
     from openpyxl import load_workbook
     import io
-    from decimal import Decimal
 
     if 'file' not in request.files:
         flash('请选择文件！', 'danger')
@@ -658,8 +656,8 @@ def import_customers():
             )
             db.session.add(customer)
             success_count += 1
-        except Exception as e:
-            errors.append(f'第 {row_idx} 行: 创建失败 - {str(e)}')
+        except Exception:
+            errors.append(f'第 {row_idx} 行: 创建失败，数据格式有误')
             fail_count += 1
 
     try:

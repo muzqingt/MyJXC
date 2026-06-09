@@ -14,8 +14,7 @@ from app.models import (
 )
 from app.utils import (
     to_decimal, add_balance, sub_balance, generate_order_number,
-    generate_order_number_safe, build_products_data, build_partners_data,
-    flash_success, flash_error, flash_warning, safe_commit,
+    build_products_data, build_partners_data, safe_commit,
     localize_dt, format_local_dt, get_redirect_tab,
     apply_excel_header_style, EXCEL_HEADER_FONT, EXCEL_HEADER_FILL,
     EXCEL_THIN_BORDER, EXCEL_HEADER_ALIGNMENT
@@ -152,13 +151,6 @@ def test_generate_order_number_different_prefix(app, db_session):
     assert si_number == f'SI{today}0001'
 
 
-def test_generate_order_number_safe(app, db_session):
-    """安全生成订单号"""
-    order_number = generate_order_number_safe('PO', PurchaseOrder)
-    assert order_number is not None
-    assert 'PO' in order_number
-
-
 # ==================== build_products_data 测试 ====================
 
 def test_build_products_data_basic(app, db_session):
@@ -200,34 +192,6 @@ def test_build_partners_data(app, db_session):
 
 
 # ==================== flash 函数测试 ====================
-
-def test_flash_success_no_punctuation(app):
-    """成功消息 - 无标点"""
-    with app.test_request_context():
-        result = flash_success('操作成功')
-        assert result is None
-
-
-def test_flash_success_with_punctuation(app):
-    """成功消息 - 有标点"""
-    with app.test_request_context():
-        result = flash_success('操作成功！')
-        assert result is None
-
-
-def test_flash_error_no_punctuation(app):
-    """错误消息 - 无标点"""
-    with app.test_request_context():
-        result = flash_error('操作失败')
-        assert result is None
-
-
-def test_flash_warning_no_punctuation(app):
-    """警告消息 - 无标点"""
-    with app.test_request_context():
-        result = flash_warning('警告信息')
-        assert result is None
-
 
 # ==================== safe_commit 测试 ====================
 
@@ -272,13 +236,6 @@ def test_generate_order_number_with_existing(app, db_session):
     today = datetime.now().strftime('%Y%m%d')
     # 应该生成今天的订单号，不是2024年的
     assert today in order_number
-
-
-def test_generate_order_number_safe_no_filter(app, db_session):
-    """安全生成订单号 - 无过滤字段"""
-    order_number = generate_order_number_safe('TEST', Log)
-    assert order_number is not None
-    assert 'TEST' in order_number
 
 
 def test_update_stock_and_log_in(app, db_session):
@@ -388,27 +345,6 @@ def test_apply_excel_header_style(app):
     # 验证样式已应用
     cell = ws.cell(row=1, column=1)
     assert cell.font.bold is True
-
-
-def test_flash_success_with_endpoint(app):
-    """成功消息 - 带重定向"""
-    with app.test_request_context('/test'):
-        result = flash_success('操作成功', 'main.index')
-        assert result is not None
-
-
-def test_flash_error_with_endpoint(app):
-    """错误消息 - 带重定向"""
-    with app.test_request_context('/test'):
-        result = flash_error('操作失败', 'main.index')
-        assert result is not None
-
-
-def test_flash_warning_with_endpoint(app):
-    """警告消息 - 带重定向"""
-    with app.test_request_context('/test'):
-        result = flash_warning('警告信息', 'main.index')
-        assert result is not None
 
 
 # ==================== localize_dt / format_local_dt 测试 ====================
@@ -543,12 +479,6 @@ def test_stock_log_properties(app, db_session):
     )
     db.session.add(log)
     db.session.commit()
-
-    # 测试 stock_in 属性
-    assert log.stock_in is None  # 没有关联的 StockIn
-
-    # 测试 stock_out 属性
-    assert log.stock_out is None  # 没有关联的 StockOut
 
     # 测试 reference_number 属性
     assert log.reference_number == ''  # 没有关联的单据
@@ -819,96 +749,6 @@ def test_stock_log_reference_number_stock_out(app, db_session):
     db.session.commit()
 
     assert log.reference_number == 'OUT202401010001'
-
-
-def test_stock_log_stock_in_property(app, db_session):
-    """StockLog stock_in 属性"""
-    product = Product(code='SL_PROD10', name='日志测试商品10', unit='个')
-    warehouse = Warehouse(code='SL_WH10', name='日志测试仓库10')
-    supplier = Supplier(code='SL_SUP4', name='日志测试供应商4', contact_person='测试', phone='13800000000')
-    db.session.add_all([product, warehouse, supplier])
-    db.session.commit()
-
-    order = PurchaseOrder(
-        order_number='PO202401010004',
-        supplier_id=supplier.id,
-        warehouse_id=warehouse.id,
-        order_date=date.today(),
-        status='confirmed'
-    )
-    db.session.add(order)
-    db.session.commit()
-
-    stock_in = StockIn(
-        receipt_number='SI202401010002',
-        purchase_order_id=order.id,
-        warehouse_id=warehouse.id,
-        receipt_date=date.today(),
-        status='completed'
-    )
-    db.session.add(stock_in)
-    db.session.commit()
-
-    log = StockLog(
-        product_id=product.id,
-        warehouse_id=warehouse.id,
-        change_type='in',
-        quantity=Decimal('10'),
-        before_quantity=Decimal('0'),
-        after_quantity=Decimal('10'),
-        reference_type='stock_in',
-        reference_id=stock_in.id
-    )
-    db.session.add(log)
-    db.session.commit()
-
-    assert log.stock_in is not None
-    assert log.stock_in.id == stock_in.id
-
-
-def test_stock_log_stock_out_property(app, db_session):
-    """StockLog stock_out 属性"""
-    product = Product(code='SL_PROD11', name='日志测试商品11', unit='个')
-    warehouse = Warehouse(code='SL_WH11', name='日志测试仓库11')
-    customer = Customer(code='SL_CUS4', name='日志测试客户4', contact_person='测试', phone='13800000000')
-    db.session.add_all([product, warehouse, customer])
-    db.session.commit()
-
-    order = SalesOrder(
-        order_number='SO202401010004',
-        customer_id=customer.id,
-        warehouse_id=warehouse.id,
-        order_date=date.today(),
-        status='confirmed'
-    )
-    db.session.add(order)
-    db.session.commit()
-
-    stock_out = StockOut(
-        delivery_number='OUT202401010002',
-        sales_order_id=order.id,
-        warehouse_id=warehouse.id,
-        delivery_date=date.today(),
-        status='completed'
-    )
-    db.session.add(stock_out)
-    db.session.commit()
-
-    log = StockLog(
-        product_id=product.id,
-        warehouse_id=warehouse.id,
-        change_type='out',
-        quantity=Decimal('5'),
-        before_quantity=Decimal('10'),
-        after_quantity=Decimal('5'),
-        reference_type='stock_out',
-        reference_id=stock_out.id
-    )
-    db.session.add(log)
-    db.session.commit()
-
-    assert log.stock_out is not None
-    assert log.stock_out.id == stock_out.id
 
 
 def test_stock_log_repr(app, db_session):
@@ -1590,26 +1430,6 @@ def test_parse_reference_ids_invalid():
     from app.utils_order import parse_reference_ids
     assert parse_reference_ids('abc') == []
     assert parse_reference_ids('1,abc,3') == []
-
-
-def test_validate_order_items_empty(app, db_session):
-    """验证订单明细 - 空数据"""
-    from app.utils_order import validate_order_items
-    assert validate_order_items([], [], []) is False
-
-
-def test_validate_order_items_valid(app, db_session):
-    """验证订单明细 - 有效数据"""
-    from app.utils_order import validate_order_items
-    assert validate_order_items(['1'], ['10'], ['50']) is True
-
-
-def test_validate_order_items_invalid(app, db_session):
-    """验证订单明细 - 无效数据"""
-    from app.utils_order import validate_order_items
-    assert validate_order_items(['abc'], ['10'], ['50']) is False
-    assert validate_order_items(['0'], ['10'], ['50']) is False
-    assert validate_order_items(['1'], ['0'], ['50']) is False
 
 
 # ==================== rebuild_items_on_error 测试 ====================

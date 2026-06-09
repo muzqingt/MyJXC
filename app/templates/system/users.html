@@ -79,7 +79,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="addUserModalLabel">添加用户</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
             </div>
             <form id="addUserForm" method="POST" action="{{ url_for('system.add_user') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

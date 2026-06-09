@@ -1,9 +1,8 @@
 """
 通用工具函数 - 减少重复代码
 """
-from flask import flash, redirect, url_for
 from datetime import datetime
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 from typing import Any, Optional, Tuple, Union
 
 from app import db
@@ -118,47 +117,6 @@ def generate_order_number(prefix: str, model_class: type, date_field_name: str =
     return f'{prefix}{today}0001'
 
 
-def generate_order_number_safe(prefix: str, model_class: type, max_retries: int = 3) -> str:
-    """
-    安全生成订单编号（带重试机制）
-
-    Args:
-        prefix: 订单号前缀
-        model_class: 模型类
-        max_retries: 最大重试次数
-
-    Returns:
-        唯一的订单编号
-
-    Raises:
-        RuntimeError: 超过最大重试次数
-    """
-    for attempt in range(max_retries):
-        order_number = generate_order_number(prefix, model_class)
-
-        # 检查是否已存在
-        filter_field = getattr(model_class, 'order_number', None) or \
-                       getattr(model_class, 'receipt_number', None) or \
-                       getattr(model_class, 'delivery_number', None) or \
-                       getattr(model_class, 'return_number', None) or \
-                       getattr(model_class, 'payment_number', None) or \
-                       getattr(model_class, 'expense_number', None)
-
-        if filter_field:
-            exists = model_class.query.filter(
-                filter_field == order_number
-            ).first()
-            if not exists:
-                return order_number
-        else:
-            return order_number
-
-    # 最后一次尝试，添加微秒后缀
-    import time
-    suffix = str(int(time.time()) % 10000).zfill(4)
-    return f'{prefix}{datetime.now().strftime("%Y%m%d")}{suffix}'
-
-
 def build_products_data(products: list, include_purchase_price: bool = True, include_sale_price: bool = True) -> list[dict]:
     """构建商品下拉数据"""
     result = []
@@ -188,37 +146,6 @@ def build_partners_data(partners: list) -> list[dict]:
     } for p in partners]
 
 
-def flash_success(message: str, endpoint: Optional[str] = None, **kwargs: Any) -> Optional[Any]:
-    """成功消息并重定向"""
-    # 确保中文标点
-    if not message.endswith(('！', '。', '…')):
-        message += '！'
-    flash(message, 'success')
-    if endpoint:
-        return redirect(url_for(endpoint, **kwargs))
-    return None
-
-
-def flash_error(message: str, endpoint: Optional[str] = None, **kwargs: Any) -> Optional[Any]:
-    """错误消息并重定向"""
-    if not message.endswith(('！', '。', '…')):
-        message += '！'
-    flash(message, 'danger')
-    if endpoint:
-        return redirect(url_for(endpoint, **kwargs))
-    return None
-
-
-def flash_warning(message: str, endpoint: Optional[str] = None, **kwargs: Any) -> Optional[Any]:
-    """警告消息并重定向"""
-    if not message.endswith(('！', '。', '…')):
-        message += '！'
-    flash(message, 'warning')
-    if endpoint:
-        return redirect(url_for(endpoint, **kwargs))
-    return None
-
-
 def update_stock_and_log(product: Any, warehouse_id: int, quantity: Union[float, Decimal, str],
                          change_type: str, reference_id: int, reference_type: str,
                          notes: str, user_id: int) -> Tuple[Decimal, Decimal]:
@@ -238,7 +165,7 @@ def update_stock_and_log(product: Any, warehouse_id: int, quantity: Union[float,
     
     from app.constants import VALID_CHANGE_TYPES
     if change_type not in VALID_CHANGE_TYPES:
-        raise ValueError(f"Invalid change_type: {change_type}")
+        raise ValueError(f"无效的变动类型: {change_type}")
 
     before_quantity = to_decimal(product.stock_quantity)
     delta = to_decimal(quantity)

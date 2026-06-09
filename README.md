@@ -1,88 +1,88 @@
-# MyJXC
+# MyJXC 进销存管理系统
 
-一个简单的进销存管理系统，支持采购管理、销售管理、库存管理、财务管理、报表分析功能。
+基于 Flask 的中小企业进销存管理系统，覆盖采购、销售、库存、财务、报表五大业务模块。
 
-## 🚀 快速开始
+## 快速开始
 
 ### 环境要求
 
-- Python 3.8 或更高版本
+- Python 3.13 或更高版本
 - pip 包管理器
 
 ### 安装步骤
 
-#### 1. 解压发布包
-
 ```bash
-tar -xzf myjxc_v1.0.0.tar.gz
-cd myjxc
-```
-
-#### 2. 安装依赖
-
-```bash
+# 安装依赖
 pip install -r requirements.txt
-```
 
-#### 3. 首次运行
-
-```bash
+# 首次运行（自动创建数据库和默认管理员）
 python run.py
 ```
 
-首次运行会自动：
-- 创建 SQLite 数据库文件
-- 创建默认管理员账户
-
-#### 4. 访问系统
-
 打开浏览器访问：**http://127.0.0.1:5000**
 
-默认管理员账号：
-- **用户名**: `admin`
-- **密码**: `admin123`
+默认管理员账号：`admin` / `admin123`
+
+### 启动模式
+
+```bash
+# 开发模式（默认，带热重载）
+FLASK_DEBUG=1 python run.py
+
+# 生产模式（waitress，多线程稳定）
+MODE=prod python run.py
+
+# 自定义端口
+PORT=8080 MODE=prod python run.py
+```
+
+| 环境变量 | 默认值 | 说明 |
+|---|---|---|
+| `MODE` | `dev` | `dev` = Flask 开发服务器，`prod` = waitress 生产服务器 |
+| `PORT` | `5000` | 监听端口 |
+| `FLASK_DEBUG` | `0` | 仅 dev 模式有效，`1` 开启调试和热重载 |
 
 ---
 
-## 📋 功能模块
+## 功能模块
 
-### ✅ 基础资料管理
+### 基础资料管理
 - 商品管理（支持图片上传）
 - 商品分类管理
 - 供应商管理
 - 客户管理
 - 仓库管理
 
-### ✅ 采购管理
+### 采购管理
 - 采购订单管理
 - 采购入库管理
 - 库存自动更新
 
-### ✅ 销售管理
+### 销售管理
 - 销售订单管理
 - 销售出库管理
 - 库存自动扣减
 
-### ✅ 库存管理
+### 库存管理
 - 实时库存查询
 - 库存预警
 - 库存盘点
 - 库存调拨
 - 库存流水记录
 
-### ✅ 财务管理
+### 财务管理
 - 收款管理
 - 付款管理
 - 费用支出管理
 - 利润统计分析
 
-### ✅ 报表分析
+### 报表分析
 - 进销存报表
 - 销售排行榜
 - 客户/供应商统计
 - 经营日报/月报
 
-### ✅ 系统功能
+### 系统功能
 - 操作日志
 - 数据备份/恢复
 - 用户管理
@@ -90,7 +90,7 @@ python run.py
 
 ---
 
-## 🧪 运行测试
+## 运行测试
 
 ```bash
 # 安装测试依赖
@@ -108,59 +108,66 @@ python -m pytest tests/test_purchase.py -v
 
 ---
 
-## 🛠 技术栈
+## 技术栈
 
-- **后端**: Flask + SQLAlchemy + Flask-Login + Flask-WTF
-- **前端**: Bootstrap 5 + jQuery
+- **后端**: Flask 2.3 + SQLAlchemy 2.0 + Flask-Login + Flask-WTF
+- **前端**: Bootstrap 5 + jQuery 3.6 + Chart.js
 - **数据库**: SQLite
-- **图表**: Chart.js
+- **生产服务器**: waitress（跨平台，Windows/Linux 均可用）
+
+## 项目结构
+
+```
+my-jxc/
+├── app/
+│   ├── __init__.py          # 应用工厂（create_app）
+│   ├── constants.py         # 业务常量（OrderStatus、ChangeType 等）
+│   ├── forms.py             # WTForms 表单定义
+│   ├── utils.py             # 通用工具函数
+│   ├── utils_order.py       # 订单相关工具函数
+│   ├── models/              # SQLAlchemy 数据模型
+│   │   ├── user.py          # 用户、操作日志
+│   │   ├── product.py       # 商品、分类
+│   │   ├── partner.py       # 供应商、客户、仓库
+│   │   ├── purchase.py      # 采购订单、入库单
+│   │   ├── sales.py         # 销售订单、出库单
+│   │   ├── inventory.py     # 库存流水
+│   │   ├── finance.py       # 收款、付款、费用
+│   │   ├── returns.py       # 采购退货、销售退货
+│   │   └── system.py        # 系统设置
+│   ├── routes/              # 路由模块（10 个蓝图）
+│   ├── templates/           # Jinja2 模板
+│   └── static/              # 静态资源
+├── tests/                   # 测试用例
+├── docs/                    # 文档
+├── config.py                # 配置文件
+├── run.py                   # 启动入口
+└── requirements.txt         # 依赖列表
+```
 
 ---
 
-## 📁 项目结构
-
-```
-myjxc/
-├── app/                  # 应用主目录
-│   ├── routes/          # 路由模块
-│   ├── templates/       # HTML模板
-│   ├── static/          # 静态文件
-│   │   ├── css/         # 样式文件
-│   │   ├── js/          # JavaScript文件
-│   │   └── uploads/     # 上传文件目录
-│   ├── models.py        # 数据模型
-│   └── forms.py         # 表单定义
-├── instance/            # 数据库目录（运行时创建）
-├── config.py            # 配置文件
-├── run.py               # 启动文件
-└── requirements.txt     # 依赖列表
-```
-
----
-
-## ⚙️ 配置说明
-
-### 修改密码
-
-首次使用后，请及时修改管理员密码：
-1. 登录系统
-2. 点击右上角用户头像
-3. 选择"个人信息"
-4. 修改密码
+## 配置说明
 
 ### 安全建议
 
-1. **修改 SECRET_KEY**: 编辑 `config.py`，将 `SECRET_KEY` 修改为随机字符串
-2. **生产环境**: 建议使用 Nginx + Gunicorn 部署
-3. **数据库**: 定期备份 `instance/store.db` 文件
+1. **修改密码**: 首次登录后及时修改管理员密码
+2. **生产部署**: 使用 `MODE=prod` 启动，外层可加 Nginx 反向代理
+3. **定期备份**: 通过系统后台 "系统功能 → 数据备份" 或直接复制 `instance/store.db`
 
-### 数据库迁移
+### 环境变量
 
-如需迁移到其他数据库（如 PostgreSQL、MySQL），请修改 `config.py` 中的 `SQLALCHEMY_DATABASE_URI`。
+| 变量 | 说明 | 默认值 |
+|---|---|---|
+| `MODE` | 启动模式：`dev` / `prod` | `dev` |
+| `PORT` | 监听端口 | `5000` |
+| `FLASK_DEBUG` | 调试模式（仅 dev） | `0` |
+| `SECRET_KEY` | Flask 密钥 | 自动生成并持久化到 `instance/.flask_secret_key` |
+| `DATABASE_URL` | 数据库连接 | `sqlite:///instance/store.db` |
 
 ---
 
-## 🔒 注意事项
+## 注意事项
 
 1. **首次运行**: 系统会自动创建数据库和默认管理员账户
 2. **数据库文件**: 位于 `instance/store.db`，请定期备份
@@ -169,30 +176,35 @@ myjxc/
 
 ---
 
-## 🐛 常见问题
+## 常见问题
 
-### Q: 启动时报错 "ModuleNotFoundError"
-A: 请确保已安装所有依赖：`pip install -r requirements.txt`
+### 启动时报错 "ModuleNotFoundError"
+确保已安装所有依赖：`pip install -r requirements.txt`
 
-### Q: 如何备份数据？
-A: 
-- 方式一：通过系统后台 "系统功能 → 数据备份"
-- 方式二：直接复制 `instance/store.db` 文件
+### 如何备份/恢复数据？
+- 备份：系统后台 → 系统功能 → 数据备份
+- 恢复：系统后台 → 系统功能 → 数据恢复
+- 手动：直接复制/替换 `instance/store.db` 文件
 
-### Q: 如何恢复数据？
-A: 通过系统后台 "系统功能 → 数据恢复"，或直接替换 `instance/store.db` 文件
+### 端口被占用？
+```bash
+PORT=8080 python run.py
+```
 
-### Q: 默认端口5000被占用？
-A: 修改 `run.py` 中的端口号，或设置环境变量 `PORT`
+### 生产环境如何部署？
+```bash
+MODE=prod PORT=5000 python run.py
+```
+外层可加 Nginx 反向代理处理静态文件和 HTTPS。
 
 ---
 
-## 📞 技术支持
+## 技术支持
 
 如有问题或建议，请联系开发者。
 
 ---
 
-## 📄 许可证
+## 许可证
 
 MIT License

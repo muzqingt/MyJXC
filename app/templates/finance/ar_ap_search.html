@@ -170,17 +170,7 @@
                             <td>{{ receipt.receipt_date.strftime('%Y-%m-%d') }}</td>
                             <td class="text-success fw-bold">¥{{ "%.2f"|format(receipt.amount) }}</td>
                             <td>
-                                {% if receipt.payment_method == 'cash' %}
-                                <span class="badge bg-primary">现金</span>
-                                {% elif receipt.payment_method == 'bank_transfer' %}
-                                <span class="badge bg-info">银行转账</span>
-                                {% elif receipt.payment_method == 'wechat' %}
-                                <span class="badge bg-success">微信支付</span>
-                                {% elif receipt.payment_method == 'alipay' %}
-                                <span class="badge bg-warning">支付宝</span>
-                                {% else %}
-                                <span class="badge bg-secondary">{{ receipt.payment_method }}</span>
-                                {% endif %}
+                                <span class="badge bg-info">{{ receipt.payment_method|payment_method }}</span>
                             </td>
                             <td>{{ receipt.notes|truncate(30) if receipt.notes else '-' }}</td>
                             <td>
@@ -359,17 +349,7 @@
                             <td>{{ payment.payment_date.strftime('%Y-%m-%d') }}</td>
                             <td class="text-danger fw-bold">¥{{ "%.2f"|format(payment.amount) }}</td>
                             <td>
-                                {% if payment.payment_method == 'cash' %}
-                                <span class="badge bg-primary">现金</span>
-                                {% elif payment.payment_method == 'bank_transfer' %}
-                                <span class="badge bg-info">银行转账</span>
-                                {% elif payment.payment_method == 'wechat' %}
-                                <span class="badge bg-success">微信支付</span>
-                                {% elif payment.payment_method == 'alipay' %}
-                                <span class="badge bg-warning">支付宝</span>
-                                {% else %}
-                                <span class="badge bg-secondary">{{ payment.payment_method }}</span>
-                                {% endif %}
+                                <span class="badge bg-info">{{ payment.payment_method|payment_method }}</span>
                             </td>
                             <td>{{ payment.notes|truncate(30) if payment.notes else '-' }}</td>
                             <td>

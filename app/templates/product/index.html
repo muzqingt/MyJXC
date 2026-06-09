@@ -9,6 +9,9 @@
     <a href="{{ url_for('product.new_product') }}" class="btn btn-primary">
         <i class="bi bi-plus-circle"></i> 添加商品
     </a>
+    <a href="{{ url_for('product.import_page') }}" class="btn btn-outline-success">
+        <i class="bi bi-upload"></i> 导入商品
+    </a>
     <a href="{{ url_for('product.categories') }}" class="btn btn-outline-secondary">
         <i class="bi bi-tags"></i> 分类管理
     </a>
@@ -129,7 +132,7 @@
                 
                 <!-- 分页 -->
                 {% if products.pages > 1 %}
-                <nav aria-label="Page navigation">
+                <nav aria-label="分页导航">
                     <ul class="pagination justify-content-center">
                         {% if products.has_prev %}
                         <li class="page-item">

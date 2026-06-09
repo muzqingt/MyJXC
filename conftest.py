@@ -84,7 +84,7 @@ def db_session(app):
 
 
 @pytest.fixture(scope='function')
-def authenticated_client(app, client):
+def authenticated_client(app, client, db_session):
     """已登录 admin 的测试客户端"""
     client.post('/auth/login', data={
         'username': 'admin',

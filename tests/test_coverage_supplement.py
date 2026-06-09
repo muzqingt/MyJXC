@@ -62,7 +62,7 @@ def test_register_password_mismatch(client):
 def test_delete_user_not_found(authenticated_client):
     """删除不存在的用户"""
     resp = authenticated_client.post('/system/user/delete/99999', follow_redirects=True)
-    assert resp.status_code == 200
+    assert resp.status_code == 404
 
 
 def test_edit_user_not_found(authenticated_client):

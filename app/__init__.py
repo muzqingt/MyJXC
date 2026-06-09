@@ -63,6 +63,11 @@ def create_app(config_name=None):
     def localize_filter(dt):
         return localize_dt(dt)
 
+    @app.template_filter('payment_method')
+    def payment_method_filter(method):
+        from app.constants import PaymentMethod
+        return PaymentMethod.label(method or '')
+
     @app.after_request
     def set_security_headers(response):
         response.headers['X-Content-Type-Options'] = 'nosniff'
@@ -70,5 +75,30 @@ def create_app(config_name=None):
         response.headers['X-XSS-Protection'] = '1; mode=block'
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         return response
+
+    # 自定义错误页面
+    @app.errorhandler(403)
+    def forbidden(e):
+        from flask import render_template
+        return render_template('error.html',
+                               error_code=403,
+                               error_message='访问被拒绝',
+                               error_detail='您没有权限执行此操作。'), 403
+
+    @app.errorhandler(404)
+    def page_not_found(e):
+        from flask import render_template
+        return render_template('error.html',
+                               error_code=404,
+                               error_message='页面未找到',
+                               error_detail='您访问的页面不存在或已被移除。'), 404
+
+    @app.errorhandler(500)
+    def internal_server_error(e):
+        from flask import render_template
+        return render_template('error.html',
+                               error_code=500,
+                               error_message='服务器内部错误',
+                               error_detail='系统遇到了一个意外错误，请稍后重试。'), 500
 
     return app

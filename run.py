@@ -128,12 +128,22 @@ if __name__ == '__main__':
     # 启动mDNS服务（需在启动Flask之前注册）
     zc = register_mdns(5000)
 
-    # 启动应用
+    port = int(os.environ.get('PORT', 5000))
+    mode = os.environ.get('MODE', 'dev')  # dev / prod
+
     print("启动进销存管理系统...")
-    print("访问地址: http://127.0.0.1:5000")
+    print(f"访问地址: http://127.0.0.1:{port}")
     print("默认账号: admin / admin123")
+
     try:
-        app.run(host='0.0.0.0', port=5000, debug=os.environ.get('FLASK_DEBUG', '0') == '1')
+        if mode == 'prod':
+            from waitress import serve
+            print(f"生产模式 (waitress)，端口 {port}")
+            serve(app, host='0.0.0.0', port=port)
+        else:
+            debug = os.environ.get('FLASK_DEBUG', '0') == '1'
+            print(f"开发模式 (Flask)，端口 {port}，debug={'开' if debug else '关'}")
+            app.run(host='0.0.0.0', port=port, debug=debug)
     finally:
         if zc:
             zc.close()

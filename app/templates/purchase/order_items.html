@@ -177,14 +177,14 @@ $(document).ready(function() {
     try {
         orderItems = JSON.parse($('#order-items-data').text());
     } catch(e) {
-        console.log('Error parsing order items:', e);
+        console.log('解析订单明细失败:', e);
     }
     
     let products = [];
     try {
         products = JSON.parse($('#products-data').text());
     } catch(e) {
-        console.log('Error parsing products:', e);
+        console.log('解析商品数据失败:', e);
     }
 
     // 供应商数据
@@ -198,7 +198,7 @@ $(document).ready(function() {
             };
         });
     } catch(e) {
-        console.log('Error parsing suppliers:', e);
+        console.log('解析供应商数据失败:', e);
     }
 
     // 初始化供应商搜索

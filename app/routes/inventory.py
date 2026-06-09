@@ -8,9 +8,8 @@ import io
 from app.forms import StockAdjustForm, StockTransferForm
 from app.utils import to_decimal, apply_excel_header_style, EXCEL_THIN_BORDER
 from app.utils_order import create_stock_log
+from app.constants import VALID_CHANGE_TYPES
 from sqlalchemy.exc import SQLAlchemyError
-
-VALID_LOG_TYPES = {'in', 'out', 'check_in', 'check_out', 'adjust_in', 'adjust_out', 'return_in', 'return_out', 'stock_transfer'}
 
 def get_product_stock_in_warehouse(product_id, warehouse_id):
     """根据 StockLog 计算某商品在指定仓库的实际库存
@@ -417,7 +416,7 @@ def stock_logs():
             query = query.filter(StockLog.change_type.like('check%'))
         elif log_type == 'adjust':
             query = query.filter(StockLog.change_type.like('adjust%'))
-        elif log_type in VALID_LOG_TYPES:
+        elif log_type in VALID_CHANGE_TYPES:
             query = query.filter_by(change_type=log_type)
 
     logs = query.order_by(StockLog.created_at.desc()).limit(100).all()
@@ -471,7 +470,7 @@ def export_logs():
             query = query.filter(StockLog.change_type.like('check%'))
         elif log_type == 'adjust':
             query = query.filter(StockLog.change_type.like('adjust%'))
-        elif log_type in VALID_LOG_TYPES:
+        elif log_type in VALID_CHANGE_TYPES:
             query = query.filter_by(change_type=log_type)
 
     logs = query.order_by(StockLog.created_at.desc()).limit(10000).all()
@@ -491,7 +490,7 @@ def export_logs():
     type_mapping = {
         'in': '入库',
         'out': '出库',
-        'transfer': '调拨',
+        'stock_transfer': '调拨',
         'check_in': '盘点',
         'check_out': '盘点',
         'adjust_in': '调整',

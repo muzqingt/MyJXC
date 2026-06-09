@@ -156,22 +156,6 @@ def test_generate_order_number_auto_increment(app, db_session):
     assert num2.startswith('TST')
 
 
-def test_generate_order_number_safe(app, db_session):
-    """generate_order_number_safe 生成唯一订单号"""
-    from app.utils import generate_order_number_safe
-    num = generate_order_number_safe('SAFE', PurchaseOrder)
-    assert num.startswith('SAFE')
-    assert len(num) >= 12
-
-
-def test_generate_order_number_safe_unique(app, db_session):
-    """generate_order_number_safe 生成订单号格式正确"""
-    from app.utils import generate_order_number_safe
-    num = generate_order_number_safe('UNQ', PurchaseOrder)
-    assert num.startswith('UNQ')
-    assert len(num) >= 12
-
-
 # ==================== update_stock_and_log ====================
 
 def test_update_stock_in(app, db_session):
