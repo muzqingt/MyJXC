@@ -4,7 +4,7 @@
  * 使用方法：
  *   const ai = new AIRecognize({
  *       docType: 'purchase',
- *       onResult: function(data) { /* 填写表单 */ }
+ *       onResult: function(data) { // 填写表单 }
  *   });
  *   ai.mount('#ai-recognize-container');
  *
