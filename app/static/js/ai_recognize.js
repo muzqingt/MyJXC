@@ -192,9 +192,15 @@ class AIRecognize {
             formData.append('image_base64', imageBase64);
             formData.append('doc_type', this.docType);
 
+            // 获取 CSRF token
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
             const response = await fetch('/api/ai/recognize', {
                 method: 'POST',
                 body: formData,
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                },
             });
 
             const result = await response.json();

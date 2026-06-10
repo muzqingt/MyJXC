@@ -6,10 +6,13 @@ import base64
 import requests
 from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required, current_user
-from app import db
+from app import db, csrf
 from app.models import SystemSetting
 
 bp = Blueprint('ai', __name__, url_prefix='/api/ai')
+
+# AI API 端点豁免 CSRF（通过 X-CSRFToken header 验证）
+csrf.exempt(bp)
 
 # 各单据类型的 prompt
 PROMPTS = {

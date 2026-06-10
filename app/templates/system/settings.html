@@ -456,7 +456,7 @@ function testAiConnection() {
     resultDiv.hide();
 
     $.ajax({
-        url: '/system/api/test-ai-connection',
+        url: '/api/ai/test-connection',
         method: 'POST',
         data: {
             csrf_token: '{{ csrf_token() }}',
