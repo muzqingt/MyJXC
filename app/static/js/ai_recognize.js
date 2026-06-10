@@ -21,7 +21,6 @@ class AIRecognize {
         this.maxSizeKB = options.maxSizeKB || 1024;
         this.quality = options.quality || 0.8;
         this.container = null;
-        this.fileInput = null;
         this.isLoading = false;
     }
 
@@ -44,15 +43,25 @@ class AIRecognize {
     _render() {
         const html = `
             <div class="ai-recognize-wrapper mb-3">
-                <div class="ai-recognize-btn" id="ai-recognize-trigger-${this.docType}"
-                     style="border: 2px dashed #0d6efd; border-radius: 8px; padding: 20px;
-                            text-align: center; cursor: pointer; background: #f8f9fa;
-                            transition: all 0.3s;">
-                    <i class="bi bi-camera" style="font-size: 2rem; color: #0d6efd;"></i>
-                    <p class="mb-0 mt-2 text-primary fw-bold">拍照识别单据</p>
-                    <small class="text-muted">支持拍照或选择图片文件</small>
+                <div style="border: 2px dashed #0d6efd; border-radius: 8px; padding: 16px;
+                            text-align: center; background: #f8f9fa;">
+                    <i class="bi bi-robot" style="font-size: 1.5rem; color: #0d6efd;"></i>
+                    <p class="mb-2 mt-1 text-primary fw-bold">AI 智能识别</p>
+                    <div class="d-flex justify-content-center gap-2">
+                        <button type="button" class="btn btn-primary btn-sm" id="ai-camera-btn-${this.docType}">
+                            <i class="bi bi-camera"></i> 拍照
+                        </button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="ai-file-btn-${this.docType}">
+                            <i class="bi bi-upload"></i> 选择图片
+                        </button>
+                    </div>
+                    <small class="text-muted d-block mt-1">拍照或上传单据图片，自动识别填写</small>
                 </div>
-                <input type="file" accept="image/*" capture="camera"
+                <!-- 摄像头专用 input -->
+                <input type="file" accept="image/*" capture="environment"
+                       id="ai-camera-input-${this.docType}" style="display: none;">
+                <!-- 文件选择专用 input -->
+                <input type="file" accept="image/*"
                        id="ai-file-input-${this.docType}" style="display: none;">
                 <div id="ai-preview-${this.docType}" style="display: none;" class="mt-2">
                     <div style="position: relative; display: inline-block;">
@@ -78,22 +87,32 @@ class AIRecognize {
      * 绑定事件
      */
     _bindEvents() {
-        const trigger = $(`#ai-recognize-trigger-${this.docType}`);
+        const cameraBtn = $(`#ai-camera-btn-${this.docType}`);
+        const fileBtn = $(`#ai-file-btn-${this.docType}`);
+        const cameraInput = $(`#ai-camera-input-${this.docType}`);
         const fileInput = $(`#ai-file-input-${this.docType}`);
         const clearBtn = $(`#ai-clear-${this.docType}`);
 
-        // 点击触发文件选择
-        trigger.on('click', () => {
+        // 拍照按钮
+        cameraBtn.on('click', () => {
+            if (!this.isLoading) {
+                cameraInput.click();
+            }
+        });
+
+        // 选择文件按钮
+        fileBtn.on('click', () => {
             if (!this.isLoading) {
                 fileInput.click();
             }
         });
 
-        // 悬停效果
-        trigger.on('mouseenter', function() {
-            $(this).css('background', '#e7f1ff');
-        }).on('mouseleave', function() {
-            $(this).css('background', '#f8f9fa');
+        // 摄像头选择
+        cameraInput.on('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                this._handleFile(file);
+            }
         });
 
         // 文件选择
@@ -359,10 +378,12 @@ class AIRecognize {
         this.isLoading = loading;
         if (loading) {
             $(`#ai-loading-${this.docType}`).show();
-            $(`#ai-recognize-trigger-${this.docType}`).css('opacity', '0.6');
+            $(`#ai-camera-btn-${this.docType}`).prop('disabled', true);
+            $(`#ai-file-btn-${this.docType}`).prop('disabled', true);
         } else {
             $(`#ai-loading-${this.docType}`).hide();
-            $(`#ai-recognize-trigger-${this.docType}`).css('opacity', '1');
+            $(`#ai-camera-btn-${this.docType}`).prop('disabled', false);
+            $(`#ai-file-btn-${this.docType}`).prop('disabled', false);
         }
     }
 
@@ -395,6 +416,7 @@ class AIRecognize {
     _clear() {
         $(`#ai-preview-${this.docType}`).hide();
         $(`#ai-preview-img-${this.docType}`).attr('src', '');
+        $(`#ai-camera-input-${this.docType}`).val('');
         $(`#ai-file-input-${this.docType}`).val('');
     }
 }
