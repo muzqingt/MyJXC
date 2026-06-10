@@ -1,0 +1,22 @@
+{# AI 单据识别组件
+   使用方法：{% include 'components/ai_recognize.html' with context %}
+   需要在页面中定义 {% block ai_on_result %} 回调函数
+#}
+
+{% if ai_enabled %}
+<div id="ai-recognize-container"></div>
+<script>
+$(document).ready(function() {
+    const aiRecognize = new AIRecognize({
+        docType: '{{ doc_type }}',
+        onResult: function(data) {
+            {% block ai_on_result %}
+            // 默认实现：子页面覆盖此 block
+            console.log('AI 识别结果:', data);
+            {% endblock %}
+        }
+    });
+    aiRecognize.mount('#ai-recognize-container');
+});
+</script>
+{% endif %}

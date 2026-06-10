@@ -54,9 +54,16 @@ def create_app(config_name=None):
     @app.context_processor
     def inject_template_functions():
         from app.utils import format_local_dt
+        from app.models import SystemSetting
+        ai_enabled = bool(
+            SystemSetting.get_value('AI_API_URL', '')
+            and SystemSetting.get_value('AI_API_KEY', '')
+            and SystemSetting.get_value('AI_MODEL_NAME', '')
+        )
         return {
             'now': datetime.now,
-            'format_local_dt': format_local_dt
+            'format_local_dt': format_local_dt,
+            'ai_enabled': ai_enabled,
         }
 
     # 注册 Jinja2 过滤器
