@@ -17,7 +17,16 @@
     <div class="card-body">
         <form method="post" id="order-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            
+
+            {% if ai_enabled and not order %}
+            <!-- AI 识别区域 -->
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div id="ai-recognize-container"></div>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- 订单基本信息编辑 -->
             <div class="row mb-4">
                 <div class="col-md-12">
@@ -426,6 +435,63 @@ $(document).ready(function() {
         });
         updateTotal();
     });
+
+    // AI 单据识别
+    {% if ai_enabled and not order %}
+    const aiRecognize = new AIRecognize({
+        docType: 'purchase',
+        onResult: function(data) {
+            // 匹配供应商
+            if (data.supplier_name) {
+                const matchedSupplier = suppliers.find(function(s) {
+                    return s.name.includes(data.supplier_name) || data.supplier_name.includes(s.name);
+                });
+                if (matchedSupplier) {
+                    supplierSearcher.selectItem(matchedSupplier);
+                } else {
+                    alert('未找到匹配的供应商: ' + data.supplier_name + '，请手动选择');
+                }
+            }
+
+            // 填充日期
+            if (data.order_date) {
+                $('input[name="order_date"]').val(data.order_date);
+            }
+
+            // 填充备注
+            if (data.notes) {
+                $('textarea[name="notes"]').val(data.notes);
+            }
+
+            // 填充商品明细
+            if (data.items && data.items.length > 0) {
+                // 清空现有行
+                $('#items-body').empty();
+                itemCount = 0;
+
+                data.items.forEach(function(item) {
+                    // 匹配商品
+                    const matchedProduct = products.find(function(p) {
+                        return p.name.includes(item.name) || (item.name && item.name.includes(p.name));
+                    });
+
+                    if (matchedProduct) {
+                        addItemRow(
+                            matchedProduct.id,
+                            item.quantity || '',
+                            item.unit_price || matchedProduct.purchase_price || ''
+                        );
+                    } else {
+                        alert('未找到匹配的商品: ' + item.name + '，请手动添加');
+                    }
+                });
+
+                updateTotal();
+            }
+        }
+    });
+    aiRecognize.mount('#ai-recognize-container');
+    {% endif %}
 });
 </script>
 {% endblock %}
