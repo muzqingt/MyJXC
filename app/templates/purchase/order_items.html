@@ -441,13 +441,16 @@ $(document).ready(function() {
     const aiRecognize = new AIRecognize({
         docType: 'purchase',
         onResult: function(data) {
-            // 匹配供应商
+            // 匹配供应商（模糊匹配：名称、编码）
             if (data.supplier_name) {
-                const matchedSupplier = suppliers.find(function(s) {
-                    return s.name.includes(data.supplier_name) || data.supplier_name.includes(s.name);
+                var keyword = data.supplier_name.toLowerCase();
+                var matched = suppliers.find(function(s) {
+                    return (s.name && s.name.toLowerCase().includes(keyword)) ||
+                           (s.code && s.code.toLowerCase().includes(keyword)) ||
+                           (keyword.includes(s.name && s.name.toLowerCase()));
                 });
-                if (matchedSupplier) {
-                    supplierSearcher.selectItem(matchedSupplier);
+                if (matched) {
+                    supplierSearcher.setValue(matched.id);
                 } else {
                     alert('未找到匹配的供应商: ' + data.supplier_name + '，请手动选择');
                 }
@@ -465,27 +468,30 @@ $(document).ready(function() {
 
             // 填充商品明细
             if (data.items && data.items.length > 0) {
-                // 清空现有行
                 $('#items-body').empty();
                 itemCount = 0;
 
+                var unmatched = [];
                 data.items.forEach(function(item) {
-                    // 匹配商品
-                    const matchedProduct = products.find(function(p) {
-                        return p.name.includes(item.name) || (item.name && item.name.includes(p.name));
+                    var keyword = (item.name || '').toLowerCase();
+                    // 匹配商品：名称、编码、规格
+                    var matched = products.find(function(p) {
+                        return (p.name && p.name.toLowerCase().includes(keyword)) ||
+                               (p.code && p.code.toLowerCase().includes(keyword)) ||
+                               (p.specification && p.specification.toLowerCase().includes(keyword)) ||
+                               (keyword.includes(p.name && p.name.toLowerCase()));
                     });
 
-                    if (matchedProduct) {
-                        addItemRow(
-                            matchedProduct.id,
-                            item.quantity || '',
-                            item.unit_price || matchedProduct.purchase_price || ''
-                        );
-                    } else {
-                        alert('未找到匹配的商品: ' + item.name + '，请手动添加');
+                    if (matched) {
+                        addItemRow(matched.id, item.quantity || '', item.unit_price || matched.purchase_price || '');
+                    } else if (keyword) {
+                        unmatched.push(item.name);
                     }
                 });
 
+                if (unmatched.length > 0) {
+                    alert('以下商品未找到，请手动添加: ' + unmatched.join('、'));
+                }
                 updateTotal();
             }
         }
