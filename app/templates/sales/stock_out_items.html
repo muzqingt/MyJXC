@@ -7,6 +7,15 @@
 {% block content %}
 <div class="card">
     <div class="card-body">
+        {% if ai_enabled %}
+        <!-- AI 识别区域 -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div id="ai-recognize-container"></div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- 出库单基本信息 -->
         <div class="row mb-4">
             <div class="col-md-6">
@@ -335,6 +344,41 @@ $(document).ready(function() {
     } else {
         addItemRow();
     }
+
+    // AI 单据识别
+    {% if ai_enabled %}
+    const aiRecognize = new AIRecognize({
+        docType: 'stock_out',
+        onResult: function(data) {
+            // 填充商品明细
+            if (data.items && data.items.length > 0) {
+                // 清空现有行
+                $('#items-body').empty();
+                itemCount = 0;
+
+                data.items.forEach(function(item) {
+                    // 匹配商品
+                    const matchedProduct = products.find(function(p) {
+                        return p.name.includes(item.name) || (item.name && item.name.includes(p.name));
+                    });
+
+                    if (matchedProduct) {
+                        addItemRow(
+                            matchedProduct.id,
+                            item.quantity || '',
+                            item.unit_price || matchedProduct.sale_price || ''
+                        );
+                    } else {
+                        alert('未找到匹配的商品: ' + item.name + '，请手动添加');
+                    }
+                });
+
+                updateTotal();
+            }
+        }
+    });
+    aiRecognize.mount('#ai-recognize-container');
+    {% endif %}
 
 });
 </script>

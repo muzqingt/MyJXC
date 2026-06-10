@@ -9,6 +9,13 @@
     <div class="col-md-8">
         <div class="card">
             <div class="card-body">
+                {% if ai_enabled %}
+                <!-- AI 识别区域 -->
+                <div class="mb-4">
+                    <div id="ai-recognize-container"></div>
+                </div>
+                {% endif %}
+
                 <form method="post">
                     {{ form.hidden_tag() }}
                     
@@ -123,9 +130,48 @@ $(document).ready(function() {
     // 设置默认日期为今天
     var today = new Date().toISOString().split('T')[0];
     $('input[name="expense_date"]').val(today);
-    
+
     // 自动聚焦类别输入框
     $('input[name="category"]').focus();
+
+    // AI 单据识别
+    {% if ai_enabled %}
+    const aiRecognize = new AIRecognize({
+        docType: 'expense',
+        onResult: function(data) {
+            // 填充费用类别
+            if (data.category) {
+                $('input[name="category"]').val(data.category);
+            }
+
+            // 填充金额
+            if (data.amount) {
+                $('input[name="amount"]').val(data.amount);
+            }
+
+            // 填充日期
+            if (data.expense_date) {
+                $('input[name="expense_date"]').val(data.expense_date);
+            }
+
+            // 填充收款方
+            if (data.payee) {
+                $('input[name="payee"]').val(data.payee);
+            }
+
+            // 匹配支付方式
+            if (data.payment_method) {
+                $('select[name="payment_method"]').val(data.payment_method);
+            }
+
+            // 填充备注
+            if (data.notes) {
+                $('textarea[name="notes"]').val(data.notes);
+            }
+        }
+    });
+    aiRecognize.mount('#ai-recognize-container');
+    {% endif %}
 });
 
 function setCategory(category) {

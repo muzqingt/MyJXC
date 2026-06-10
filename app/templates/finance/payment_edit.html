@@ -9,6 +9,13 @@
     <div class="col-md-8">
         <div class="card">
             <div class="card-body">
+                {% if ai_enabled and not payment %}
+                <!-- AI 识别区域 -->
+                <div class="mb-4">
+                    <div id="ai-recognize-container"></div>
+                </div>
+                {% endif %}
+
                 <form method="post">
                     {% if payment %}
                     <!-- 编辑模式：不使用WTForms，直接使用HTML表单 -->
@@ -215,8 +222,8 @@ $(document).ready(function() {
     // 初始化供应商搜索
     const selectedSupplierId = '{{ payment.supplier_id if payment else "" }}';
     const preSelectedSupplier = selectedSupplierId ? suppliers.find(s => String(s.id) === String(selectedSupplierId)) : null;
-    
-    initEntitySearch('#supplier-search-container', suppliers, function(supplier) {}, {
+
+    const supplierSearcher = initEntitySearch('#supplier-search-container', suppliers, function(supplier) {}, {
         containerClass: 'supplier-search',
         fieldCode: 'code',
         fieldName: 'name',
@@ -224,6 +231,35 @@ $(document).ready(function() {
         selectedId: preSelectedSupplier ? preSelectedSupplier.id : null,
         hiddenName: 'supplier_id'
     });
+
+    // AI 单据识别
+    {% if ai_enabled and not payment %}
+    const aiRecognize = new AIRecognize({
+        docType: 'payment',
+        onResult: function(data) {
+            // 填充金额
+            if (data.amount) {
+                $('input[name="amount"]').val(data.amount);
+            }
+
+            // 填充日期
+            if (data.payment_date) {
+                $('input[name="payment_date"]').val(data.payment_date);
+            }
+
+            // 匹配支付方式
+            if (data.payment_method) {
+                $('select[name="payment_method"]').val(data.payment_method);
+            }
+
+            // 填充备注
+            if (data.notes) {
+                $('textarea[name="notes"]').val(data.notes);
+            }
+        }
+    });
+    aiRecognize.mount('#ai-recognize-container');
+    {% endif %}
 });
 
 function toggleOrder(orderId, orderNumber) {
