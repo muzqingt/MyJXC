@@ -37,6 +37,7 @@ def create_app(config_name=None):
 
     # 注册蓝图
     from app.routes import auth, product, partner, purchase, sales, inventory, finance, report, system, main
+    from app.routes import ai
     app.register_blueprint(auth.bp)
     app.register_blueprint(product.bp)
     app.register_blueprint(partner.bp)
@@ -47,6 +48,7 @@ def create_app(config_name=None):
     app.register_blueprint(report.bp)
     app.register_blueprint(system.bp)
     app.register_blueprint(main.bp)
+    app.register_blueprint(ai.bp)
 
     # 注册模板上下文处理器
     @app.context_processor

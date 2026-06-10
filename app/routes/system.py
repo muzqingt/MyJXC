@@ -256,8 +256,15 @@ def settings():
         'ENABLE_BACKUP': SystemSetting.get_value('ENABLE_BACKUP', '1') == '1',
         'ENABLE_LOGGING': SystemSetting.get_value('ENABLE_LOGGING', '1') == '1',
         'DEFAULT_WAREHOUSE': SystemSetting.get_value('DEFAULT_WAREHOUSE', ''),
+        # AI 配置
+        'AI_API_URL': SystemSetting.get_value('AI_API_URL', ''),
+        'AI_API_KEY': SystemSetting.get_value('AI_API_KEY', ''),
+        'AI_MODEL_NAME': SystemSetting.get_value('AI_MODEL_NAME', ''),
     }
-    
+    # 密钥脱敏
+    ai_key = config.get('AI_API_KEY', '')
+    config['AI_API_KEY_MASKED'] = (ai_key[:4] + '****') if len(ai_key) > 4 else ai_key
+
     return render_template('system/settings.html', title='系统设置', config=config, warehouses=warehouses)
 
 @bp.route('/users')
@@ -488,7 +495,8 @@ def save_settings():
     settings_keys = [
         'COMPANY_NAME', 'COMPANY_ADDRESS', 'COMPANY_PHONE',
         'DEFAULT_CURRENCY', 'ITEMS_PER_PAGE', 'ENABLE_BACKUP', 'ENABLE_LOGGING',
-        'DEFAULT_WAREHOUSE'
+        'DEFAULT_WAREHOUSE',
+        'AI_API_URL', 'AI_API_KEY', 'AI_MODEL_NAME',
     ]
     
     try:
