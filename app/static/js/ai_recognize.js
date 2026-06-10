@@ -3,12 +3,10 @@
  *
  * 使用方法：
  *   const ai = new AIRecognize({
- *       docType: 'purchase',        // 单据类型
- *       onResult: function(data) {  // 识别结果回调
- *           // 自动填写表单
- *       }
+ *       docType: 'purchase',
+ *       onResult: function(data) { /* 填写表单 */ }
  *   });
- *   ai.mount('#ai-button-container');  // 挂载到指定容器
+ *   ai.mount('#ai-recognize-container');
  *
  * 依赖：jQuery, Bootstrap 5
  */
@@ -24,402 +22,255 @@ class AIRecognize {
         this.isLoading = false;
     }
 
-    /**
-     * 挂载到指定容器
-     */
     mount(selector) {
         this.container = $(selector);
-        if (this.container.length === 0) {
-            console.warn('AIRecognize: 容器不存在', selector);
-            return;
-        }
+        if (this.container.length === 0) return;
         this._render();
-        this._bindEvents();
     }
 
-    /**
-     * 渲染按钮和隐藏的文件输入
-     */
     _render() {
+        const self = this;
+        const dt = this.docType;
+
         const html = `
-            <div class="ai-recognize-wrapper mb-3">
-                <div style="border: 2px dashed #0d6efd; border-radius: 8px; padding: 16px;
-                            text-align: center; background: #f8f9fa;">
-                    <i class="bi bi-robot" style="font-size: 1.5rem; color: #0d6efd;"></i>
-                    <p class="mb-2 mt-1 text-primary fw-bold">AI 智能识别</p>
-                    <div class="d-flex justify-content-center gap-2">
-                        <button type="button" class="btn btn-primary btn-sm" id="ai-camera-btn-${this.docType}">
-                            <i class="bi bi-camera"></i> 拍照
-                        </button>
-                        <button type="button" class="btn btn-outline-primary btn-sm" id="ai-file-btn-${this.docType}">
-                            <i class="bi bi-upload"></i> 选择图片
-                        </button>
-                    </div>
-                    <small class="text-muted d-block mt-1">拍照或上传单据图片，自动识别填写</small>
+            <div class="mb-3" style="border: 2px dashed #0d6efd; border-radius: 8px; padding: 16px; text-align: center; background: #f8f9fa;">
+                <i class="bi bi-robot" style="font-size: 1.5rem; color: #0d6efd;"></i>
+                <p class="mb-2 mt-1 text-primary fw-bold">AI 智能识别</p>
+                <div class="d-flex justify-content-center gap-2">
+                    <button type="button" class="btn btn-primary btn-sm"
+                            onclick="window._ai_${dt}.openCamera()">
+                        <i class="bi bi-camera"></i> 拍照
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm"
+                            onclick="window._ai_${dt}.openFile()">
+                        <i class="bi bi-upload"></i> 选择图片
+                    </button>
                 </div>
-                <!-- 摄像头专用 input -->
-                <input type="file" accept="image/*" capture="environment"
-                       id="ai-camera-input-${this.docType}" style="display: none;">
-                <!-- 文件选择专用 input -->
-                <input type="file" accept="image/*"
-                       id="ai-file-input-${this.docType}" style="display: none;">
-                <div id="ai-preview-${this.docType}" style="display: none;" class="mt-2">
-                    <div style="position: relative; display: inline-block;">
-                        <img id="ai-preview-img-${this.docType}" style="max-width: 100%; max-height: 200px; border-radius: 8px;">
-                        <button type="button" class="btn btn-sm btn-danger" id="ai-clear-${this.docType}"
-                                style="position: absolute; top: 5px; right: 5px;">
-                            <i class="bi bi-x"></i>
-                        </button>
-                    </div>
-                </div>
-                <div id="ai-loading-${this.docType}" style="display: none;" class="mt-2 text-center">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">识别中...</span>
-                    </div>
-                    <p class="mt-2 text-primary">正在识别单据...</p>
+                <small class="text-muted d-block mt-1">拍照或上传单据图片，自动识别填写</small>
+            </div>
+            <input type="file" accept="image/*" capture="environment"
+                   id="ai-camera-${dt}" style="display:none;"
+                   onchange="window._ai_${dt}.onFile(this)">
+            <input type="file" accept="image/*"
+                   id="ai-file-${dt}" style="display:none;"
+                   onchange="window._ai_${dt}.onFile(this)">
+            <div id="ai-preview-${dt}" style="display:none;" class="mt-2 mb-2">
+                <div style="position:relative; display:inline-block;">
+                    <img id="ai-preview-img-${dt}" style="max-width:100%; max-height:200px; border-radius:8px;">
+                    <button type="button" class="btn btn-sm btn-danger"
+                            onclick="window._ai_${dt}.clear()"
+                            style="position:absolute; top:5px; right:5px;">
+                        <i class="bi bi-x"></i>
+                    </button>
                 </div>
             </div>
+            <div id="ai-loading-${dt}" style="display:none;" class="mt-2 text-center">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2 text-primary">正在识别...</p>
+            </div>
+            <div id="ai-error-${dt}" style="display:none;" class="mt-2"></div>
         `;
+
         this.container.html(html);
+
+        // 暴露到全局供 onclick 使用
+        window[`_ai_${dt}`] = {
+            openCamera: function() { self.openCamera(); },
+            openFile: function() { self.openFile(); },
+            onFile: function(input) { self.onFile(input); },
+            clear: function() { self.clear(); }
+        };
     }
 
-    /**
-     * 绑定事件
-     */
-    _bindEvents() {
-        const cameraBtn = $(`#ai-camera-btn-${this.docType}`);
-        const fileBtn = $(`#ai-file-btn-${this.docType}`);
-        const cameraInput = $(`#ai-camera-input-${this.docType}`);
-        const fileInput = $(`#ai-file-input-${this.docType}`);
-        const clearBtn = $(`#ai-clear-${this.docType}`);
-
-        // 拍照按钮
-        cameraBtn.on('click', () => {
-            if (!this.isLoading) {
-                cameraInput.click();
-            }
-        });
-
-        // 选择文件按钮
-        fileBtn.on('click', () => {
-            if (!this.isLoading) {
-                fileInput.click();
-            }
-        });
-
-        // 摄像头选择
-        cameraInput.on('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                this._handleFile(file);
-            }
-        });
-
-        // 文件选择
-        fileInput.on('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                this._handleFile(file);
-            }
-        });
-
-        // 清除
-        clearBtn.on('click', (e) => {
-            e.stopPropagation();
-            this._clear();
-        });
+    openCamera() {
+        if (this.isLoading) return;
+        document.getElementById(`ai-camera-${this.docType}`).click();
     }
 
-    /**
-     * 处理选择的文件
-     */
-    async _handleFile(file) {
+    openFile() {
+        if (this.isLoading) return;
+        document.getElementById(`ai-file-${this.docType}`).click();
+    }
+
+    onFile(input) {
+        const file = input.files[0];
+        if (!file) return;
+
         if (!file.type.startsWith('image/')) {
-            this._showError('请选择图片文件');
+            this.showError('请选择图片文件');
             return;
         }
 
-        try {
-            // 显示预览
-            const previewUrl = URL.createObjectURL(file);
-            $(`#ai-preview-img-${this.docType}`).attr('src', previewUrl);
-            $(`#ai-preview-${this.docType}`).show();
+        // 显示预览
+        const url = URL.createObjectURL(file);
+        $(`#ai-preview-img-${this.docType}`).attr('src', url);
+        $(`#ai-preview-${this.docType}`).show();
 
-            // 压缩图片
-            const base64 = await this._compressImage(file);
-
-            // 调用识别
-            await this._recognize(base64);
-        } catch (err) {
-            this._showError(err.message || '处理图片失败');
-        }
+        // 压缩后识别
+        const self = this;
+        this._compressImage(file).then(function(base64) {
+            self._recognize(base64);
+        }).catch(function(err) {
+            self.showError(err.message || '处理图片失败');
+        });
     }
 
-    /**
-     * 压缩图片
-     */
     _compressImage(file) {
-        return new Promise((resolve, reject) => {
+        const self = this;
+        return new Promise(function(resolve, reject) {
             const reader = new FileReader();
-            reader.onload = (e) => {
+            reader.onload = function(e) {
                 const img = new Image();
-                img.onload = () => {
+                img.onload = function() {
                     const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
-
-                    // 缩放
-                    if (width > this.maxWidth) {
-                        height = Math.round(height * this.maxWidth / width);
-                        width = this.maxWidth;
+                    let w = img.width, h = img.height;
+                    if (w > self.maxWidth) {
+                        h = Math.round(h * self.maxWidth / w);
+                        w = self.maxWidth;
                     }
+                    canvas.width = w;
+                    canvas.height = h;
+                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
 
-                    canvas.width = width;
-                    canvas.height = height;
-
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-
-                    // 转为 base64
-                    let quality = this.quality;
-                    let result = canvas.toDataURL('image/jpeg', quality);
-
-                    // 如果还是太大，继续压缩
-                    while (result.length > this.maxSizeKB * 1024 * 4 / 3 && quality > 0.3) {
-                        quality -= 0.1;
-                        result = canvas.toDataURL('image/jpeg', quality);
+                    let q = self.quality;
+                    let result = canvas.toDataURL('image/jpeg', q);
+                    while (result.length > self.maxSizeKB * 1024 * 4 / 3 && q > 0.3) {
+                        q -= 0.1;
+                        result = canvas.toDataURL('image/jpeg', q);
                     }
-
                     resolve(result);
                 };
-                img.onerror = () => reject(new Error('加载图片失败'));
+                img.onerror = function() { reject(new Error('加载图片失败')); };
                 img.src = e.target.result;
             };
-            reader.onerror = () => reject(new Error('读取文件失败'));
+            reader.onerror = function() { reject(new Error('读取文件失败')); };
             reader.readAsDataURL(file);
         });
     }
 
-    /**
-     * 调用 AI 识别 API
-     */
     async _recognize(imageBase64) {
-        this._setLoading(true);
+        const dt = this.docType;
+        this.isLoading = true;
+        $(`#ai-loading-${dt}`).show();
+        $(`#ai-error-${dt}`).hide();
 
         try {
-            const formData = new FormData();
-            formData.append('image_base64', imageBase64);
-            formData.append('doc_type', this.docType);
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const body = new FormData();
+            body.append('image_base64', imageBase64);
+            body.append('doc_type', dt);
 
-            // 获取 CSRF token
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-
-            const response = await fetch('/api/ai/recognize', {
+            const resp = await fetch('/api/ai/recognize', {
                 method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRFToken': csrfToken,
-                },
+                body: body,
+                headers: { 'X-CSRFToken': csrf }
             });
 
-            const result = await response.json();
+            const result = await resp.json();
 
             if (result.success) {
-                this._showConfirmDialog(result.data);
+                this._showConfirm(result.data);
             } else {
-                this._showError(result.message || '识别失败');
+                this.showError(result.message || '识别失败');
             }
         } catch (err) {
-            if (err.name === 'TypeError' && err.message.includes('fetch')) {
-                this._showError('网络错误，请检查网络连接');
-            } else {
-                this._showError(err.message || '识别失败，请重试');
-            }
+            this.showError(err.message || '网络错误，请重试');
         } finally {
-            this._setLoading(false);
+            this.isLoading = false;
+            $(`#ai-loading-${dt}`).hide();
         }
     }
 
-    /**
-     * 显示确认对话框
-     */
-    _showConfirmDialog(data) {
+    _showConfirm(data) {
+        const dt = this.docType;
+        const self = this;
         const summary = this._buildSummary(data);
-        const modalId = 'ai-confirm-modal-' + this.docType;
+        const modalId = 'ai-modal-' + dt;
 
-        // 移除旧的模态框
-        $(`#${modalId}`).remove();
+        $('#' + modalId).remove();
 
-        const modalHtml = `
+        $('body').append(`
             <div class="modal fade" id="${modalId}" tabindex="-1">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">
-                                <i class="bi bi-robot"></i> AI 识别结果
-                            </h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="alert alert-info">
-                                <i class="bi bi-info-circle"></i> 请确认以下识别结果，确认后将自动填写表单。
-                            </div>
-                            <div id="ai-result-summary-${this.docType}">
-                                ${summary}
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                            <button type="button" class="btn btn-primary" id="ai-confirm-btn-${this.docType}">
-                                <i class="bi bi-check-circle"></i> 确认填写
-                            </button>
-                        </div>
-                    </div>
+              <div class="modal-dialog">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-robot"></i> AI 识别结果</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body">
+                    <div class="alert alert-info"><i class="bi bi-info-circle"></i> 请确认识别结果，确认后自动填写表单。</div>
+                    ${summary}
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="ai-confirm-${dt}">
+                      <i class="bi bi-check-circle"></i> 确认填写
+                    </button>
+                  </div>
                 </div>
+              </div>
             </div>
-        `;
-
-        $('body').append(modalHtml);
+        `);
 
         const modal = new bootstrap.Modal(document.getElementById(modalId));
         modal.show();
 
-        // 确认按钮
-        $(`#ai-confirm-btn-${this.docType}`).on('click', () => {
+        $(`#ai-confirm-${dt}`).on('click', function() {
             modal.hide();
-            this.onResult(data);
-            this._clear();
+            self.onResult(data);
+            self.clear();
         });
 
-        // 模态框关闭后清理
-        $(`#${modalId}`).on('hidden.bs.modal', function() {
-            $(this).remove();
-        });
+        $(`#${modalId}`).on('hidden.bs.modal', function() { $(this).remove(); });
     }
 
-    /**
-     * 构建识别结果摘要
-     */
     _buildSummary(data) {
-        let html = '<div class="table-responsive"><table class="table table-sm table-bordered">';
-
-        // 根据单据类型显示不同字段
-        const fieldMap = {
-            purchase: [
-                ['supplier_name', '供应商'],
-                ['order_date', '订单日期'],
-            ],
-            sales: [
-                ['customer_name', '客户'],
-                ['order_date', '订单日期'],
-            ],
-            stock_in: [
-                ['receipt_date', '入库日期'],
-            ],
-            stock_out: [
-                ['delivery_date', '出库日期'],
-            ],
-            receipt: [
-                ['amount', '金额'],
-                ['receipt_date', '收款日期'],
-                ['payment_method', '支付方式'],
-            ],
-            payment: [
-                ['amount', '金额'],
-                ['payment_date', '付款日期'],
-                ['payment_method', '支付方式'],
-            ],
-            expense: [
-                ['category', '费用类别'],
-                ['amount', '金额'],
-                ['expense_date', '费用日期'],
-                ['payee', '收款方'],
-            ],
-            return: [
-                ['return_date', '退货日期'],
-            ],
+        let h = '<table class="table table-sm table-bordered">';
+        const fields = {
+            purchase: [['supplier_name','供应商'],['order_date','订单日期']],
+            sales: [['customer_name','客户'],['order_date','订单日期']],
+            stock_in: [['receipt_date','入库日期']],
+            stock_out: [['delivery_date','出库日期']],
+            receipt: [['amount','金额'],['receipt_date','收款日期'],['payment_method','支付方式']],
+            payment: [['amount','金额'],['payment_date','付款日期'],['payment_method','支付方式']],
+            expense: [['category','费用类别'],['amount','金额'],['expense_date','费用日期'],['payee','收款方']],
+            return: [['return_date','退货日期']]
         };
 
-        const fields = fieldMap[this.docType] || [];
-        for (const [key, label] of fields) {
-            if (data[key] != null) {
-                html += `<tr><th style="width: 30%">${label}</th><td>${data[key]}</td></tr>`;
-            }
+        for (const [k, l] of (fields[this.docType] || [])) {
+            if (data[k] != null) h += `<tr><th style="width:30%">${l}</th><td>${data[k]}</td></tr>`;
         }
 
-        // 商品明细
         if (data.items && data.items.length > 0) {
-            html += `<tr><th>商品明细</th><td>`;
-            html += `<table class="table table-sm mb-0">`;
-            html += `<thead><tr><th>名称</th><th>数量</th><th>单价</th></tr></thead><tbody>`;
-            for (const item of data.items) {
-                html += `<tr>
-                    <td>${item.name || '-'}</td>
-                    <td>${item.quantity || '-'}</td>
-                    <td>${item.unit_price || '-'}</td>
-                </tr>`;
+            h += '<tr><th>商品</th><td><table class="table table-sm mb-0"><thead><tr><th>名称</th><th>数量</th><th>单价</th></tr></thead><tbody>';
+            for (const i of data.items) {
+                h += `<tr><td>${i.name||'-'}</td><td>${i.quantity||'-'}</td><td>${i.unit_price||'-'}</td></tr>`;
             }
-            html += `</tbody></table></td></tr>`;
+            h += '</tbody></table></td></tr>';
         }
 
-        // 备注
-        if (data.notes) {
-            html += `<tr><th>备注</th><td>${data.notes}</td></tr>`;
-        }
-
-        html += '</table></div>';
-        return html;
+        if (data.notes) h += `<tr><th>备注</th><td>${data.notes}</td></tr>`;
+        return h + '</table>';
     }
 
-    /**
-     * 设置加载状态
-     */
-    _setLoading(loading) {
-        this.isLoading = loading;
-        if (loading) {
-            $(`#ai-loading-${this.docType}`).show();
-            $(`#ai-camera-btn-${this.docType}`).prop('disabled', true);
-            $(`#ai-file-btn-${this.docType}`).prop('disabled', true);
-        } else {
-            $(`#ai-loading-${this.docType}`).hide();
-            $(`#ai-camera-btn-${this.docType}`).prop('disabled', false);
-            $(`#ai-file-btn-${this.docType}`).prop('disabled', false);
-        }
-    }
-
-    /**
-     * 显示错误提示
-     */
-    _showError(message) {
-        const errorId = 'ai-error-' + this.docType;
-        $(`#${errorId}`).remove();
-
-        const html = `
-            <div id="${errorId}" class="alert alert-danger alert-dismissible fade show mt-2" role="alert">
-                <i class="bi bi-exclamation-triangle"></i> ${message}
+    showError(msg) {
+        const dt = this.docType;
+        $(`#ai-error-${dt}`).html(
+            `<div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> ${msg}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        `;
-        this.container.append(html);
-
-        // 3秒后自动消失
-        setTimeout(() => {
-            $(`#${errorId}`).fadeOut(function() {
-                $(this).remove();
-            });
-        }, 5000);
+            </div>`
+        ).show();
+        setTimeout(function() { $(`#ai-error-${dt}`).fadeOut(); }, 5000);
     }
 
-    /**
-     * 清除预览和状态
-     */
-    _clear() {
-        $(`#ai-preview-${this.docType}`).hide();
-        $(`#ai-preview-img-${this.docType}`).attr('src', '');
-        $(`#ai-camera-input-${this.docType}`).val('');
-        $(`#ai-file-input-${this.docType}`).val('');
+    clear() {
+        const dt = this.docType;
+        $(`#ai-preview-${dt}`).hide();
+        $(`#ai-preview-img-${dt}`).attr('src', '');
+        $(`#ai-camera-${dt}`).val('');
+        $(`#ai-file-${dt}`).val('');
     }
 }
 
-// 导出到全局
 window.AIRecognize = AIRecognize;
